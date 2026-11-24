@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mécanique Lebec — en équipe</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:,">
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="loading">Chargement…</div>
+
+<!-- ================= HUD ================= -->
+<div id="hud" class="hidden">
+  <div id="tl" class="box">
+    <div id="clock">07:00</div>
+    <div class="row">Score d'équipe <b id="score">0</b></div>
+    <div class="gauge"><span>Satisfaction client</span><div class="bar"><i id="sat"></i></div></div>
+    <div class="row"><span class="dim">Trouvailles cachées</span><b id="finds">★ 0/6</b></div>
+  </div>
+  <div id="tickets"></div>
+  <div id="tr"><canvas id="minimap" width="180" height="196"></canvas><div id="team" class="box"></div></div>
+  <div id="crosshair"></div>
+  <div id="prompt"></div>
+  <div id="subtitle"></div>
+  <div id="notifs"></div>
+  <div id="drive" class="box hidden"></div>
+  <div class="stam"><i id="stamina"></i></div>
+  <div id="inventory"></div>
+  <div id="big"></div>
+  <div id="flash"></div>
+  <div id="hostlost" class="hidden">⚠ L'hôte ne répond plus… (attente)</div>
+  <div class="hint">Tab : aide · M : son</div>
+</div>
+
+<!-- ================= Dialogue ================= -->
+<div id="dialogue" class="hidden"><div class="speaker"></div><div class="text"></div><div class="timer"><i></i></div><div class="options"></div></div>
+
+<!-- ================= Aide ================= -->
+<div id="help" class="overlay hidden"><div class="card wide">
+  <h2>Comment ça marche ?</h2>
+  <ol class="how">
+    <li><b>Un ticket arrive</b> en haut de l'écran : pièce, matière, machine, outil et étapes.</li>
+    <li><b>Prends le brut</b> de la bonne matière aux racks (fond de l'atelier) et donne-le à une machine du bon type (Tour / Fraiseuse) : <b>E</b> sur l'opérateur ou la machine.</li>
+    <li><b>Prends l'outil</b> demandé dans l'armoire rouge et donne-le à la même machine. Elle usine toute seule… si l'opérateur bosse !</li>
+    <li>La <b>caisse</b> sort en zone EXPÉDITION (verte). Charge-la dans la benne d'une voiture, file chez le client, reprends-la et <b>livre-la</b> (E sur le client).</li>
+    <li>Étapes spéciales : 🔥 <b>Fonderie</b> / ⚙️ <b>Chaudronnerie</b> (va commander le brut chez eux, il apparaît sur leur quai), ♨️ <b>Traitement thermique</b> (apporte la caisse usinée à TTH Ouest avant de livrer).</li>
+    <li><b>Stock vide ?</b> Matière chez Eliott (Aciers de l'Ouest, il parle très vite), outils chez Coco (Outi'Pro). Dépose les caisses en RÉCEPTION (zone bleue).</li>
+  </ol>
+  <p><b>Équipe :</b> passe un objet à un coéquipier (E sur lui). Une claque (clic gauche) réveille un opérateur en pause… ou fait lâcher ce que tient un coéquipier. Si Lebec te voit frapper : <b>COUP DE PELLE</b>.</p>
+  <p><b>Trouvailles :</b> 6 objets brillants sont cachés derrière les bâtiments de la ville. Bonus pour toute l'équipe.</p>
+  <div class="keys"><kbd>ZQSD</kbd> bouger · <kbd>Maj</kbd> courir · <kbd>Espace</kbd> sauter · <kbd>E</kbd> interagir · <kbd>G</kbd> poser · <kbd>Clic D</kbd> lancer · <kbd>1-3</kbd> / molette : main · <kbd>V</kbd> vue voiture · <kbd>H</kbd> klaxon</div>
+  <p class="dim">Tab pour fermer</p>
+</div></div>
+
+<div id="end" class="overlay hidden"><div id="endcard" class="card"></div></div>
+<div id="pause" class="overlay hidden"><div class="card"><h2>Pause</h2><p>Clique pour reprendre.</p><p class="dim">En multijoueur, la partie continue pour les autres !</p></div></div>
+
+<!-- ================= Menus ================= -->
+<div id="lobby" class="overlay">
+  <div id="scr-home" class="card wide">
+    <h1>MÉCANIQUE LEBEC</h1>
+    <h3>Usinage en équipe — jusqu'à 5 joueurs</h3>
+    <p class="pitch">Des tickets tombent, des opérateurs flemmardent, Eliott parle trop vite et Lebec a une pelle. Fabriquez, transportez, livrez… ensemble.</p>
+    <div class="form">
+      <label>Pseudo <input id="in-name" maxlength="16" placeholder="Ton pseudo"></label>
+      <label id="server-row">Serveur <input id="in-server" placeholder="ws://localhost:8080"></label>
+    </div>
+    <div class="actions">
+      <button id="btn-solo" class="sec">Jouer en solo</button>
+      <button id="btn-create">Créer un salon</button>
+      <label class="chk"><input type="checkbox" id="in-priv"> privé</label>
+    </div>
+    <div class="actions">
+      <input id="in-code" maxlength="4" placeholder="CODE" class="code">
+      <button id="btn-join">Rejoindre</button>
+      <button id="btn-list" class="sec">Salons ouverts</button>
+    </div>
+    <div id="room-list"></div>
+    <p id="status" class="dim"></p>
+    <ol class="how small">
+      <li>Prends les tickets en haut de l'écran.</li><li>Brut (racks) + outil (armoire rouge) → la bonne machine.</li>
+      <li>Caisse finie → benne de la Mégane → client.</li><li>Fonderie, chaudronnerie, traitement thermique : certains tickets passent chez les sous-traitants.</li>
+    </ol>
+  </div>
+  <div id="scr-room" class="card hidden">
+    <h2>Salon <span id="room-code" class="code big"></span> <button id="btn-copy" class="sec tiny">copier</button></h2>
+    <p class="dim">Donne ce code à tes amis : ils cliquent « Rejoindre » avec ce code.</p>
+    <div id="room-players"></div>
+    <div class="actions"><button id="btn-start">LANCER LA JOURNÉE</button><span id="room-wait" class="dim"></span></div>
+    <div class="actions"><button id="btn-leave" class="sec">Quitter le salon</button></div>
+  </div>
+</div>
+<div id="toasts"></div>
+
+<!-- Three.js r128 + chargeur glTF (copies locales : marche hors ligne et en double-clic) -->
+<script src="lib/three.min.js"></script>
+<script src="lib/GLTFLoader.js"></script>
+<script src="assets-ville.js"></script>   <!-- décors KayKit en base64 -->
+<script src="js/config.js"></script>      <!-- réglages, persos, entreprises, pièces -->
+<script src="js/util.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/assets.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/net.js"></script>         <!-- client WebSocket -->
+<script src="js/items.js"></script>
+<script src="js/people.js"></script>
+<script src="js/world.js"></script>
+<script src="js/cars.js"></script>
+<script src="js/rules.js"></script>       <!-- textes des actions [E] (client) -->
+<script src="js/sim.js"></script>         <!-- simulation de l'hôte -->
+<script src="js/dialogue.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/game.js"></script>        <!-- session : joueur local + synchro -->
+<script src="js/lobby.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

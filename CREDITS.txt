@@ -1,0 +1,5 @@
+Décors de ville : KayKit City Builder Bits — Kay Lousberg (kaylousberg.com), licence CC0.
+  Extraits de assets-data.js (projet Backrooms) par outils/extraire-assets-ville.js.
+Moteur 3D : three.js r128 (licence MIT, voir lib/THREE-LICENSE.txt) + GLTFLoader.
+Bibliothèque serveur : ws (licence MIT).
+Tout le reste (code, textures dessinées par code, sons synthétisés) : fait pour ce projet.

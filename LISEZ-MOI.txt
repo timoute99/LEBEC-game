@@ -1,0 +1,47 @@
+MÉCANIQUE LEBEC — usinage en équipe (V1 multijoueur, 1 à 5 joueurs)
+=====================================================================
+
+JOUER TOUT SEUL
+  Double-clic sur JOUER.bat (ou sur index.html) → pseudo → « Jouer en solo ».
+
+JOUER À PLUSIEURS EN LOCAL (même PC ou même réseau)
+  1. Installer Node.js (https://nodejs.org, version 18 ou plus) une seule fois.
+  2. Double-clic sur SERVEUR-LOCAL.bat : il installe la bibliothèque "ws" puis lance
+     le serveur, et ouvre http://localhost:8080/
+  3. Pour tester seul à plusieurs : ouvrir un 2e onglet sur http://localhost:8080/
+  4. Un joueur clique « Créer un salon » et donne le CODE (4 lettres) aux autres,
+     qui cliquent « Rejoindre ». L'hôte (le créateur) lance la journée.
+  Sur le même réseau Wi-Fi, les amis ouvrent http://IP-DU-PC:8080/ (ipconfig pour l'IP).
+
+METTRE LE SERVEUR EN LIGNE (Render, gratuit) — pour jouer avec des amis à distance
+  1. Mettre TOUT le dossier dans un dépôt GitHub (sans server/node_modules).
+  2. Sur render.com : New → Web Service → relier le dépôt.
+       Build Command : cd server && npm install
+       Start Command : node server/server.js
+  3. Render donne une adresse https://xxxx.onrender.com
+     → c'est directement le jeu ! Les amis ouvrent ce lien, c'est tout.
+     (Si quelqu'un joue avec index.html en double-clic : mettre wss://xxxx.onrender.com
+      dans le champ « Serveur » du menu.)
+  4. Render gratuit s'endort après ~15 min sans joueur : la 1re connexion peut prendre
+     jusqu'à 1 min (le jeu affiche « Réveil du serveur… » et patiente tout seul).
+  Note : c'est un serveur séparé de backrooms-relay (le protocole est différent).
+
+BUT DU JEU
+  Des tickets arrivent en haut de l'écran. Pour chacun :
+  brut (racks au fond de l'atelier) + outil (armoire rouge) → la bonne machine →
+  la caisse sort en EXPÉDITION → benne d'une voiture → livrer au client.
+  Certains tickets passent par la Fonderie, la Chaudronnerie ou le Traitement thermique.
+  Stock vide : matière chez Eliott (Aciers de l'Ouest), outils chez Coco (Outi'Pro),
+  puis déposer les caisses en RÉCEPTION (zone bleue).
+  6 trouvailles sont cachées derrière les bâtiments de la ville : bonus d'équipe.
+  Tab en jeu : aide complète.
+
+TOUCHES
+  ZQSD bouger · Souris regarder · Maj courir · Espace sauter / frein à main
+  E interagir (prendre, donner, conduire, livrer, passer un objet à un coéquipier)
+  Clic gauche : claque (réveille un opérateur… ou fait lâcher l'objet d'un coéquipier)
+  Clic droit : lancer l'objet tenu · G : poser · 1-3 ou molette : main
+  V : vue voiture · H : klaxon · M : son · Tab : aide
+
+ATTENTION À LEBEC : s'il voit quelqu'un frapper dans l'atelier, sa colère monte.
+À 50 : il poursuit le coupable. COUP DE PELLE = assommé 3 s et tout lâché.
