@@ -16,11 +16,13 @@
     ML.colliders.length = 0; W.targets = []; W.machines = {}; W.radars = []; W.lights = []; W.lampHeads = null;
     ML.mapRects = []; W.up = upgrades || {}; W.owned = mach || ML.MACHINES.map(m => m.id); W.partCars = [];
     rng = U.rng(seed ^ 0x5bd1e995);
+    ML.Decor.begin(seed, root);                                     // détails graphiques fusionnés (decor.js)
     const city = W.city = ML.CityGen.generate(seed);
     ML.LOC = { comp: city.companies, hides: city.hides.slice(), perches: city.perches, radars: city.radars };
-    W.ground(city); W.atelier(); W.furniture(); W.machinesBuild();
+    W.ground(city); W.atelier(); W.furniture(); ML.Decor.atelier(); W.machinesBuild();
     for (const k in city.companies) W.company(k, ML.COMPANIES[k], city.companies[k]);
     W.decor(city); W.bounds();
+    ML.Decor.end();
     ML.LOC.hides = ML.LOC.hides.filter(h => !U.inCollider(h.x, h.z, 0.5));
   };
   const add = o => { root.add(o); return o; };
@@ -66,7 +68,6 @@
     U.cyl(0.45, 0.45, 10, 0x7f8c8d, 0, 4.3, 14.15, root).rotation.z = Math.PI / 2;
     U.box(40.8, 0.3, 28.8, T.mat('tole', 8, 6, 0x7f8c8d), 0, 7.15, 0, root);
     U.box(40.9, 0.8, 0.1, 0x24457a, 0, 6.3, 14.25, root);
-    const sign = U.label('MÉCANIQUE LEBEC — Usinage de précision', { size: 1.1, color: '#ffd257', bg: 'rgba(20,30,60,0.92)' }); sign.position.set(0, 8.3, 14.6); add(sign);
     W.neonMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xdddddd });
     for (let x = -14; x <= 14; x += 7) for (const z of [-8, 0, 8]) U.box(2.6, 0.08, 0.3, W.neonMat, x, 6.9, z, root, false);
     W.inLights = [new THREE.PointLight(0xfff4e0, 0.35, 34), new THREE.PointLight(0xfff4e0, 0.25, 30)];
@@ -191,6 +192,7 @@
       const front = def.type === 'fraiseuse' ? def.z - 1.3 : def.z + 0.9;
       W.targets.push({ id: 'mach:' + def.id, x: def.x + (def.type === 'fraiseuse' ? 0.6 : 0.9), y: 1.2, z: front, r: 2.6 });
       W.targets.push({ id: 'bac:' + def.id, x: m.chips.x, y: 0.5, z: m.chips.z, r: 1.9 });
+      ML.Decor.machine(m, def, g);
       W.machines[def.id] = m;
       if (fresh) { const nl = U.label('★ NEUVE !', { size: 0.4, color: '#ffd257' }); nl.position.set(0, 4.4, 0); g.add(nl); setTimeout(() => g.remove(nl), 60000); }
     }
@@ -300,6 +302,7 @@
         break;
       }
     }
+    ML.Decor.company(key, C, P);
   };
 
   /* ---------- Décor de ville ---------- */
@@ -312,8 +315,10 @@
   }
   W.decor = city => {
     for (const f of city.fillers) {
-      const b = place(f.model, 7.5, f.x, f.z, f.rot * Math.PI / 2, false);
-      if (!b) U.box(14, 12, 14, T.mat('brique', 3, 3, 0xf6e58d), f.x, 6, f.z, root);
+      if (!ML.Decor.building(f)) {                                  // maison / boutique / immeuble à balcons… ou modèle KayKit
+        const b = place(f.model, 7.5, f.x, f.z, f.rot * Math.PI / 2, false);
+        if (!b) U.box(14, 12, 14, T.mat('brique', 3, 3, 0xf6e58d), f.x, 6, f.z, root);
+      }
       U.boxCollider(f.x, f.z, 15, 15, 'city'); ML.mapRects.push({ x: f.x, z: f.z, w: 15, d: 15, c: '#8e7f74' });
     }
     for (const c of city.parked) place(c.model, 4.6, c.x, c.z, c.ry, 'small', 0.33);
@@ -342,11 +347,13 @@
       U.boxCollider(x, z, 0.4, 0.4, 'feu'); W.lights.push({ node: ni, red, green });
     }
     // arbres (instanciés : beaucoup d'arbres pour peu d'appels de dessin)
-    const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.22, 0.3, 2.2, 6), U.mat(0x6d4c41), city.trees.length);
-    const leaves = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.3, 0), new THREE.MeshLambertMaterial({ color: 0xffffff }), city.trees.length * 3);
+    const pines = city.trees.filter(t => t.c === 3), round = city.trees.filter(t => t.c !== 3);   // un arbre sur quatre devient un sapin
+    for (const t of pines) U.boxCollider(t.x, t.z, 0.6, 0.6, 'tree');
+    const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.22, 0.3, 2.2, 6), U.mat(0x6d4c41), round.length);
+    const leaves = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.3, 0), new THREE.MeshLambertMaterial({ color: 0xffffff }), round.length * 3);
     const cols = [0x2d6a4f, 0x40916c, 0x52b788, 0x588157].map(c => new THREE.Color(c));
     trunks.castShadow = leaves.castShadow = true;
-    city.trees.forEach((t, i) => {
+    round.forEach((t, i) => {
       o.position.set(t.x, 1.1, t.z); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); o.updateMatrix(); trunks.setMatrixAt(i, o.matrix);
       for (let k = 0; k < 3; k++) {
         const s = t.k - k * 0.22; o.position.set(t.x + (k - 1) * 0.3, 2.4 + k * 1.05 * t.k, t.z + (1 - k) * 0.25); o.scale.set(s, s, s); o.rotation.set(0, k, 0); o.updateMatrix();
@@ -356,6 +363,7 @@
     });
     add(trunks); add(leaves);
     for (const b of city.bushes) place('city_bush', b.s, b.x, b.z, b.ry, false);
+    ML.Decor.streets(city); ML.Decor.nature(city, pines);
   };
 
   W.bounds = () => {
@@ -363,6 +371,6 @@
     U.addCollider(M.minX - 30, M.minX, M.minZ - 40, M.maxZ + 40, 'bound'); U.addCollider(M.maxX, M.maxX + 30, M.minZ - 40, M.maxZ + 40, 'bound');
     U.addCollider(M.minX - 30, M.maxX + 30, M.minZ - 40, M.minZ, 'bound'); U.addCollider(M.minX - 30, M.maxX + 30, M.maxZ, M.maxZ + 40, 'bound');
   };
-  W.setDaylight = k => { if (W.lampMat) W.lampMat.emissive.setHex(k < 0.6 ? 0xffd27a : 0x000000); };
+  W.setDaylight = k => { if (W.lampMat) W.lampMat.emissive.setHex(k < 0.6 ? 0xffd27a : 0x000000); ML.Decor.setNight(k); };
   W.target = id => W.targets.find(t => t.id === id);
 })();
