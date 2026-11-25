@@ -18,7 +18,10 @@
     window.addEventListener('keydown', e => {
       if (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
       if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
-      if (!e.repeat) I._p[e.code] = true;
+      if (!e.repeat) {
+        I._p[e.code] = true;
+        if (e.key && /^[a-z]$/i.test(e.key)) I._p['Key' + e.key.toUpperCase()] = true;   // AZERTY : la lettre affichée compte aussi
+      }
       I.keys[e.code] = true; I.padActive = false;
     });
     window.addEventListener('keyup', e => { I.keys[e.code] = false; });

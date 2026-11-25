@@ -39,12 +39,12 @@
   F.ping = (x, z, name, color) => {
     if (!F.root) return;
     const g = new THREE.Group(); g.position.set(x, 0, z);
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 14, 8, 1, true), new THREE.MeshBasicMaterial({ color: color || 0xffd257, transparent: true, opacity: 0.55, depthWrite: false }));
-    beam.position.y = 7; g.add(beam);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.9, 20), new THREE.MeshBasicMaterial({ color: color || 0xffd257, side: THREE.DoubleSide, transparent: true, opacity: 0.8 }));
-    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; g.add(ring);
-    const l = U.label('📍 ' + name + ' : viens ici !', { size: 0.5, color: '#ffd257', depthTest: false }); l.position.y = 3; g.add(l);
-    F.root.add(g); F.pings.push({ g, t: 6, ring });
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 40, 10, 1, true), new THREE.MeshBasicMaterial({ color: color || 0xffd257, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    beam.position.y = 20; beam.renderOrder = 3; g.add(beam);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.5, 24), new THREE.MeshBasicMaterial({ color: color || 0xffd257, side: THREE.DoubleSide, transparent: true, opacity: 0.9, fog: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.08; g.add(ring);
+    const l = U.label('📍 ' + name + ' : viens ici !', { size: 0.9, color: '#ffd257', bg: 'rgba(0,0,0,0.75)', depthTest: false }); l.position.y = 4; l.renderOrder = 4; g.add(l);
+    F.root.add(g); F.pings.push({ g, t: 12, ring });
   };
 
   /* ---------- Chien de la casse ---------- */
@@ -152,7 +152,7 @@
       if (p.m.position.y < 0.05) { p.m.position.y = 0.05; p.v.set(0, 0, 0); }
       if (p.t <= 0) { F.root.remove(p.m); F.parts.splice(F.parts.indexOf(p), 1); }
     }
-    for (const p of F.pings.slice()) { p.t -= dt; p.ring.scale.setScalar(1 + (6 - p.t) % 1); if (p.t <= 0) { F.root.remove(p.g); F.pings.splice(F.pings.indexOf(p), 1); } }
+    for (const p of F.pings.slice()) { p.t -= dt; p.ring.scale.setScalar(1 + (12 - p.t) % 1); if (p.t <= 0) { F.root.remove(p.g); F.pings.splice(F.pings.indexOf(p), 1); } }
     if (F.pigeon) {
       const P = F.pigeon, d = P.userData, k = Math.min(1, dt * 10), ox = P.position.x, oz = P.position.z;
       P.position.lerp(d.t, k);

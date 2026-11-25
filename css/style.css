@@ -111,7 +111,7 @@ input { background: #1d2230; color: #fff; border: 1px solid #556; border-radius:
 .toast { background: rgba(20,22,32,.95); border: 1px solid #ffd257; padding: 8px 16px; border-radius: 8px; font-size: 14px; }
 
 /* ===================== v2 ===================== */
-#evbar { position: absolute; top: 168px; left: 232px; right: 210px; display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; pointer-events: none; }
+#evbar { position: absolute; left: 10px; bottom: 380px; width: 400px; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 4px; pointer-events: none; }   /* V4.1 : délais et événements en bas à gauche */
 #evbar .ev { background: rgba(120, 60, 0, .82); border: 1px solid #ffb347; border-radius: 14px; padding: 3px 10px; font-size: 12px; animation: evp 1.6s infinite; }
 #evbar .ev.hot { background: rgba(160, 30, 10, .88); border-color: #ff7a1a; }
 #evbar .ev.rule { background: rgba(70, 30, 110, .9); border-color: #c39bff; animation: none; font-size: 13px; }

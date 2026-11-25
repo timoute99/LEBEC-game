@@ -175,7 +175,13 @@
       case 'stat': if (e.to === G.me) ML.Account.stat(e.k, e.n); break;
       case 'secret': if (e.to === G.me) { G.traitor = true; ML.HUD.secret(e.s); ML.HUD.big('🕵 TU ES LE TRAÎTRE', '#c39bff'); } break;
       case 'emote': { if (e.pid === G.me) ML.HUD.notify('Tu fais : ' + ML.EMOTES[e.n]); else if (G.avatars[e.pid]) { ML.People.emote(G.avatars[e.pid], ML.EMOTES[e.n]); ML.Sfx.play('emote', 0.6); } break; }
-      case 'ping': { const P = G.players[e.pid]; ML.Fx.ping(e.x, e.z, P ? P.name : '?', P ? ML.COLORS[P.idx % 6].hex : 0xffd257); ML.Sfx.play('bip'); break; }
+      case 'ping': {
+        const P = G.players[e.pid], nm = e.pid === G.me ? 'Toi' : P ? P.name : '?';
+        ML.Fx.ping(e.x, e.z, nm, P ? ML.COLORS[P.idx % 6].hex : 0xffd257); ML.Sfx.play('bip');
+        const me = G.p.car !== null && ML.Cars.list[G.p.car] ? ML.Cars.list[G.p.car].pos : G.p.pos, d = Math.round(Math.hypot(e.x - me.x, e.z - me.z));
+        ML.HUD.notify(e.pid === G.me ? `📍 Ping posé (${d} m) : tout le monde le voit.` : `📍 ${nm} : « Viens ici ! » (à ${d} m, regarde la colonne de lumière)`, 'info');
+        break;
+      }
       case 'horn': ML.Sfx.horn(e.k, e.pid === G.me ? undefined : e.x, e.z); break;
       case 'flash': {
         const r = ML.World.radars[e.r]; if (r) r.flash = 0.4;
@@ -247,7 +253,7 @@
     if (p.stun > 0) p.stun -= dt;
     if (p.punchT > 0) p.punchT -= dt;
     G.fxNow = null;
-    const can = !ML.ui.modal && p.stun <= 0 && I.active() && !G.ended;
+    const can = !ML.ui.modal && p.stun <= 0 && I.active() && !G.ended, modal0 = ML.ui.modal;   // modal0 : fenêtre ouverte AVANT cette image (sinon M / Tab ouvrent et referment aussitôt)
     if (I.pressed('Escape') && !ML.ui.modal && !I.active() && !G.ended) ML.HUD.showPause(true);    // 2e Échap hors du PC : vraie pause
     if (can) {
       if (I.pressed('KeyK')) ML.HUD.notify(ML.Sfx.toggleMute() ? '🔇 Son coupé' : '🔊 Son activé');
@@ -258,10 +264,10 @@
       if (I.wheel) p.sel = (p.sel + (I.wheel > 0 ? 1 : -1) + 3) % 3;
       if (I.pressed('KeyT')) G.ping();
     }
-    if (ML.ui.modal === 'dialogue') { for (let i = 1; i <= 9; i++) if (I.pressed('Digit' + i) || I.pressed('Numpad' + i)) { ML.Dialogue.pick(i - 1); break; } if (I.pressed('Escape')) ML.Dialogue.close(); }
-    else if (ML.ui.modal === 'help' && (I.pressed('Tab') || I.pressed('Escape'))) ML.HUD.toggleHelp();
-    else if (ML.ui.modal === 'map' && (I.pressed('KeyM') || I.pressed('Escape'))) ML.HUD.toggleMap();
-    else if (ML.ui.modal === 'erp' && I.pressed('Escape')) ML.ERP.close();     // Échap : on sort du PC (sans mettre en pause)
+    if (modal0 === 'dialogue') { for (let i = 1; i <= 9; i++) if (I.pressed('Digit' + i) || I.pressed('Numpad' + i)) { ML.Dialogue.pick(i - 1); break; } if (I.pressed('Escape')) ML.Dialogue.close(); }
+    else if (modal0 === 'help' && ML.ui.modal === 'help' && (I.pressed('Tab') || I.pressed('Escape'))) ML.HUD.toggleHelp();
+    else if (modal0 === 'map' && ML.ui.modal === 'map' && (I.pressed('KeyM') || I.pressed('Escape'))) ML.HUD.toggleMap();
+    else if (modal0 === 'erp' && ML.ui.modal === 'erp' && I.pressed('Escape')) ML.ERP.close();     // Échap : on sort du PC (sans mettre en pause)
 
     // --- passager (cabine ou benne) ---
     if (p.ride) {
