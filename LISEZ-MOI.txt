@@ -1,4 +1,4 @@
-MÉCANIQUE LEBEC — usinage en équipe (V4.0, 1 à 6 joueurs)
+MÉCANIQUE LEBEC — usinage en équipe (V4.1, 1 à 6 joueurs)
 ==========================================================
 En ligne : https://lebec-game.onrender.com
 
@@ -38,6 +38,15 @@ MODES
   avec le code peut la reprendre ; l'Inspecteur vient quand l'atelier est prêt, le réussir
   termine le jeu) · Inspection (boss : règles absurdes qui changent) · Course de Mégane
   (5 manches) · Mode traître (3 joueurs minimum : un joueur payé par UsiFlash, vote à la fin).
+
+NOUVEAU EN V4.1
+  - Bouton « Installer le jeu » (Chrome / Edge) : icône sur le bureau, sa propre fenêtre.
+  - Plus de temps pour faire les pièces ; seul, les pièces rapportent plus et c'est plus calme.
+  - Café : on va beaucoup plus vite. Pigeons plus rares + abonnement Pigeon-Stop.
+  - Les caisses ne tombent qu'en percutant le décor à plus de 70 km/h ; on peut les lancer dans les bennes et le camion.
+  - Touche M : clic = repère, le trajet s'affiche comme un GPS (au sol, mini-carte, carte).
+  - Fournisseurs : panier (+ / − / supprimer), un colis arrive en réception : R pour l'ouvrir, puis ranger au rack / à l'armoire.
+  - Échap dans le PC : on sort du PC (pas de pause). Les journées s'enchaînent tant que la caisse ne passe pas sous −2 000 € (faillite).
 
 NOUVEAU EN V4
   - Tout se compte en EUROS : livrer rapporte ; matière, outils, sous-traitance, amendes

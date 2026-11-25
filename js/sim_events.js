@@ -176,7 +176,7 @@
         const lp = K.lastPos[pid], win = !lp || S.rt - lp.t >= 0.6;      // vitesse mesurée sur 0,6 s
         if (win) K.lastPos[pid] = { x: p.x, z: p.z, t: S.rt };
         if (K.foot(P) && U.inWorkshop(p)) {
-          if (S.rule === 'no_sprint' && lp && win && Math.hypot(p.x - lp.x, p.z - lp.z) / (S.rt - lp.t) > 7.3) K.violation(pid, 'no_sprint');
+          if (S.rule === 'no_sprint' && lp && win && Math.hypot(p.x - lp.x, p.z - lp.z) / (S.rt - lp.t) > 7.3 * (P.coffee > S.rt ? ML.CFG.COFFEE.mult : 1)) K.violation(pid, 'no_sprint');
           if (S.rule === 'casque' && !P.inv.some(x => x && x.type === 'casque')) { K.casqueT = K.casqueT || {}; K.casqueT[pid] = (K.casqueT[pid] || 0) + dt; if (K.casqueT[pid] > 4) { K.casqueT[pid] = 0; K.violation(pid, 'casque'); } }
         }
         if (S.rule === 'speed30' && P.car !== null && S.cars[P.car] && Math.abs(S.cars[P.car].s || 0) > 8.4) K.violation(pid, 'speed30');

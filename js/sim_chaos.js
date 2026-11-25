@@ -18,7 +18,7 @@
     if (rng() < 0.6) addPuddle(-8 + rng() * 16, -2 + rng() * 6);
     if (S.weather === 'pluie' && !S.up.isolation) for (let i = 0; i < 3; i++) addPuddle(-8 + rng() * 16, 16 + rng() * 6);
     const perch = rng.pick(ML.LOC.perches) || { x: 30, y: 6, z: 40 };
-    pg = K.pg = { x: perch.x, y: perch.y, z: perch.z, perch, state: 'perch', T: 45 + rng() * 50, path: [], carry: null, hold: 0 };
+    pg = K.pg = { x: perch.x, y: perch.y, z: perch.z, perch, state: 'perch', T: 150 + rng() * 120, path: [], carry: null, hold: 0 };
   };
 
   /* ---------- Outils ---------- */
@@ -53,7 +53,7 @@
       K.all(`🐦 ${S.pl[by] ? S.pl[by].name : 'Quelqu\'un'} a fait lâcher la plaquette au pigeon !`, 'good'); if (by) K.stat(by, 'pigeon');
       pg.carry = null;
     }
-    K.sfx('pigeon', pg.x, pg.z); flyTo(rng.pick(ML.LOC.perches) || pg.perch, 'escape'); pg.T = 60 + rng() * 50;
+    K.sfx('pigeon', pg.x, pg.z); flyTo(rng.pick(ML.LOC.perches) || pg.perch, 'escape'); pg.T = 180 + rng() * 120;
   };
   function flyTo(target, state) {
     pg.state = state; pg.target = target;
@@ -67,7 +67,10 @@
     if (pg.state === 'perch') {
       pg.T -= dt;
       if (pg.carry) { pg.hold -= dt; if (pg.hold <= 0) { pg.carry = null; K.all('🐦 Le pigeon a perdu la plaquette dans une gouttière. Adieu.', 'warn'); Sim.dirty = true; } }
-      if (pg.T <= 0 && !pg.carry && S.stock.plaquette > 0) { flyTo(CAB, 'steal'); K.sfx('pigeon', pg.x, pg.z); }
+      if (pg.T <= 0 && !pg.carry && S.stock.plaquette > 0) {
+        if (S.up.antipigeon) { pg.T = 120; return; }               // abonnement Pigeon-Stop : les filets le découragent
+        flyTo(CAB, 'steal'); K.sfx('pigeon', pg.x, pg.z);
+      }
       return;
     }
     const t = pg.path[0]; if (!t) { pg.state = 'perch'; return; }
@@ -78,7 +81,7 @@
         if (pg.state === 'steal') {
           if (S.stock.plaquette > 0) { S.stock.plaquette--; pg.carry = 'plaquette'; pg.hold = 40; K.all('🐦 Le PIGEON a volé une plaquette ! Lance-lui quelque chose (clic droit) ou souffle-le !', 'warn'); Sim.dirty = true; }
           flyTo(rng.pick(ML.LOC.perches) || pg.perch, 'escape');
-        } else { pg.state = 'perch'; pg.perch = pg.target; pg.T = 70 + rng() * 60; }
+        } else { pg.state = 'perch'; pg.perch = pg.target; pg.T = 160 + rng() * 140; }
       }
     } else { pg.x += dx / d * sp; pg.y += dy / d * sp; pg.z += dz / d * sp; }
   }

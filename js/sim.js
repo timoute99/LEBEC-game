@@ -42,8 +42,9 @@
     // niveau de l'atelier (0 → 1) : la difficulté monte avec les machines, la réputation et les jours
     const nM = Object.keys(S.machines).length;
     K.lvl = S.lvl = g.campaign ? U.clamp((nM - 2) / 4 * 0.55 + U.clamp((S.rep - 40) / 50, 0, 1) * 0.25 + U.clamp((S.day - 1) / 9, 0, 1) * 0.2, 0, 1) : 0.35;
-    const D0 = ML.DIFFS[S.diff], lv = K.lvl;
-    K.D = Object.assign({}, D0, { chaos: D0.chaos * (0.45 + 0.85 * lv), events: [Math.round(D0.events[0] * (0.4 + 0.8 * lv)), Math.max(1, Math.round(D0.events[1] * (0.5 + 0.7 * lv)))] });
+    const D0 = ML.DIFFS[S.diff], lv = K.lvl, pi = K.pi = Math.min(4, Math.max(1, cfg.players.length)) - 1;
+    // V4.1 : moins de chaos et d'événements quand on est peu nombreux
+    K.D = Object.assign({}, D0, { chaos: D0.chaos * (0.45 + 0.85 * lv) * ML.ECO.playerChaos[pi], events: [Math.max(0, Math.round(D0.events[0] * (0.4 + 0.8 * lv)) - (pi ? 0 : 1)), Math.max(1, Math.round(D0.events[1] * (0.5 + 0.7 * lv)) - (pi ? 0 : 1))] });
     S.anger = C.LEBEC.base + K.D.base;
     const roles = (g.roles || {});
     for (const p of cfg.players) S.pl[p.id] = { name: p.name, idx: p.idx, inv: [null, null, null], car: null, ride: null, stun: 0, coffee: 0, hp: C.HP.max, ko: false, role: ML.ROLES[roles[p.id]] ? roles[p.id] : 'poly' };
@@ -134,6 +135,17 @@
     if (i < 0) { note(pid, 'Inventaire plein (3 places). Pose quelque chose (G).', 'warn'); return false; }
     P.inv[i] = it; Sim.dirty = true; return true;
   };
+  /** Range dans le stock tous les produits de ce type que le joueur a en main */
+  K.store = (P, type, key) => { let n = 0; P.inv.forEach((it, i) => { if (it && it.type === type) { P.inv[i] = null; n++; } }); if (n) { S.stock[key] += n; Sim.dirty = true; } return n; };
+  /** Ouvre un colis : tout ce qu'il contient tombe par terre autour */
+  K.openColis = (c, x, z) => {
+    let n = 0;
+    for (const k in c) for (let i = 0; i < c[k]; i++, n++) {
+      const a = rng() * 6.283, r = 0.3 + rng() * 1.1;
+      K.spawnItem({ type: ML.MATERIALS[k] ? 'brut_' + k : k, d: {} }, x + Math.cos(a) * 0.2, 0.9, z + Math.sin(a) * 0.2, [Math.cos(a) * r * 2.2, 2.5 + rng() * 2, Math.sin(a) * r * 2.2]);
+    }
+    return n;
+  };
   K.dropAll = (pid, impulse) => {
     const P = S.pl[pid], p = pose[pid] || { x: 0, z: 0 };
     P.inv.forEach((it, i) => { if (it) { K.spawnItem(it, p.x + (rng() - 0.5), 0.9, p.z + (rng() - 0.5), [(rng() - 0.5) * impulse, 2 + rng() * 2, (rng() - 0.5) * impulse]); P.inv[i] = null; } });
@@ -173,7 +185,8 @@
   K.maxActive = () => Math.min(8, Object.keys(S.machines).length + Math.max(1, S.n));
   /** Prix d'une commande (avant le bonus de délai) */
   K.orderPrice = (steps, size, far, mult) => {
-    const E2 = ML.ECO.order, base = (E2.base + E2.perStep * (steps.length - 2) + (far ? E2.far : 0)) * ML.ECO.size[size || 'm'] * (0.85 + 0.3 * S.rep / 100) * (mult || 1);
+    const E2 = ML.ECO.order, pi = Math.min(4, Math.max(1, S.n)) - 1;
+    const base = (E2.base + E2.perStep * (steps.length - 2) + (far ? E2.far : 0)) * ML.ECO.size[size || 'm'] * (0.85 + 0.3 * S.rep / 100) * (mult || 1) * ML.ECO.playerPay[pi];
     return Math.round(K.points(base) / 5) * 5;
   };
   /** Nouvelle DEMANDE client : elle arrive au PC, il faut l'accepter (ou l'ERP+ le fait) */
@@ -192,7 +205,7 @@
     const big = S.owned.includes('fenwick') && S.owned.includes('camion');
     const sr = rng(); let size = kind === 'plain' ? (sr < 0.3 ? 's' : sr < 0.78 ? 'm' : 'l') : kind === 'chaudro' ? (sr < 0.5 ? 'm' : 'l') : kind === 'tth' ? (sr < 0.5 ? 's' : 'm') : 'm';
     if (size === 'l' && !big) size = 'm';
-    const dur = (C.ORDER.base + C.ORDER.perStep * (steps.length - 2) + (far ? C.ORDER.far : 0)) * (K.H.dur || 1) * K.D.dur * (1.25 - 0.35 * lv) * (size === 'l' ? 1.3 : 1);
+    const dur = (C.ORDER.base + C.ORDER.perStep * (steps.length - 2) + (far ? C.ORDER.far : 0)) * (K.H.dur || 1) * K.D.dur * (1.25 - 0.35 * lv) * (size === 'l' ? 1.3 : 1) * ML.ECO.playerTime[Math.min(4, Math.max(1, S.n)) - 1];
     const p = { id: S.nextOid++, client, part, mat, mtype, tool, steps, si: 0, size, src: kind === 'fonderie' || kind === 'chaudro' ? kind : null, dur, price: K.orderPrice(steps, size, far), exp: S.rt + ML.ECO.propLife };
     S.props.push(p); Sim.dirty = true;
     if (S.up.erp_auto && S.orders.length < K.maxActive()) { K.accept(p.id, null, true); return; }
@@ -300,7 +313,7 @@
       case 'hit': hit(pid, ps, String(m.id || '')); break;
       case 'eliott': {
         const n = npcs.eliott; if (!n.active || !near(ps, n.x, n.z, 7)) return;
-        let succ = U.clamp(m.succ | 0, 0, 3); const mat = ['acier', 'alu', 'inox'].includes(m.mat) ? m.mat : 'acier', pr = ML.SUPPLY[mat].price;
+        let succ = U.clamp(m.succ | 0, 0, 3); const mat = ['acier', 'alu', 'inox'].includes(m.mat) ? m.mat : 'acier', pr = ML.SUPPLY[mat].price * 3;
         succ = Math.min(succ, Math.max(0, Math.floor(S.money / pr)));
         if (succ) K.money(-pr * succ, 'achat');
         for (let i = 0; i < succ; i++) { const [x, z] = K.dockSpot('aciers'); K.spawnItem({ type: 'matiere', d: { mat, q: 3 } }, x, 0, z); }
@@ -317,6 +330,15 @@
         say(n, comp === 'fonderie' ? `Je coule le brut de la #${o.id}. Repasse dans ${C.SUB_SEC} s !` : U.pick(ML.LINES.nono));
         break;
       }
+      case 'open': {                                         // ouvrir un colis (en main ou par terre)
+        let c = null, x = ps.x - Math.sin(ps.yaw) * 1, z = ps.z - Math.cos(ps.yaw) * 1;
+        if (m.id) { const o = S.items.find(i => i.id === +m.id && i.type === 'colis'); if (!o || !near(ps, o.x, o.z, 3.5)) return; c = o.d.c; x = o.x; z = o.z; K.removeItem(o); }
+        else if (held && held.type === 'colis') { c = held.d.c; P.inv[sel] = null; }
+        if (!c) return;
+        const n = K.openColis(c, x, z); sfx('clang', x, z);
+        note(pid, `📦 Colis ouvert : ${n} article(s) par terre. Prends-les et range-les (E sur le rack ou l'armoire, produits en main).`, 'good');
+        break;
+      }
       case 'emote': K.ev({ e: 'emote', pid, n: U.clamp(m.n | 0, 0, 5) }); break;
       case 'ping': if (isFinite(m.x) && isFinite(m.z)) K.ev({ e: 'ping', pid, x: +m.x, z: +m.z }); break;
     }
@@ -328,13 +350,14 @@
     if (t && !near(ps, t.x, t.z, t.r + 2.5)) return;
     for (const mod of Sim.mods) if (mod.use && mod.use(pid, P, ps, sel, held, kind, a, b, m)) return;
     switch (kind) {
-      case 'rack': if (S.stock[a] === undefined) return;
-        if (S.stock[a] <= 0) return note(pid, `Rupture de ${ML.MATERIALS[a].label} ! Commande chez Eliott (Aciers de l'Ouest).`, 'warn');
-        if (K.give(pid, { type: 'brut_' + a, d: {} }, sel)) { S.stock[a]--; sfx('pickup', ps.x, ps.z); } return;
-      case 'tool': if (!ML.TOOLS[a]) return;
-        if (S.stock[a] <= 0) return note(pid, `Plus de ${ML.TOOLS[a].label.toLowerCase()} ! Va chez Outi'Pro (Coco).`, 'warn');
-        if (K.give(pid, { type: a, d: {} }, sel)) { S.stock[a]--; sfx('pickup', ps.x, ps.z); } return;
-      case 'coffee': P.coffee = S.rt + (S.up.cafe_pro ? 90 : 40); note(pid, `☕ Un petit noir : sprint plus long pendant ${S.up.cafe_pro ? 90 : 40} s.`, 'good'); return;
+      case 'rack': case 'tool': {
+        const type = kind === 'rack' ? 'brut_' + a : a; if (S.stock[a] === undefined) return;
+        const n = K.store(P, type, a);                       // produits en main : on les RANGE
+        if (n) { note(pid, `📦 Rangé : ${n} × ${kind === 'rack' ? 'barre ' + ML.MATERIALS[a].label : ML.TOOLS[a].label} (stock ${S.stock[a]}).`, 'good'); sfx('drop', ps.x, ps.z); return; }
+        if (S.stock[a] <= 0) return note(pid, kind === 'rack' ? `Rupture de ${ML.MATERIALS[a].label} ! Commande au PC de gestion (ou chez Eliott).` : `Plus de ${ML.TOOLS[a].label.toLowerCase()} ! Commande au PC de gestion (ou chez Coco).`, 'warn');
+        if (K.give(pid, { type, d: {} }, sel)) { S.stock[a]--; sfx('pickup', ps.x, ps.z); } return;
+      }
+      case 'coffee': { const sec = S.up.cafe_pro ? C.COFFEE.secPro : C.COFFEE.sec; P.coffee = S.rt + sec; note(pid, `☕ Un petit noir : tu vas BEAUCOUP plus vite pendant ${sec} s !`, 'good'); return; }
       case 'frigo': if (S.up.frigo && K.give(pid, { type: 'viennoiseries', d: {} }, sel)) sfx('pickup', ps.x, ps.z); return;
       case 'casques': if (K.give(pid, { type: 'casque', d: {} }, sel)) sfx('pickup', ps.x, ps.z); return;
       case 'reception':
@@ -545,7 +568,7 @@
         }
         if (!K.atHome(n)) { if (!n.path.length) K.walkTo(n, n.home.x, n.home.z, null, n.mids && n.mids.length > 1); break; }
         n.faceYaw = n.home.yaw;
-        const lazy = op.lazy * (S.up.babyfoot ? 0.7 : 1);
+        const lazy = op.lazy * 0.7 * (S.up.babyfoot ? 0.7 : 1);
         if (lazy > 0 && rng() < lazy * 0.012 * dt * (M.job ? 1 : 1.5)) {
           if (op.traits.includes('deadstop')) { n.state = 'pause'; n.pauseT = 35 + rng() * 30; say(n, 'Flemme.'); }
           else { const sp = U.pick(ML.LOC.coffee); n.state = 'toPause'; K.walkTo(n, sp.x, sp.z, () => { n.state = 'pause'; n.pauseT = (18 + rng() * 20) * (S.up.babyfoot ? 0.6 : 1); }); say(n, 'Petite pause café...'); }
@@ -711,15 +734,18 @@
     if (S.over || S.voting) return;
     S.over = true; Sim.dirty = true;
     const race = S.mode === 'course';
-    if (!race) { const sal = K.salaries(); S.money -= sal; S.today.salaires = sal; }
-    const T = S.today, profit = T.ca + T.bonus - T.achat - T.amende - T.salaires;
+    if (!race) {
+      const sal = K.salaries(); S.money -= sal; S.today.salaires = sal;
+      const abo = Object.keys(ML.CATALOG).reduce((a, k) => a + (ML.CATALOG[k].daily && S.up[k] ? ML.CATALOG[k].daily : 0), 0); S.money -= abo; S.today.abos = abo;
+    }
+    const T = S.today, profit = T.ca + T.bonus - T.achat - T.amende - T.salaires - (T.abos || 0);
     const k = (1 + 0.35 * (Math.max(1, S.n) - 1)) * K.D.stars * (0.6 + 0.2 * Object.keys(S.machines).length), need = ML.ECO.stars.map(v => Math.round(v * k / 10) * 10);
     const stars = race ? 0 : profit >= need[2] ? 3 : profit >= need[1] ? 2 : profit >= need[0] ? 1 : 0;
     if (S.money >= 10000) for (const p in S.pl) K.stat(p, 'rich');
     if (Object.keys(S.machines).length >= 6) for (const p in S.pl) K.stat(p, 'full');
     if (S.nParts >= 3) for (const p in S.pl) K.stat(p, 'part3');
     const res = Object.assign({ mode: S.mode, diff: S.diff, day: S.day, score: race ? S.score : Math.max(0, Math.round(profit / 4)), served: S.served, failed: S.failed, stars, finds: S.finds.got, findsTotal: S.finds.total, sat: Math.round(S.sat), need,
-      money: S.money, profit, today: Object.assign({}, T), rep: S.rep, rep0: S.rep0, campaign: S.campaign, co: S.co, snap: Sim.companySnap() }, extra || {});
+      money: S.money, profit, today: Object.assign({}, T), rep: S.rep, rep0: S.rep0, campaign: S.campaign, co: S.co, snap: Sim.companySnap(), bankrupt: !race && S.mode !== 'inspection' && S.money < ML.ECO.bankrupt }, extra || {});
     for (const m of Sim.mods) if (m.onEnd) m.onEnd(res);
     if (S.served >= 10) for (const p in S.pl) K.stat(p, 'served10');
     if (res.vote) { S.over = false; S.voting = { until: S.rt + 25, votes: {}, res }; K.ev({ e: 'vote', until: 25, players: Object.keys(S.pl).map(id => [id, S.pl[id].name]) }); return; }

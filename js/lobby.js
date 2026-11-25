@@ -30,6 +30,10 @@
   /** Fin de journée (hôte) : on enregistre l'entreprise, jour suivant, l'inspecteur viendra-t-il ? */
   Camp.applyEnd = res => {
     const E = Co().merge(Camp.get() || Co().fresh(), res.snap);
+    if (res.bankrupt) {                                                // sous −2 000 € : faillite, l'entreprise est fermée
+      E.bankrupt = true; Camp.push(E);
+      return { camp: `<div class="camp"><p>💸 <b>${ML.U.esc(E.name)}</b> ferme ses portes après ${E.day} jour${E.day > 1 ? 's' : ''}. On peut recommencer une nouvelle entreprise.</p></div>`, nextLabel: 'Recommencer (nouvelle entreprise)' };
+    }
     E.tot.ca += (res.today && res.today.ca) || 0; E.tot.served += res.served || 0; E.tot.days++; E.tot.best = Math.max(E.tot.best, res.profit || 0);
     let msg = '';
     if (res.mode === 'inspection') {
@@ -47,6 +51,7 @@
   /** Configuration d'une journée de campagne */
   Camp.cfg = (diff, traitor, roles) => {
     const E = Camp.get(); if (!E) return null;
+    if (E.bankrupt) { ML.HUD.toast(`💸 « ${E.name} » a fait faillite : crée une nouvelle entreprise.`); return null; }
     return { mode: E.insp === 'due' ? 'inspection' : 'campagne', campaign: true, day: E.day, E, city: E.city, code: E.code, traitor, diff, roles };
   };
 
@@ -158,7 +163,23 @@
     N.on('unstable', () => ML.HUD.toast('Connexion instable… reconnexion en cours.'));
     N.on('resumed', () => ML.HUD.toast('Reconnecté !'));
     N.on('lost', () => { ML.Game.stop('Connexion perdue.'); L.showHome(); ML.HUD.toast('Connexion au serveur perdue.'); });
+    L.initInstall();
     L.showHome();
+  };
+  /** Appli installable (PWA) : bouton « Installer le jeu » (Chrome / Edge), icône sur le bureau, sa propre fenêtre */
+  L.initInstall = () => {
+    const web = /^https?:/.test(location.protocol), btn = $('go-install');
+    const installed = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+    if (web && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { /* rien */ });
+    if (!web || installed()) return;
+    btn.classList.remove('hidden');
+    window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); L.installEv = e; });
+    window.addEventListener('appinstalled', () => { btn.classList.add('hidden'); ML.HUD.toast('📲 Jeu installé ! Lance-le depuis l\'icône « Mécanique Lebec » sur ton bureau.'); });
+    btn.onclick = async () => {
+      if (!L.installEv) return ML.HUD.toast(/iPhone|iPad/.test(navigator.userAgent) ? 'Sur iPhone : bouton Partager, puis « Sur l\'écran d\'accueil ».' : 'Ouvre le jeu dans Chrome ou Edge : menu ⋮ → « Installer Mécanique Lebec » (ou l\'icône ⊕ dans la barre d\'adresse).');
+      L.installEv.prompt(); const r = await L.installEv.userChoice; L.installEv = null;
+      if (r && r.outcome === 'accepted') btn.classList.add('hidden');
+    };
   };
   /** Astuce au hasard (salon, solo) */
   L.tip = () => { const t = U.pick(ML.TIPS); for (const id of ['tip-h', 'tip-r']) if ($(id)) $(id).innerHTML = '💡 ' + U.esc(t); };
@@ -315,7 +336,17 @@
   /** Fin de journée : rejouer (hôte ou solo) */
   L.replay = () => {
     const G = ML.Game;
-    const g = G.game || {}, cfg = g.campaign ? Camp.cfg(g.diff, g.traitor, G.solo ? g.roles : L.resolveRoles()) : L.freeCfg(g.mode, g.diff, g.traitor, G.solo ? g.roles : L.resolveRoles());
+    const g = G.game || {}, roles = G.solo ? g.roles : L.resolveRoles(), r = G.lastRes;
+    let cfg;
+    if (g.campaign) {
+      const cur = Camp.get();
+      if (cur && cur.bankrupt) { Camp.create(cur.name).then(() => L.replay()); return; }        // faillite : nouvelle entreprise, même nom
+      cfg = Camp.cfg(g.diff, g.traitor, roles);
+    } else {
+      cfg = L.freeCfg(g.mode, g.diff, g.traitor, roles);
+      // journée libre : on CONTINUE avec le même atelier tant qu'on n'est pas en faillite
+      if (g.mode === 'coop' && r && r.snap && !r.bankrupt && g.E) { const E = ML.Company.merge(g.E, r.snap); E.day = (g.E.day || 1) + 1; E.name = g.E.name; cfg.E = E; cfg.day = E.day; cfg.city = g.city; }
+    }
     if (!cfg) return;
     if (G.solo) { const me = G.players[G.me]; G.start({ solo: true, seed: Date.now() >>> 0, me: G.me, host: G.me, players: [me], game: cfg }); }
     else if (G.isHost) N.send({ t: 'start', seed: (Math.random() * 1e9) >>> 0, cfg });

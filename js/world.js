@@ -126,7 +126,7 @@
     // coin café (+ améliorations)
     U.box(0.8, 1.8, 0.7, W.up.cafe_pro ? 0x95a5a6 : 0x4e342e, -19.3, 0.9, 12.5, root); U.box(3, 0.45, 0.6, 0x8d6e63, -17, 0.23, 13.3, root);
     U.boxCollider(-19.3, 12.5, 0.8, 0.7, 'coffee'); U.boxCollider(-17, 13.3, 3, 0.6, 'bench');
-    const lc = U.label(W.up.cafe_pro ? '☕ Café PRO (sprint 90 s)' : '☕ Café (sprint +)', { size: 0.3 }); lc.position.set(-18.8, 2.3, 12.5); add(lc);
+    const lc = U.label(W.up.cafe_pro ? '☕ Café PRO : très rapide 2 min' : '☕ Café : très rapide 1 min', { size: 0.3 }); lc.position.set(-18.8, 2.3, 12.5); add(lc);
     W.targets.push({ id: 'coffee', x: -19.3, y: 1.2, z: 12.5, r: 2.4 }, { id: 'reception', x: -12.5, y: 0.8, z: 10.3, r: 4.2 });
     // bureau du chef, imprimante, PC, marbre, tableau électrique, boîte de casques
     U.box(2.4, 0.8, 1.2, 0x5d4037, 12, 0.4, -8, root); U.boxCollider(12, -8, 2.4, 1.2, 'desk');

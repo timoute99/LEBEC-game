@@ -20,6 +20,7 @@
   const myRole = () => { const S = S_(); return S && S.pl[ML.Game.me] ? S.pl[ML.Game.me].role : 'poly'; };
   R.myRole = myRole;
   const isPart = it => !!it && (it.type === 'caisse' || it.type === 'piece');
+  const inv = () => { const S = S_(); return S && S.pl[ML.Game.me] ? S.pl[ML.Game.me].inv : []; };
 
   function machineLabel(mid, held) {
     const S = S_(), M = S.machines[mid], def = ML.MACHINES.find(m => m.id === mid);
@@ -44,9 +45,9 @@
     const G = ML.Game, S = G.S; if (!S) return null;
     const held = G.held(), [kind, a, b] = id.split(':');
     switch (kind) {
-      case 'rack': return `Prendre un brut ${ML.MATERIALS[a].label} (stock : ${S.stock[a]})`;
-      case 'tool': return S.evs && S.evs.herve ? '🔒 Armoire bloquée par Hervé : il veut sa convention !' : `Prendre : ${ML.TOOLS[a].label} (stock : ${S.stock[a]})`;
-      case 'coffee': return `Café : sprint plus long (${S.up && S.up.cafe_pro ? 90 : 40} s)`;
+      case 'rack': { const n = inv().filter(x => x && x.type === 'brut_' + a).length; return n ? `📦 Ranger ${n} barre${n > 1 ? 's' : ''} ${ML.MATERIALS[a].label} dans le rack` : `Prendre un brut ${ML.MATERIALS[a].label} (stock : ${S.stock[a]})`; }
+      case 'tool': { if (S.evs && S.evs.herve) return '🔒 Armoire bloquée par Hervé : il veut sa convention !'; const n = inv().filter(x => x && x.type === a).length; return n ? `📦 Ranger ${n} × ${ML.TOOLS[a].label} dans l'armoire` : `Prendre : ${ML.TOOLS[a].label} (stock : ${S.stock[a]})`; }
+      case 'coffee': return `☕ Café : tu vas BEAUCOUP plus vite (${S.up && S.up.cafe_pro ? ML.CFG.COFFEE.secPro : ML.CFG.COFFEE.sec} s)`;
       case 'frigo': return 'Frigo : prendre des viennoiseries';
       case 'casques': return 'Prendre un casque de sécurité';
       case 'reception': return held && held.type === 'matiere' ? 'Déposer la caisse en réception (+ stock)' : null;
@@ -64,7 +65,7 @@
         return M.chips >= 15 ? `🗑 Prendre le bac de copeaux de ${a} (${Math.round(M.chips)} %)` : null;
       }
       case 'benne': return held && held.type === 'bac_plein' ? '🗑 Vider le bac dans la benne à copeaux' : null;
-      case 'item': { const it = G.itemViews[a]; if (!it) return null; if (it.type === 'palette') return `🏗 Palette #${it.d.oid} : trop lourd ! Fenwick (cariste)`; return it.type === 'find' ? `★ Ramasser la trouvaille : ${IT.name(it)}` : `Ramasser : ${IT.name(it)}`; }
+      case 'item': { const it = G.itemViews[a]; if (!it) return null; if (it.type === 'colis') return `📦 Porter le colis (${it.d.n} articles) · [R] l'OUVRIR`; if (it.type === 'palette') return `🏗 Palette #${it.d.oid} : trop lourd ! Fenwick (cariste)`; return it.type === 'find' ? `★ Ramasser la trouvaille : ${IT.name(it)}` : `Ramasser : ${IT.name(it)}`; }
       case 'car': {
         const c = S.cars[+a]; if (!c) return null;
         if (b === 'door') {

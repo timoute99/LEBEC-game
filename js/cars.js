@@ -149,14 +149,14 @@
     const yawRate = c.speed * Math.tan(c.steer) / P.wb;
     c.h += yawRate * dt;
     if (env.puddle && Math.abs(c.speed) > 6) c.h += (Math.random() - 0.5) * 3 * dt;   // aquaplaning
-    const f = Cars.fwd(c.h);
+    const f = Cars.fwd(c.h), v0 = Math.abs(c.speed);
     const moved = c.speed * dt;
     c.pos.x += f.x * moved; c.pos.z += f.z * moved;
     if (!tp && Math.abs(moved) > 0) c.fuel = Math.max(0, c.fuel - Math.abs(moved) * (P.fuelUse || CF.fuelUse));
-    let hit = false, hard = 0;
+    let hit = false, hard = 0, decor = false;
     for (const k of OFF(c)) {
       const p = { x: c.pos.x + f.x * k, z: c.pos.z + f.z * k }, ox = p.x, oz = p.z;
-      if (U.resolveCircle(p, R(c) - 0.02)) { hit = true; c.pos.x += p.x - ox; c.pos.z += p.z - oz; }
+      if (U.resolveCircle(p, R(c) - 0.02)) { hit = true; decor = true; c.pos.x += p.x - ox; c.pos.z += p.z - oz; }
       const others = Cars.list.filter(o => o !== c).map(o => o.pos).concat(Cars.traffic.filter(t => t.visible).map(t => t.position));
       if (Cars.police && Cars.police.visible) others.push(Cars.police.position);
       for (const o of others) {
@@ -166,7 +166,7 @@
     }
     if (hit) { hard = Math.abs(c.speed); if (hard > 6) ML.Sfx.play('clang'); c.speed *= -0.2; }
     c.target.copy(c.pos); c.th = c.h;
-    return { lat: Math.abs(c.speed * yawRate), side: Math.sign(yawRate) * -1, hard };
+    return { lat: Math.abs(c.speed * yawRate), side: Math.sign(yawRate) * -1, hard, crash: decor ? v0 : 0 };   // crash : vitesse au moment du choc contre le décor
   };
 
   /** Rendu : position lissée (si pas locale), roues, contenu de la benne */

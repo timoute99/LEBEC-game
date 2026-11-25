@@ -41,7 +41,9 @@
     if (ML.debug) { I.locked = true; ML.HUD.showPause(false); return; }
     if (I.padActive) { ML.HUD.showPause(false); return; }
     try { const p = I.canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* refusé */ }
-    setTimeout(() => { if (!I.active() && !ML.ui.modal && ML.Game.on) ML.HUD.showPause(true); }, 400);
+    // Le navigateur refuse de recapturer la souris juste après Échap : au lieu de l'écran PAUSE,
+    // un simple « clique pour reprendre » (le jeu n'est pas en pause).
+    setTimeout(() => { if (!I.active() && !ML.ui.modal && ML.Game.on) ML.HUD.showPause(true, true); }, 400);
   };
   I.unlock = () => { if (document.pointerLockElement) document.exitPointerLock(); if (!ML.debug) I.locked = false; };
   I.pressed = c => !!I._p[c];

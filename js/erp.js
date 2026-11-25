@@ -10,7 +10,7 @@
    - Bilan : argent du jour, réputation, objectif de la campagne.
    ===================================================================== */
 (function () {
-  const E = ML.ERP = { tab: 'cmd' };
+  const E = ML.ERP = { tab: 'cmd', cart: {} };
   const U = ML.U, $ = id => document.getElementById(id);
   const eur = n => `${Math.round(n).toLocaleString('fr-FR')} €`;
   const COMP = ML.COMPANIES, STEP_ICON = { fonderie: '🔥', chaudro: '⚙️', usinage: '🛠️', tth: '♨️', livraison: '🚚' };
@@ -34,6 +34,16 @@
       if (a === 'close') return E.close();
       if (a === 'arexis') { E.close(); ML.Mini.run('arexis', {}, r => { if (r === 'ok') G.intent({ a: 'use', id: 'pc', mg: 'ok' }); }); return; }
       if (a === 'part') { G.intent({ a: 'part', id: b.dataset.id, ok: +b.dataset.ok }); ML.Sfx.play('bip'); return; }
+      // panier (côté joueur) : plus, moins, supprimer, vider, tout commander
+      if (['cplus', 'cminus', 'cdel', 'cclear', 'corder'].includes(a)) {
+        const k = b.dataset.k, C = E.cart, tot = () => Object.values(C).reduce((x, y) => x + y, 0);
+        if (a === 'cplus' && tot() < ML.CART_MAX) C[k] = (C[k] || 0) + 1;
+        if (a === 'cminus' && C[k]) { C[k]--; if (!C[k]) delete C[k]; }
+        if (a === 'cdel') delete C[k];
+        if (a === 'cclear') E.cart = {};
+        if (a === 'corder' && tot()) { G.intent({ a: 'erp', op: 'order', cart: Object.assign({}, C) }); E.cart = {}; ML.Sfx.play('cash'); }
+        ML.Sfx.play('bip'); E.render(true); return;
+      }
       const m = { a: 'erp', op: a };
       for (const k of ['id', 'mid', 'k']) if (b.dataset[k] !== undefined) m[k] = b.dataset[k];
       if (a === 'supply') { const q = el.querySelector(`select[data-q="${b.dataset.k}"]`); m.n = q ? +q.value : 1; }
@@ -109,7 +119,7 @@
   }
 
   function tabShop(S) {
-    const cats = { machine: '🏭 Machines', atelier: '🏗 Atelier', equip: '🚜 Équipement', deco: '☕ Confort & déco (installé le lendemain)' };
+    const cats = { machine: '🏭 Machines', atelier: '🏗 Atelier', equip: '🚜 Équipement', deco: '☕ Confort & déco (installé le lendemain)', abo: '🐦 Abonnements (payés chaque soir)' };
     let h = '<p class="dim">Les véhicules (Mégane, Ducato, camion plateau) s\'achètent au <b>Garage Pasquier</b>, en ville.</p>';
     for (const cat in cats) {
       h += `<h3>${cats[cat]}</h3><div class="erp-grid">`;
@@ -118,7 +128,7 @@
         const own = it.mach ? !!S.machines[it.mach] : it.veh ? S.owned.includes(it.veh) : (S.up[k] || 0) >= (it.max || 1);
         const lock = it.need && !S.up[it.need], lvl = it.max > 1 ? ` (${S.up[k] || 0}/${it.max})` : '';
         h += `<div class="erp-item ${own ? 'own' : ''}"><b>${U.esc(it.name)}${lvl}</b><span class="small dim">${U.esc(it.desc || '')}</span>
-          ${own ? '<span class="ok">✔ acheté</span>' : lock ? `<span class="dim">🔒 il faut : ${U.esc(ML.CATALOG[it.need].name)}</span>` : `<button data-act="buy" data-k="${k}" ${S.money < it.price ? 'disabled' : ''}>Acheter ${eur(it.price)}</button>`}</div>`;
+          ${own && it.daily ? `<span class="ok">✔ abonné (${it.daily} €/jour)</span><button class="sec" data-act="unsub" data-k="${k}">Résilier</button>` : own ? '<span class="ok">✔ acheté</span>' : lock ? `<span class="dim">🔒 il faut : ${U.esc(ML.CATALOG[it.need].name)}</span>` : `<button data-act="buy" data-k="${k}" ${S.money < it.price ? 'disabled' : ''}>Acheter ${eur(it.price)}</button>`}</div>`;
       }
       h += '</div>';
     }
@@ -126,16 +136,23 @@
   }
 
   function tabSup(S) {
-    let h = '<h3>📦 Stock</h3><div class="erp-stock">' + Object.keys(ML.SUPPLY).map(k => `<span class="${S.stock[k] ? '' : 'red'}">${(ML.MATERIALS[k] || ML.TOOLS[k]).label} : <b>${S.stock[k]}</b></span>`).join('') + '</div>';
-    h += `<h3>🛒 Commander (livraison par camion, ${ML.ECO.supplierDelay[0] / 60}–${ML.ECO.supplierDelay[1] / 60} min, ${ML.ECO.fee} € de port)</h3>
-      <p class="dim small">Pressé ? Le MAGASINIER peut aller chercher directement chez Eliott (Aciers de l'Ouest) et Coco (Outi'Pro) : même prix, sans frais de port, tout de suite.</p><div class="erp-grid">`;
+    const C = E.cart, units = Object.values(C).reduce((x, y) => x + y, 0), sub = Object.keys(C).reduce((x, k) => x + C[k] * ML.SUPPLY[k].price, 0), total = units ? sub + ML.ECO.fee : 0;
+    const label = k => (ML.MATERIALS[k] || ML.TOOLS[k]).label;
+    let h = `<p class="dim small">Ajoute les produits au panier, puis commande tout d'un coup : un seul COLIS arrive en réception (${ML.ECO.supplierDelay[0] / 60} à ${ML.ECO.supplierDelay[1] / 60} min). Ouvre-le avec <b>R</b>, puis range les produits (E sur le rack ou l'armoire). Pressé ? Le MAGASINIER peut aller chercher directement chez Eliott et Coco, sans frais de port.</p><h3>🛒 Produits</h3><div class="erp-grid">`;
     for (const k in ML.SUPPLY) {
-      const L = ML.SUPPLY[k];
-      h += `<div class="erp-item"><b>${U.esc(L.name)}</b><span class="small dim">${COMP[L.from].name} · ${L.price} € le lot</span>
-        <span><select data-q="${k}">${[1, 2, 3].map(n => `<option value="${n}">${n} lot${n > 1 ? 's' : ''}</option>`).join('')}</select> <button data-act="supply" data-k="${k}" ${S.money < L.price + ML.ECO.fee ? 'disabled' : ''}>Commander</button></span></div>`;
+      const L = ML.SUPPLY[k], q = C[k] || 0;
+      h += `<div class="erp-item prod"><b>${U.esc(L.name)}</b><span class="small dim">${COMP[L.from].name} · <b class="price">${L.price} €</b> l'unité · en stock : <b class="${S.stock[k] ? '' : 'red'}">${S.stock[k]}</b></span>
+        <span class="qty"><button class="mini" data-act="cminus" data-k="${k}" ${q ? '' : 'disabled'}>−</button><b>${q}</b><button class="mini" data-act="cplus" data-k="${k}" ${units >= ML.CART_MAX ? 'disabled' : ''}>+</button><button class="mini del" data-act="cdel" data-k="${k}" ${q ? '' : 'disabled'} title="Supprimer">🗑</button></span></div>`;
     }
-    h += '</div><h3>🚚 Livraisons en route</h3>';
-    h += S.deliv.length ? S.deliv.slice().sort((a, b) => a.eta - b.eta).map(d => `<div class="erp-row"><div>${U.esc(d.name)} <span class="dim">(${COMP[d.from] ? COMP[d.from].name : ''})</span></div><div class="erp-act">arrive dans <b>${T(d.eta)}</b></div></div>`).join('') : '<p class="dim">Rien en route.</p>';
+    h += `</div><h3>🧺 Panier (${units}/${ML.CART_MAX} articles)</h3>`;
+    if (!units) h += '<p class="dim">Le panier est vide : clique sur « + » pour ajouter des produits.</p>';
+    else {
+      h += '<table class="erp-tab cart">' + Object.keys(C).map(k => `<tr><td>${U.esc(ML.SUPPLY[k].name)}</td><td><button class="mini" data-act="cminus" data-k="${k}">−</button> <b>${C[k]}</b> <button class="mini" data-act="cplus" data-k="${k}" ${units >= ML.CART_MAX ? 'disabled' : ''}>+</button> <button class="mini del" data-act="cdel" data-k="${k}">🗑</button></td><td>${eur(C[k] * ML.SUPPLY[k].price)}</td></tr>`).join('') +
+        `<tr><td class="dim">Frais de port</td><td></td><td class="dim">${eur(ML.ECO.fee)}</td></tr><tr><td><b>Total</b></td><td></td><td><b>${eur(total)}</b></td></tr></table>
+        <div class="cart-btns"><button class="go" data-act="corder" ${S.money < total ? 'disabled' : ''}>📦 Commander tout (${eur(total)})</button><button class="sec" data-act="cclear">Vider le panier</button>${S.money < total ? ' <span class="red">Pas assez d\'argent en caisse.</span>' : ''}</div>`;
+    }
+    h += '<h3>🚚 Livraisons en route</h3>';
+    h += S.deliv.length ? S.deliv.slice().sort((a, b) => a.eta - b.eta).map(d => `<div class="erp-row"><div>${U.esc(d.name)}${d.cart ? ` <span class="dim">: ${Object.keys(d.cart).map(k => d.cart[k] + ' × ' + label(k)).join(', ')}</span>` : ''}</div><div class="erp-act">arrive dans <b>${T(d.eta)}</b></div></div>`).join('') : '<p class="dim">Rien en route.</p>';
     return h;
   }
 
@@ -160,11 +177,12 @@
 
   function tabBil(S) {
     const T = S.today, sal = S.staff.reduce((a, id) => a + ML.STAFF[id].pay, 0) + Object.keys(ML.AI_STAFF).reduce((a, k) => a + (S.ai[k] ? ML.AI_STAFF[k].pay : 0), 0);
-    const profit = T.ca + T.bonus - T.achat - T.amende - sal;
+    const abo = Object.keys(ML.CATALOG).reduce((a, k) => a + (ML.CATALOG[k].daily && S.up[k] ? ML.CATALOG[k].daily : 0), 0);
+    const profit = T.ca + T.bonus - T.achat - T.amende - sal - abo;
     const row = (l, v, c) => `<tr><td>${l}</td><td class="${c || ''}">${v}</td></tr>`;
     let h = `<h3>📊 Aujourd'hui</h3><table class="erp-tab">${row('Chiffre d\'affaires (livraisons)', '+' + eur(T.ca), 'ok')}${row('Primes (audit, visiteurs…)', '+' + eur(T.bonus), 'ok')}
-      ${row('Achats (matière, outils, sous-traitance)', '−' + eur(T.achat), 'red')}${row('Amendes et casse', '−' + eur(T.amende), 'red')}${row('Salaires à verser ce soir', '−' + eur(sal), 'red')}
-      ${row('<b>Bénéfice prévu</b>', `<b>${eur(profit)}</b>`, profit >= 0 ? 'ok' : 'red')}${row('Investissements (machines, embauches, véhicules)', '−' + eur(T.invest), 'dim')}${row('<b>En caisse</b>', `<b>${eur(S.money)}</b>`)}</table>`;
+      ${row('Achats (matière, outils, sous-traitance)', '−' + eur(T.achat), 'red')}${row('Amendes et casse', '−' + eur(T.amende), 'red')}${row('Salaires à verser ce soir', '−' + eur(sal), 'red')}${abo ? row('Abonnements (ce soir)', '−' + eur(abo), 'red') : ''}
+      ${row('<b>Bénéfice prévu</b>', `<b>${eur(profit)}</b>`, profit >= 0 ? 'ok' : 'red')}${S.money - sal - abo < ML.ECO.bankrupt + 500 ? row('<b>⚠ Faillite</b>', `sous ${eur(ML.ECO.bankrupt)} ce soir = FAILLITE`, 'red') : ''}${row('Investissements (machines, embauches, véhicules)', '−' + eur(T.invest), 'dim')}${row('<b>En caisse</b>', `<b>${eur(S.money)}</b>`)}</table>`;
     h += `<h3>⭐ Réputation : ${S.rep}/100</h3><div class="bar"><i style="width:${S.rep}%"></i></div><p class="dim small">Livrer à l'heure la fait monter (et les prix avec), rater ou laisser expirer une demande la fait baisser. Novatics ouvre à 55, Ublo à 70.</p>`;
     if (S.campaign) h += `<h3>🎯 Campagne</h3><p>${ML.Company.goal({ won: S.co.won, insp: S.co.insp, mach: Object.keys(S.machines), rep: S.rep, day: S.co.day })}</p>${S.co.code ? `<p class="dim">Code de sauvegarde : <b class="code">${S.co.code}</b> — n'importe qui avec ce code peut reprendre l'atelier (sauvegarde auto toutes les minutes).</p>` : ''}`;
     else h += '<p class="dim">Journée libre : rien n\'est sauvegardé. Lance une CAMPAGNE pour faire grandir ton atelier jour après jour.</p>';

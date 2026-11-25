@@ -3,9 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mécanique Lebec — en équipe (V4.0)</title>
+<title>Mécanique Lebec — en équipe (V4.1)</title>
 <link rel="stylesheet" href="css/style.css">
-<link rel="icon" href="data:,">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1a2340">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 </head>
 <body>
 <canvas id="gl"></canvas>
@@ -24,7 +27,7 @@
   <div id="evbar"></div>
   <div id="raceboard" class="box hidden"></div>
   <div id="secret" class="hidden"></div>
-  <div id="tr"><canvas id="minimap" width="180" height="196"></canvas><div id="team" class="box"></div></div>
+  <div id="tr"><canvas id="minimap" width="180" height="196"></canvas><div id="gps" class="hidden"></div><div id="team" class="box"></div></div>
   <div id="crosshair"></div>
   <div id="prompt"></div>
   <div id="subtitle"></div>
@@ -41,7 +44,7 @@
   <div id="daycard" class="hidden"></div>
 </div>
 <div id="mini" class="hidden"></div>
-<div id="bigmap" class="overlay hidden"><div class="bm-head">🗺 Carte de la ville — clic : poser un repère pour l'équipe · M ou Échap : fermer</div><canvas></canvas></div>
+<div id="bigmap" class="overlay hidden"><div class="bm-head">🗺 Carte de la ville — <b>clic : poser un repère</b> (trajet GPS affiché, l'équipe le voit aussi) · clic droit : effacer · M ou Échap : fermer</div><canvas></canvas></div>
 <div id="vote" class="overlay hidden"></div>
 
 <!-- ================= Dialogue ================= -->
@@ -85,7 +88,7 @@
       <button id="go-solo" class="choice"><span class="ic">🧑‍🔧</span>SOLO<small>toi contre l'atelier</small></button>
       <button id="go-multi" class="choice"><span class="ic">👥</span>MULTIJOUEUR<small>jusqu'à 5 en ligne</small></button>
     </div>
-    <div class="homebar"><button id="go-account" class="link">👤 <span id="acc-mini">Compte</span></button><button id="go-guide" class="link">📖 Guide & astuces</button></div>
+    <div class="homebar"><button id="go-account" class="link">👤 <span id="acc-mini">Compte</span></button><button id="go-guide" class="link">📖 Guide & astuces</button><button id="go-install" class="link hidden">📲 Installer le jeu</button></div>
   </div>
 
   <!-- Compte -->
@@ -114,6 +117,7 @@
       <p><b>Lebec :</b> il ne supporte pas la violence dans SON atelier. 5 coups de pelle = KO, et il faut le médecin.</p>
       <p><b>Difficultés :</b> 🙂 Facile · 😐 Normal · 😤 Difficile · 🔥 LEBEC EN FEU (tout brûle, gains ×1,5). En campagne, le rythme monte aussi avec la taille de l'atelier.</p>
       <p class="keys"><kbd>ZQSD</kbd> bouger · <kbd>Maj</kbd> courir · <kbd>E</kbd> interagir · <kbd>G</kbd> poser · <kbd>clic G</kbd> claque/outil · <kbd>clic D</kbd> lancer · <kbd>M</kbd> carte · <kbd>T</kbd> ping · <kbd>Tab</kbd> aide · manette compatible</p>
+      <p><b>📲 Installer le jeu :</b> bouton « Installer le jeu » sur l'accueil (Chrome ou Edge). Il s'installe comme un programme, avec une icône sur le bureau et sa propre fenêtre, sans .exe ni alerte Windows. Les mises à jour arrivent toutes seules.</p>
       <h3>💡 Astuces</h3><ul id="guide-tips" class="tips"></ul>
     </div>
     <div class="actions"><button class="back">Retour</button></div>
@@ -174,7 +178,7 @@
   </div>
 </div>
 <div id="toasts"></div>
-<div id="version">V4.0</div>
+<div id="version">V4.1</div>
 
 <!-- Three.js r128 + chargeur glTF (copies locales : marche hors ligne et en double-clic) -->
 <script src="lib/three.min.js"></script>
@@ -193,6 +197,7 @@
 <script src="js/citygen.js"></script>      <!-- ville générée à partir d'une graine -->
 <script src="js/world.js"></script>
 <script src="js/cars.js"></script>
+<script src="js/gps.js"></script>         <!-- repère + trajet façon GPS -->
 <script src="js/rules.js"></script>       <!-- textes des actions [E] (client) -->
 <script src="js/fx.js"></script>          <!-- feux, flaques, pigeon, particules -->
 <script src="js/sim.js"></script>         <!-- simulation de l'hôte (cœur) -->

@@ -27,12 +27,13 @@
     jerrican: { kind: 'equip', name: "Jerrican d'essence", icon: '⛽', hint: 'E sur une voiture : +40 % d\'essence' },
     casque: { kind: 'equip', name: 'Casque de sécurité', icon: '⛑️' },
     convention: { kind: 'paper', name: d => d.signee ? 'Convention SIGNÉE' : 'Convention (à faire signer)', icon: '📝' },
-    find: { name: d => ML.FINDS[d.k].name, icon: '⭐' }
+    find: { name: d => ML.FINDS[d.k].name, icon: '⭐' },
+    colis: { bulky: d => d.sz !== 's', name: d => `Colis fournisseurs (${d.n || '?'} articles)`, icon: '📦', hint: 'R : ouvrir (tout tombe par terre), puis range les produits' }
   };
   I.def = it => I.TYPES[it.type];
   I.name = it => { const n = I.def(it).name; return typeof n === 'function' ? n(it.d || {}) : n; };
   I.icon = it => I.def(it).icon;
-  I.bulky = it => !!(it && I.def(it).bulky);
+  I.bulky = it => { if (!it) return false; const b = I.def(it).bulky; return typeof b === 'function' ? !!b(it.d || {}) : !!b; };
   I.heavy = it => !!(it && I.def(it).heavy);
 
   /** Modèle 3D d'un objet. opts.noLabel : pas d'étiquette (objet en main) */
@@ -76,6 +77,13 @@
       case 'bac_plein': case 'bac_vide':
         U.box(0.8, 0.5, 0.6, 0x2c3e50, 0, 0.25, 0, g); if (it.type === 'bac_plein') U.box(0.72, 0.12, 0.52, 0xb0b7bf, 0, 0.5, 0, g);
         break;
+      case 'colis': {                                        // carton : taille selon la commande
+        const k = { s: 0.5, m: 0.8, l: 1.1 }[d.sz] || 0.8;
+        const b = new THREE.Mesh(new THREE.BoxGeometry(k * 1.2, k * 0.8, k), U.mat(0xc69c6d)); b.position.y = k * 0.4; b.castShadow = b.receiveShadow = true; g.add(b);
+        U.box(k * 1.21, 0.06, 0.12, 0xe8d3a6, 0, k * 0.8 + 0.01, 0, g); U.box(0.25, 0.012, 0.18, 0xffffff, k * 0.3, k * 0.8 + 0.02, k * 0.2, g);
+        if (!opts.noLabel) { const l = U.label(`📦 COLIS ×${d.n || '?'} (R : ouvrir)`, { size: 0.22, fontSize: 40 }); l.position.y = k * 0.8 + 0.5; g.add(l); g.userData.label = l; }
+        break;
+      }
       case 'caisse': case 'matiere': {
         const tint = it.type === 'caisse' ? 0xffffff : (d.mat ? 0x9ec5ff : 0xffd2a0);
         const b = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), ML.Tex.mat('bois', 1, 1, tint));

@@ -21,8 +21,9 @@ ML.CFG = {
   CAMION: { accel: 9, brake: 20, max: 24, rev: 5, steer: 0.45, wb: 4.2, cap: 8, fuelUse: 0.05 },   // plateau : 8 places (palette = 4)
   KANGOO: { accel: 9, brake: 20, max: 19, rev: 5, steer: 0.55, wb: 2.5, fuelUse: 0.045 },             // le vieux Kangoo : poussif
   DUCATO: { accel: 11, brake: 22, max: 24, rev: 6, steer: 0.5, wb: 3, fuelUse: 0.05 },
-  ORDER: { base: 165, perStep: 60, far: 20, interval: 44, firstAt: 2 },
-  PROD_SEC: 17, SUB_SEC: 18,
+  ORDER: { base: 250, perStep: 90, far: 35, interval: 44, firstAt: 2 },   // V4.1 : beaucoup plus de temps pour faire les pièces
+  PROD_SEC: 14, SUB_SEC: 16,
+  COFFEE: { mult: 1.45, sec: 60, secPro: 120 },                           // café : on va beaucoup plus vite
   START_STOCK: { acier: 4, alu: 4, inox: 3, plaquette: 3, fraise: 3, foret: 3 },
   SPEED_LIMIT: 16.7,                   // 60 km/h : au-delà, les radars flashent
   POLICE_TRIGGER: 19.5,                // 70 km/h près de la police : poursuite
@@ -195,27 +196,31 @@ ML.HAIRS = [0x3b2a1a, 0xe0b050, 0x111111, 0x8b5a2b, 0xa0522d, 0xbdc3c7];
    salaires et les amendes coûtent. Les prix ci-dessous équilibrent une
    campagne d'environ 1 h 30 jusqu'à l'inspecteur. */
 ML.ECO = {
-  startMoney: 600, freeMoney: 1500, startRep: 40,
+  startMoney: 900, freeMoney: 1500, startRep: 40, bankrupt: -2000,     // sous −2 000 € le soir : faillite
+  // moins on est de joueurs, plus les pièces rapportent et plus on a de temps (index = nb de joueurs − 1)
+  playerPay: [1.6, 1.25, 1.1, 1], playerTime: [1.35, 1.15, 1.05, 1], playerChaos: [0.55, 0.75, 0.9, 1],
   order: { base: 125, perStep: 65, far: 30, ctl: 15 },        // prix d'une commande (avant taille, réputation, délai)
   size: { s: 0.8, m: 1, l: 1.8 },
-  part: { mult: 2.6, dur: 150, wait: 55, every: [150, 230] },   // particuliers (pièces urgentes)
-  propLife: 70,                                                 // une demande non acceptée au PC expire
+  part: { mult: 2.6, dur: 240, wait: 90, every: [150, 230] },   // particuliers (pièces urgentes)
+  propLife: 120,                                                // une demande non acceptée au PC expire
   supplierDelay: [120, 180], fee: 20,                           // livraison par camion fournisseur (s, frais de port)
   sub: { fonderie: 60, chaudro: 70, tth: 45 },                  // sous-traitance en direct
   subPC: { fonderie: 90, chaudro: 100 }, subDelay: [100, 140],  // brut commandé au PC (livré à l'atelier)
   coco: 70,                                                     // caisse d'outils en direct chez Outi'Pro
   fines: { radar: 5, police: 60, ped: 30, burn: 80, audit: 40, inspect: 10, slapInsp: 30 },
   bonus: { audit: 30, mathieu: 10, fred: 10, herve: 20 },
-  rep: { ok: 2, late: 1, fail: 5, expire: 1, part: 3, partFail: 4, audit: 3 },
+  rep: { ok: 2, late: 1, fail: 3, expire: 1, part: 3, partFail: 3, audit: 3 },
   stars: [100, 350, 700]                                        // bénéfice du jour pour 1, 2, 3 étoiles (× nb joueurs, machines…)
 };
-/* Lots achetés au PC (prix du lot, livré par le fournisseur) — en direct c'est le même prix sans frais de port */
+/* Produits commandés au PC (prix à l'unité). Tout arrive dans UN colis en réception : on l'ouvre (R) et on range.
+   lot = quantité d'une commande « automatique » (Sylvie). En direct chez Eliott : une caisse = 3 barres. */
 ML.SUPPLY = {
-  acier: { name: 'Barres ACIER ×3', q: 3, price: 36, from: 'aciers' }, alu: { name: 'Barres ALU ×3', q: 3, price: 48, from: 'aciers' },
-  inox: { name: 'Barres INOX ×3', q: 3, price: 60, from: 'aciers' },
-  plaquette: { name: 'Plaquettes carbure ×2', q: 2, price: 30, from: 'outipro' }, fraise: { name: 'Fraises ×2', q: 2, price: 40, from: 'outipro' },
-  foret: { name: 'Forets ×2', q: 2, price: 24, from: 'outipro' }
+  acier: { name: 'Barre ACIER', price: 12, lot: 3, from: 'aciers' }, alu: { name: 'Barre ALU', price: 16, lot: 3, from: 'aciers' },
+  inox: { name: 'Barre INOX', price: 20, lot: 3, from: 'aciers' },
+  plaquette: { name: 'Plaquette carbure', price: 15, lot: 2, from: 'outipro' }, fraise: { name: 'Fraise', price: 20, lot: 2, from: 'outipro' },
+  foret: { name: 'Foret', price: 12, lot: 2, from: 'outipro' }
 };
+ML.CART_MAX = 40;                                               // articles max dans un colis
 /* Catalogue du PC (machines, équipements, améliorations). now: effet immédiat ; sinon installé le lendemain matin. */
 ML.CATALOG = {
   T2: { cat: 'machine', name: 'Tour CN T2', price: 1100, mach: 'T2', desc: 'Un deuxième tour. Il lui faut un opérateur (RH).' },
@@ -234,7 +239,8 @@ ML.CATALOG = {
   frigo: { cat: 'deco', name: "Frigo de l'atelier", price: 150, desc: 'Viennoiseries sur place, Matis n\'a plus faim.' },
   babyfoot: { cat: 'deco', name: 'Babyfoot', price: 120, desc: 'Pauses plus courtes.' },
   plantes: { cat: 'deco', name: 'Plantes vertes', price: 80, desc: 'Clients plus satisfaits.' },
-  posters: { cat: 'deco', name: 'Posters de Lebec', price: 60, desc: 'Sa colère retombe plus vite.' }
+  posters: { cat: 'deco', name: 'Posters de Lebec', price: 60, desc: 'Sa colère retombe plus vite.' },
+  antipigeon: { cat: 'abo', name: 'Abonnement Pigeon-Stop', price: 60, daily: 25, desc: 'Filets + effaroucheur : plus aucun pigeon ne vole de plaquettes. 25 €/jour, résiliable.', now: true }
 };
 /* Personnel : embauche (une fois) + salaire (chaque soir) */
 ML.STAFF = {
@@ -287,8 +293,8 @@ ML.TIPS = [
   'Touche M : la carte complète, avec les objectifs. Clic = repère pour toute l\'équipe.',
   'Les GROSSES pièces : seul le cariste (fenwick) puis le livreur (camion) peuvent s\'en occuper.',
   'KO ? Pas de panique : le médecin (ou le Docteur Gwenn, un peu lent) va venir.',
-  'En virage, les caisses tombent de la benne. Ralentis… ou rattrape-les.',
   'L\'huile soluble fait glisser : la soufflette sèche les flaques.',
+  'Les caisses ne tombent de la benne qu\'en cas de choc contre le décor au-delà de 70 km/h.',
   'Il reste des trouvailles cachées en ville : la Pelle d\'or calme Lebec pendant 2 minutes.',
   'Passager de la Mégane ? Tu peux lancer des objets depuis la voiture.',
   'Hervé bloque l\'armoire ? Imprimante → signature de Lebec → retour à Hervé.',
@@ -298,6 +304,10 @@ ML.TIPS = [
   'Un seul opérateur pour deux machines ? Il court de l\'une à l\'autre. Embauche dès que tu peux !',
   'Les particuliers au comptoir paient bien plus cher. Ne les fais pas attendre !',
   'Le magasinier paie la matière au même prix que le PC, sans frais de port et sans attendre le camion.',
+  'Un colis arrivé en réception : R pour l\'ouvrir (tout tombe par terre), puis E sur le rack ou l\'armoire avec les produits en main pour les ranger.',
+  'Touche M : clique sur la carte pour poser un repère, le trajet s\'affiche comme un GPS.',
+  'Un café et tu cours BEAUCOUP plus vite pendant une minute.',
+  'Seul, chaque pièce rapporte plus et les délais sont plus longs : prends ton temps !',
   'Les salaires tombent le soir : garde toujours un peu d\'argent en caisse.',
   'Le Garage Pasquier vend la Méga Mégane, le Ducato et le camion plateau. Le vieux Kangoo, lui, tient avec du scotch.',
   'Campagne : note bien le CODE de sauvegarde. Avec lui, n\'importe qui peut reprendre l\'atelier.',
@@ -324,7 +334,7 @@ ML.PEOPLE = {
   amaury: { name: 'Amaury Carter', role: 'Opérateur', op: { speed: 1.0, lazy: 0.04, traits: ['forgetful'] }, look: { skin: 0xf0c8a0, shirt: 0x4e8a3e, pants: 0x34495e, hair: 0x6b4a2b, height: 1.83 } },
   marius: { name: 'Marius Challine', role: 'Opérateur', op: { speed: 1.2, lazy: 0, traits: ['robot'] }, look: { skin: 0xeac39b, shirt: 0x7f8c8d, pants: 0x2c3e50, hair: 0x222222, height: 1.86 } },
   matis: { name: 'Matis Caillou', role: 'Opérateur', op: { speed: 1.0, lazy: 0.08, traits: ['hungry'] }, look: { skin: 0xf5cfaa, shirt: 0xe67e22, pants: 0x2c3e50, hair: 0xe0b050, height: 1.72, width: 1.2 } },
-  brieuc: { name: 'Brieuc', role: 'Opérateur', op: { speed: 1.35, lazy: 0.45, traits: ['deadstop'] }, look: { skin: 0x5b3a29, shirt: 0xc0392b, pants: 0x222831, hair: 0x111111, height: 1.55, width: 1.3 } },
+  brieuc: { name: 'Brieuc', role: 'Opérateur', op: { speed: 1.35, lazy: 0.3, traits: ['deadstop'] }, look: { skin: 0x5b3a29, shirt: 0xc0392b, pants: 0x222831, hair: 0x111111, height: 1.55, width: 1.3 } },
   app1: { name: 'Kylian', role: 'Apprenti', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xf0c8a0, shirt: 0x2980b9, pants: 0x34495e, hair: 0x3b2a1a, height: 1.74 } },
   app2: { name: 'Lilou', role: 'Apprentie', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xc68642, shirt: 0xe84393, pants: 0x34495e, hair: 0x111111, height: 1.66, longHair: true } },
   app3: { name: 'Enzo', role: 'Apprenti', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xe2b48c, shirt: 0x00b894, pants: 0x34495e, hair: 0x8b5a2b, height: 1.78 } },

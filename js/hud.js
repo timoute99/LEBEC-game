@@ -11,7 +11,7 @@
 
   H.init = () => {
     H.el = {};
-    for (const id of ['hud', 'props', 'clock', 'score', 'sat', 'finds', 'tickets', 'team', 'prompt', 'notifs', 'subtitle', 'big', 'flash', 'inventory', 'stamina', 'drive', 'pause', 'help', 'end', 'endcard', 'hostlost', 'minimap', 'toasts', 'evbar', 'daycard', 'raceboard', 'vote', 'secret', 'hp', 'hpbox', 'rolebadge', 'ko', 'bigmap'])
+    for (const id of ['hud', 'props', 'clock', 'score', 'sat', 'finds', 'tickets', 'team', 'prompt', 'notifs', 'subtitle', 'big', 'flash', 'inventory', 'stamina', 'drive', 'pause', 'help', 'end', 'endcard', 'hostlost', 'minimap', 'toasts', 'evbar', 'daycard', 'raceboard', 'vote', 'secret', 'hp', 'hpbox', 'rolebadge', 'ko', 'bigmap', 'gps'])
       H.el[id] = $(id);
     H.el.inventory.innerHTML = [0, 1, 2].map(i => `<div class="slot"><span class="k">${i + 1}</span><span class="ic"></span><span class="nm"></span></div>`).join('');
     H.slots = [...H.el.inventory.querySelectorAll('.slot')];
@@ -24,7 +24,11 @@
     H.buildMap();
   };
   H.stopGame = () => { for (const k of ['hud', 'end', 'help', 'pause', 'hostlost', 'vote', 'daycard']) H.el[k].classList.add('hidden'); };
-  H.showPause = b => { if (!H.el) return; H.el.pause.classList.toggle('hidden', !b); };
+  H.showPause = (b, soft) => {
+    if (!H.el) return;
+    if (b && soft !== H._soft) { H._soft = !!soft; H.el.pause.classList.toggle('soft', !!soft); H.el.pause.innerHTML = soft ? '<div class="resume">🖱 Clique pour reprendre la main</div>' : '<div class="card"><h2>Pause</h2><p>Clique pour reprendre.</p><p class="dim">En multijoueur, la partie continue pour les autres !</p></div>'; }
+    H.el.pause.classList.toggle('hidden', !b);
+  };
 
   /** Carte de début de journée : mode, humeur de Lebec, météo */
   H.dayCard = S => {
@@ -86,6 +90,7 @@
       s.querySelector('.nm').textContent = it ? ML.Items.name(it) + (it && ML.Items.def(it).hint && i === p.sel ? ' — ' + ML.Items.def(it).hint : '') : '—';
     });
     H.renderTickets(S); H.renderTeam(S); H.renderEvents(S); H.renderRace(S);
+    const gt = ML.GPS.target ? `📍 Repère : ${Math.round(ML.GPS.dist)} m` : ''; if (gt !== H._gps) { H.el.gps.textContent = gt; H.el.gps.classList.toggle('hidden', !gt); H._gps = gt; }
     H.drawMap(S);
   };
 
@@ -187,6 +192,7 @@
     const stars = [1, 2, 3].map(i => `<span class="${i <= r.stars ? 'on' : ''}">★</span>`).join('');
     const verdict = r.stars >= 3 ? "« Pas mal. Pour des jeunes formés par l'Éducation Nationale. »" : r.stars >= 1 ? '« Ça passe. Demain on ne traîne pas ! »' : r.profit < 0 ? '« On perd de l\'argent ! C\'est écrit dans le poly : on vend PLUS qu\'on ne dépense ! »' : '« Si UsiFlash voit ça... COUP DE PELLE ! »';
     let more = '';
+    const broke = !r.bankrupt ? '' : `<div class="won broke"><h2>💸 FAILLITE</h2><p>La caisse est passée sous ${eur(ML.ECO.bankrupt)}. Le banquier a appelé Lebec… « C'était écrit dans le poly : on ne dépense pas l'argent qu'on n'a pas ! »</p></div>`;
     const won = !r.won ? '' : `<div class="won"><h2>🏆 JEU TERMINÉ !</h2><p>L'inspecteur de l'Éducation Nationale donne un <b>AVIS FAVORABLE</b> à ${U.esc(r.co ? r.co.name : 'l\'atelier')}.<br>François Lebec : « … C'était écrit dans le poly. » (il sourit, presque)</p><p class="dim">Vous pouvez continuer à faire tourner l'atelier : la sauvegarde reste ouverte.</p></div>`;
     if (r.race) more += `<h3>🏁 Classement</h3><table>${r.race.map(([id, n, p], i) => `<tr><td>${['🥇', '🥈', '🥉'][i] || i + 1 + 'e'} ${U.esc(n)}</td><td><b>${p}</b> pts</td></tr>`).join('')}</table>`;
     if (r.inspection) more += `<h3>🎓 Inspection : ${r.inspection.pass ? '<span class="ok">AVIS FAVORABLE</span>' : '<span class="ko">AVIS DÉFAVORABLE</span>'}</h3><p class="dim">${r.inspection.viol} infraction(s) · il fallait ≤ 4 et au moins ${eur(r.need[0])} de bénéfice.</p>`;
@@ -199,12 +205,12 @@
     else btns = '<p class="dim">En attente de l\'hôte…</p><button id="end-menu" class="sec">Quitter le salon</button>';
     const T = r.today || {}, row = (l, v, c) => `<tr><td>${l}</td><td class="${c || ''}">${v}</td></tr>`;
     const table = r.mode === 'course' ? '' : row('Chiffre d\'affaires', '+' + eur(T.ca || 0), 'ok') + (T.bonus ? row('Primes', '+' + eur(T.bonus), 'ok') : '') +
-      row('Achats (matière, outils, sous-traitance)', '−' + eur(T.achat || 0), 'ko') + (T.amende ? row('Amendes et casse', '−' + eur(T.amende), 'ko') : '') + row('Salaires', '−' + eur(T.salaires || 0), 'ko') +
+      row('Achats (matière, outils, sous-traitance)', '−' + eur(T.achat || 0), 'ko') + (T.amende ? row('Amendes et casse', '−' + eur(T.amende), 'ko') : '') + row('Salaires', '−' + eur(T.salaires || 0), 'ko') + (T.abos ? row('Abonnements', '−' + eur(T.abos), 'ko') : '') +
       row('<b>Bénéfice de la journée</b>', `<b>${eur(r.profit || 0)}</b>`, (r.profit || 0) >= 0 ? 'ok' : 'ko') + (T.invest ? row('Investissements', '−' + eur(T.invest), 'dim') : '') +
-      row('<b>En caisse</b>', `<b>${eur(r.money || 0)}</b>`) + row('Réputation', `${r.rep}/100 (${r.rep - r.rep0 >= 0 ? '+' : ''}${r.rep - r.rep0})`) +
+      row('<b>En caisse</b>', `<b>${eur(r.money || 0)}</b>`, (r.money || 0) < 0 ? 'ko' : '') + ((r.money || 0) < 0 && !r.bankrupt && r.mode !== 'course' ? row('⚠ Attention', `faillite sous ${eur(ML.ECO.bankrupt)}`, 'ko') : '') + row('Réputation', `${r.rep}/100 (${r.rep - r.rep0 >= 0 ? '+' : ''}${r.rep - r.rep0})`) +
       row('Commandes livrées / ratées', `${r.served} / ${r.failed}`) + row('Trouvailles', `${r.finds}/${r.findsTotal}`) + row('Étoiles (bénéfice)', `<span class="dim">★ ${eur(r.need[0])} · ★★ ${eur(r.need[1])} · ★★★ ${eur(r.need[2])}</span>`);
     H.el.endcard.innerHTML = `<h1>${r.mode === 'course' ? 'Fin de la course' : 'Bilan de la journée'}</h1>${r.mode === 'course' ? '' : `<div class="stars">${stars}</div>`}
-      ${won}<table>${table}</table>${more}
+      ${broke}${won}<table>${table}</table>${more}
       ${r.mode === 'course' ? '' : `<p><i>François Lebec : ${verdict}</i></p>`}<div class="btns">${btns}</div>`;
     H.el.end.classList.remove('hidden');
     const again = $('end-again'), menu = $('end-menu');
@@ -222,8 +228,9 @@
       cv.onclick = e => {
         const r = cv.getBoundingClientRect(), k = H.bigK; if (!k) return;
         const x = (e.clientX - r.left) * cv.width / r.width / k.s + MAPC.minX, z = (e.clientY - r.top) * cv.height / r.height / k.s + MAPC.minZ;
-        ML.Game.intent({ a: 'ping', x: Math.round(x), z: Math.round(z) }); H.toast('📍 Repère posé pour toute l\'équipe');
+        ML.GPS.set(x, z); ML.Game.intent({ a: 'ping', x: Math.round(x), z: Math.round(z) }); H.toast('📍 Repère posé : suis le trajet violet !');
       };
+      cv.oncontextmenu = e => { e.preventDefault(); ML.GPS.clear(); H.toast('Repère effacé.'); };
     } else { ML.ui.modal = null; ML.Input.lock(); }
   };
   H.drawBigMap = S => {
@@ -273,6 +280,8 @@
       if (pos) dot(pos.x, pos.z, col, me ? 7 : 6, (me ? '▶ ' : '') + P.name + (P.ko ? ' (KO)' : ''));
     }
     const L = G.npcViews.lebec; if (L && L.seen) dot(L.pos.x, L.pos.z, '#2e8b57', 5, 'Lebec');
+    ML.GPS.paint(c, X, Z, 4);
+    if (ML.GPS.target) { c.font = 'bold 13px Arial'; c.textAlign = 'center'; c.lineWidth = 3; c.strokeStyle = '#000'; const t = `📍 ${Math.round(ML.GPS.dist)} m`; c.strokeText(t, X(ML.GPS.target.x), Z(ML.GPS.target.z) - 14); c.fillStyle = '#e9c7ff'; c.fillText(t, X(ML.GPS.target.x), Z(ML.GPS.target.z) - 14); }
   };
 
   /* ---------- Mini-carte ---------- */
@@ -296,6 +305,7 @@
     ctx.drawImage(H.mapBg, 0, 0);
     const dot = (x, z, col, r) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(mx(x), mz(z), r, 0, 7); ctx.fill(); };
     if (S.race && ML.LOC.comp[S.race.target]) { const L = ML.LOC.comp[S.race.target], t = performance.now() / 300; ctx.strokeStyle = '#ffd257'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mx(L.dock.x), mz(L.dock.z), 5 + Math.sin(t) * 2, 0, 7); ctx.stroke(); }
+    ML.GPS.paint(ctx, mx, mz, 2.2);
     for (const t of ML.Cars.traffic) if (t.visible) dot(t.position.x, t.position.z, '#95a5a6', 1.5);
     if (ML.Cars.police && ML.Cars.police.visible) dot(ML.Cars.police.position.x, ML.Cars.police.position.z, Math.floor(performance.now() / 200) % 2 ? '#2255ff' : '#ff2222', 3.2);
     ML.Cars.list.forEach((c, i) => { const sc = S.cars[i]; dot(c.pos.x, c.pos.z, sc ? '#' + new THREE.Color(sc.color).getHexString() : '#fff', sc && sc.kind === 'tp' ? 2 : 3); });

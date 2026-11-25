@@ -21,7 +21,7 @@
     cfg.players.forEach(p => { G.players[p.id] = p; });
     if (!game.E) game.E = ML.Company.fresh('', game.mode === 'course' ? 0 : ML.ECO.freeMoney);
     ML.World.build(game.city || cfg.seed, game.E.up || {}, game.E.mach);
-    ML.World.setPower(true); ML.Fx.reset(); ML.Cars.clear(); ML.Cars.parkPolice();
+    ML.World.setPower(true); ML.Fx.reset(); ML.Cars.clear(); ML.Cars.parkPolice(); ML.GPS.reset();
     const meP = G.players[G.me], sp = ML.LOC.spawn[meP.idx % 6];
     G.p = { pos: new THREE.Vector3(sp.x, 0, sp.z), vy: 0, yaw: Math.PI / 2, pitch: -0.05, sel: 0, stamina: C.PLAYER.stamina, stun: 0, punchT: 0, bob: 0, car: null, look: { y: 0, p: 0 }, slip: 0, slipV: null, push: null, rag: null, roll: 0 };
     G.looks[G.me] = ML.Account.look();
@@ -43,7 +43,7 @@
     if (ML.Dialogue.open) ML.Dialogue.forceClose();
     ML.Mini.forceClose(); ML.Cars.clear();
     if (G.rain) { ML.scene.remove(G.rain); G.rain = null; }
-    ML.Sfx.setEngine(false, 0);
+    ML.Sfx.setEngine(false, 0); if (ML.GPS) ML.GPS.reset();
   };
   G.stop = msg => {
     if (!G.on) return;
@@ -196,7 +196,9 @@
     if (ML.ERP.isOpen()) ML.ERP.close();
     const coins = ML.Account.endDay(res);
     let extra = { coins };
+    G.lastRes = res;
     if (G.isHost && G.game.campaign) extra = Object.assign(extra, ML.Camp.applyEnd(res));
+    else if (!G.game.campaign && G.game.mode === 'coop') extra.nextLabel = res.bankrupt ? 'Recommencer à zéro' : `Jour ${(G.game.E.day || 1) + 1} →`;
     else if (G.game.campaign && res.co) extra.camp = `<div class="camp"><p>${ML.Company.goal(Object.assign({}, G.game.E, { day: res.co.day, mach: res.snap ? res.snap.mach : G.game.E.mach, rep: res.rep }))}</p></div>`;
     ML.HUD.showEnd(res, extra);
   };
@@ -218,6 +220,7 @@
     ML.World.updateVisuals(dt, G.S, G.rt);
     ML.Fx.update(dt, G.S);
     ML.Cars.renderTraffic(dt);
+    ML.GPS.update(dt);
     ML.Dialogue.update(dt);
     if (!ML.ui.modal && G.p.car === null && !G.p.ride && G.p.stun <= 0 && G.S) G.scan(); else G.cur = null;
     G.updateView(dt);
@@ -245,6 +248,7 @@
     if (p.punchT > 0) p.punchT -= dt;
     G.fxNow = null;
     const can = !ML.ui.modal && p.stun <= 0 && I.active() && !G.ended;
+    if (I.pressed('Escape') && !ML.ui.modal && !I.active() && !G.ended) ML.HUD.showPause(true);    // 2e Échap hors du PC : vraie pause
     if (can) {
       if (I.pressed('KeyK')) ML.HUD.notify(ML.Sfx.toggleMute() ? '🔇 Son coupé' : '🔊 Son activé');
       if (I.pressed('KeyM')) ML.HUD.toggleMap();
@@ -257,7 +261,7 @@
     if (ML.ui.modal === 'dialogue') { for (let i = 1; i <= 9; i++) if (I.pressed('Digit' + i) || I.pressed('Numpad' + i)) { ML.Dialogue.pick(i - 1); break; } if (I.pressed('Escape')) ML.Dialogue.close(); }
     else if (ML.ui.modal === 'help' && (I.pressed('Tab') || I.pressed('Escape'))) ML.HUD.toggleHelp();
     else if (ML.ui.modal === 'map' && (I.pressed('KeyM') || I.pressed('Escape'))) ML.HUD.toggleMap();
-    else if (ML.ui.modal === 'erp' && I.pressed('Escape')) ML.ERP.close();
+    else if (ML.ui.modal === 'erp' && I.pressed('Escape')) ML.ERP.close();     // Échap : on sort du PC (sans mettre en pause)
 
     // --- passager (cabine ou benne) ---
     if (p.ride) {
@@ -279,9 +283,8 @@
       const r = ML.Cars.drive(c, dt, can, { frozen: sc && sc.frozen > S.rt, rain: S && S.weather === 'pluie', puddle: onPud });
       ML.Sfx.setEngine(true, c.speed);
       G.spillT -= dt;
-      // V4 : les caisses tombent beaucoup moins (virage très serré à grande vitesse ou gros choc). Le vieux Kangoo a une suspension fragile.
-      const sk = sc && (sc.kind === 'kangoo' ? [16, 8, 11] : sc.kind === 'camion' ? [30, 14, 16] : [22, 11, 15]);
-      if (sc && sc.bed.length && sc.kind !== 'tp' && G.spillT <= 0 && ((r.lat > sk[0] && Math.abs(c.speed) > sk[1]) || r.hard > sk[2])) { G.spillT = 1.5; G.intent({ a: 'spill', car: p.car, side: r.side }); }
+      // V4.1 : les caisses ne tombent QUE si on percute le décor à plus de 70 km/h (19,4 m/s)
+      if (sc && sc.bed.length && sc.kind !== 'tp' && G.spillT <= 0 && r.crash > 19.4) { G.spillT = 1.5; G.intent({ a: 'spill', car: p.car, side: r.side }); ML.HUD.notify('💥 Gros choc : des caisses sont tombées !', 'warn'); }
       if (c.kind !== 'tp' && c.fuel <= 0 && !G.dryOnce) { G.dryOnce = true; G.intent({ a: 'dry' }); }
       if (c.fuel > 5) G.dryOnce = false;
       if (can && I.pressed('KeyE')) G.exitCar();
@@ -305,8 +308,9 @@
     const unlimited = S && S.buffs.cafe > S.rt, coffee = S && S.pl[G.me] && S.pl[G.me].coffee > S.rt;
     const ko = !!(S && S.pl[G.me] && S.pl[G.me].ko);
     let speed = ko ? C.HP.koSpeed : PC.walk, sprint = false;
-    if (!ko && (I.down('ShiftLeft') || I.down('ShiftRight')) && len > 0 && (p.stamina > 0 || unlimited)) { speed = PC.sprint; sprint = true; if (!unlimited) p.stamina -= dt * (coffee ? 0.45 : 1); }
+    if (!ko && (I.down('ShiftLeft') || I.down('ShiftRight')) && len > 0 && (p.stamina > 0 || unlimited)) { speed = PC.sprint; sprint = true; if (!unlimited) p.stamina -= dt * (coffee ? 0.3 : 1); }
     else p.stamina = Math.min(PC.stamina, p.stamina + dt * 0.8);
+    if (coffee && !ko) speed *= C.COFFEE.mult;                           // café : beaucoup plus vite
     // auras : Fred (Arexis) et Mathieu (du coup…) ralentissent
     if (G.npcDist('fred') < 3.5 || (G.npcDist('mathieu') < 4 && (G.npcViews.mathieu || {}).group)) { speed *= 0.6; G.auraT -= dt; if (G.auraT <= 0) { G.auraT = 8; ML.HUD.notify(G.npcDist('fred') < 3.5 ? '💼 Fred te tient la jambe : « ARÉXIS ! » (tu ralentis)' : '🐌 Mathieu te parle… tu ralentis…'); } }
     const ox = p.pos.x, oz = p.pos.z;
@@ -338,6 +342,10 @@
     if (!can) return;
     const h = G.held();
     if (I.pressed('KeyE') && G.cur) ML.Rules.use(G.cur.id);
+    if (I.pressed('KeyR')) {                                             // R : ouvrir un colis (visé par terre, ou en main)
+      if (G.cur && G.cur.id.startsWith('item:') && G.itemViews[G.cur.id.slice(5)] && G.itemViews[G.cur.id.slice(5)].type === 'colis') G.intent({ a: 'open', id: +G.cur.id.slice(5) });
+      else if (h && h.type === 'colis') G.intent({ a: 'open' });
+    }
     if (h && h.type === 'extincteur') {
       if (I.leftDown) {
         G.fxNow = 'spray'; const e = G.eye(), f = G.forward();
@@ -373,8 +381,9 @@
   G.throwHeld = () => {
     const h = G.held();
     if (!h) { ML.HUD.notify('Rien en main à lancer. Prends un brut au rack !'); return; }
-    if (ML.Items.bulky(h)) { ML.HUD.notify('Trop lourd pour être lancé. Pose la caisse avec G.'); return; }
-    const f = G.forward(); G.intent({ a: 'throw', v: [f.x * 15, f.y * 15 + 2.5, f.z * 15] }); ML.Sfx.play('whoosh');
+    if (ML.Items.heavy(h)) { ML.HUD.notify('Une palette, ça ne se lance pas ! Le fenwick.'); return; }
+    const f = G.forward(), k = ML.Items.bulky(h) ? 1.25 : 1;            // une caisse se lance aussi (moins loin) : dans une benne, sur le plateau du camion…
+    G.intent({ a: 'throw', v: [f.x * 15 * k, f.y * 15 + 2.5 * k + (k > 1 ? 1.5 : 0), f.z * 15 * k] }); ML.Sfx.play('whoosh');
   };
 
   /* ======================= Voiture ======================= */

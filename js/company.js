@@ -31,7 +31,7 @@
       mach: list(d.mach, x => ML.MACHINES.some(m => m.id === x)) || F.mach,
       staff: list(d.staff, x => !!ML.STAFF[x]) || F.staff,
       ai: {}, veh: list(d.veh, x => !!ML.VEHICLES[x]) || F.veh, up: {}, stock: {},
-      insp: d.insp === 'due' ? 'due' : null, inspNext: num(d.inspNext, 0, 0, 9999), won: !!d.won,
+      insp: d.insp === 'due' ? 'due' : null, inspNext: num(d.inspNext, 0, 0, 9999), won: !!d.won, bankrupt: !!d.bankrupt,
       tot: { ca: num(d.tot && d.tot.ca, 0, 0, 1e9), served: num(d.tot && d.tot.served, 0, 0, 1e7), days: num(d.tot && d.tot.days, 0, 0, 1e5), best: num(d.tot && d.tot.best, 0, -1e7, 1e9) },
       log: Array.isArray(d.log) ? d.log.slice(-8).map(x => String(x).slice(0, 120)) : []
     };
@@ -47,8 +47,8 @@
   /** L'inspecteur peut-il venir ? (atelier prêt, ou jour limite) */
   Co.inspReady = E => !E.won && !E.insp && E.day >= (E.inspNext || 0) &&
     ((E.mach.length >= ML.CAMPAIGN.inspMach && E.rep >= ML.CAMPAIGN.inspRep) || E.day >= ML.CAMPAIGN.inspLate);
-  Co.summary = E => `🏭 <b>${ML.U.esc(E.name)}</b>${E.code ? ` · code <b class="code">${E.code}</b>` : ' · <span class="dim">sauvegarde sur ce PC</span>'} · 📅 jour ${E.day} · 💶 ${E.money.toLocaleString('fr-FR')} € · ⭐ ${E.rep}/100 · ${E.mach.length} machine${E.mach.length > 1 ? 's' : ''} · 👷 ${E.staff.length}${E.won ? ' · 🏆 terminé' : E.insp ? ' · 🎓 inspection demain !' : ''}`;
-  Co.goal = E => E.won ? '🏆 Campagne terminée : vous pouvez continuer à faire tourner l\'atelier.' :
+  Co.summary = E => `🏭 <b>${ML.U.esc(E.name)}</b>${E.code ? ` · code <b class="code">${E.code}</b>` : ' · <span class="dim">sauvegarde sur ce PC</span>'} · 📅 jour ${E.day} · 💶 ${E.money.toLocaleString('fr-FR')} € · ⭐ ${E.rep}/100 · ${E.mach.length} machine${E.mach.length > 1 ? 's' : ''} · 👷 ${E.staff.length}${E.bankrupt ? ' · 💸 FAILLITE' : E.won ? ' · 🏆 terminé' : E.insp ? ' · 🎓 inspection demain !' : ''}`;
+  Co.goal = E => E.bankrupt ? '💸 Faillite : crée une nouvelle entreprise (ou charge-en une autre avec son code).' : E.won ? '🏆 Campagne terminée : vous pouvez continuer à faire tourner l\'atelier.' :
     E.insp ? "🎓 L'inspecteur de l'Éducation Nationale vient à la prochaine journée !" :
     `🎯 Objectif : ${ML.CAMPAIGN.inspMach} machines (${E.mach.length}/${ML.CAMPAIGN.inspMach}) et réputation ${ML.CAMPAIGN.inspRep} (${E.rep}) → l'inspecteur viendra. (Au plus tard au jour ${ML.CAMPAIGN.inspLate}.)`;
   Co.ID = ID;

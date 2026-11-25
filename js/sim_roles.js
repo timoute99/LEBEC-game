@@ -296,8 +296,8 @@
     for (let i = 0; i < S.cars.length; i++) {
       const c = S.cars[i]; if (c.kind === 'fenwick' || IT.heavy(o)) continue;
       if (S.pl[o.thr] && (S.pl[o.thr].car === i)) continue;
-      const k = c.kind === 'tp' ? 0.4 : c.kind === 'camion' ? 1.6 : 1.25, bx = c.x - Math.sin(c.h) * k, bz = c.z - Math.cos(c.h) * k;
-      if (Math.hypot(o.x - bx, o.z - bz) < (c.kind === 'tp' ? 0.9 : c.kind === 'camion' ? 2.2 : 1.3) && o.y < 2.4 && o.vy < 0 && K.bedFree(c) >= 1) {
+      const k = c.kind === 'tp' ? 0.4 : c.kind === 'camion' ? 1.4 : 1.25, bx = c.x - Math.sin(c.h) * k, bz = c.z - Math.cos(c.h) * k;
+      if (Math.hypot(o.x - bx, o.z - bz) < (c.kind === 'tp' ? 0.9 : c.kind === 'camion' ? 2.8 : 1.4) && o.y < (c.kind === 'camion' ? 2.8 : 2.4) && o.vy < 0 && K.bedFree(c) >= 1) {
         o.gone = true; o.rest = true; c.bed.push(K.strip(o)); K.sfx('drop', c.x, c.z); K.note(o.thr, `🎯 Dans ${c.name} !`, 'good'); Sim.dirty = true; return true;
       }
     }

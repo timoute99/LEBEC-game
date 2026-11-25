@@ -285,3 +285,12 @@ button.mini.on { background: #2e86de; }
 .erp-body .bar { height: 8px; background: rgba(255,255,255,.1); border-radius: 4px; overflow: hidden; max-width: 400px; } .erp-body .bar i { display: block; height: 100%; background: #ffd257; }
 .erp-body select { padding: 3px; }
 #erp-card { max-width: none; overflow: hidden; }
+
+/* V4.1 : après Échap dans le PC / la carte : pas de pause, juste « clique pour reprendre » */
+#pause.soft { background: transparent; backdrop-filter: none; align-items: flex-end; padding-bottom: 150px; }
+#pause.soft .resume { background: rgba(18,20,30,.9); border: 1px solid rgba(255,210,87,.5); border-radius: 20px; padding: 10px 22px; font-size: 16px; color: #ffd257; animation: evp 1.6s infinite; }
+#gps { margin-top: 6px; padding: 5px 10px; border-radius: 10px; background: rgba(120, 40, 170, .88); border: 1px solid #c061ff; color: #fff; font-size: 13px; font-weight: bold; text-align: center; }
+.erp-item.prod .qty { display: flex; align-items: center; gap: 6px; } .erp-item.prod .qty b { min-width: 22px; text-align: center; font-size: 15px; }
+button.mini.del { background: rgba(231,76,60,.35); } button.mini:disabled { opacity: .35; }
+.erp-tab.cart td { padding: 4px 18px 4px 0; } .cart-btns { margin-top: 10px; display: flex; gap: 8px; align-items: center; } .cart-btns .go { font-size: 15px; padding: 8px 16px; }
+#endcard .won.broke { border-color: #e74c3c; background: rgba(231,76,60,.15); } #endcard .won.broke h2 { color: #ff6b6b; }

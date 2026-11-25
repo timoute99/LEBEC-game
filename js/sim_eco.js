@@ -30,14 +30,27 @@
     return [R.x, R.z];
   };
   /** Commande chez un fournisseur (livrée par camion après un délai) */
+  /** Commande « automatique » d'un lot (Sylvie) : rangée directement en stock à l'arrivée */
   K.supplyOrder = (pid, k, n, who) => {
     const L = ML.SUPPLY[k]; if (!L) return false;
-    n = U.clamp(n | 0, 1, 5);
-    const price = L.price * n + ECO.fee;
+    const q = L.lot * U.clamp(n | 0, 1, 5), price = L.price * q + ECO.fee;
     if (!K.spend(pid, price, 'achat', L.name)) return false;
     const d = ECO.supplierDelay, eta = S.rt + d[0] + rng() * (d[1] - d[0]);
-    S.deliv.push({ id: S.nextId++, k, q: L.q * n, eta, from: L.from, name: `${L.name}${n > 1 ? ' ×' + n : ''}` });
-    K.all(`🛒 ${who || name(pid)} a commandé ${L.name}${n > 1 ? ' ×' + n : ''} (${price} € port compris) : livraison dans ~${Math.round((eta - S.rt) / 60 * 10) / 10} min.`, 'info');
+    S.deliv.push({ id: S.nextId++, k, q, eta, from: L.from, name: `${L.name} ×${q}` });
+    K.all(`🛒 ${who || name(pid)} a commandé ${L.name} ×${q} (${price} € port compris) : livraison dans ~${Math.round((eta - S.rt) / 60 * 10) / 10} min.`, 'info');
+    Sim.dirty = true; return true;
+  };
+  /** Commande du panier du PC : tout arrive dans UN colis en réception */
+  K.cartOrder = (pid, cart) => {
+    const c = {}; let units = 0, price = 0;
+    for (const k in ML.SUPPLY) { const q = U.clamp((cart && cart[k]) | 0, 0, ML.CART_MAX); if (q) { c[k] = q; units += q; price += q * ML.SUPPLY[k].price; } }
+    if (!units) return false;
+    if (units > ML.CART_MAX) { K.note(pid, `Un colis contient au plus ${ML.CART_MAX} articles.`, 'warn'); return false; }
+    price += ECO.fee;
+    if (!K.spend(pid, price, 'achat', 'la commande')) return false;
+    const d = ECO.supplierDelay, eta = S.rt + d[0] + rng() * (d[1] - d[0]);
+    S.deliv.push({ id: S.nextId++, cart: c, eta, from: 'aciers', name: `Colis fournisseurs (${units} article${units > 1 ? 's' : ''})` });
+    K.all(`🛒 ${name(pid)} a passé commande : ${Object.keys(c).map(k => c[k] + ' × ' + ML.SUPPLY[k].name).join(', ')} — ${price} € port compris. Colis livré en RÉCEPTION dans ~${Math.round((eta - S.rt) / 60 * 10) / 10} min.`, 'info');
     Sim.dirty = true; return true;
   };
   const isCatOwned = k => {
@@ -101,6 +114,8 @@
         K.sfx('cash'); Sim.dirty = true; return;
       }
       case 'supply': K.supplyOrder(pid, String(m.k), m.n); return;
+      case 'order': K.cartOrder(pid, m.cart); return;
+      case 'unsub': { const k = String(m.k), it = ML.CATALOG[k]; if (!it || !it.daily || !S.up[k]) return; delete S.up[k]; K.all(`✂ ${name(pid)} a résilié : ${it.name}.`, 'info'); Sim.dirty = true; return; }
       case 'subpc': {
         const o = S.orders.find(x => x.id === +m.id); if (!o || o.q) return;
         const st = K.stage(o); if (st !== 'fonderie' && st !== 'chaudro') return;
@@ -236,7 +251,12 @@
     for (const d of S.deliv.slice()) {
       if (S.rt < d.eta) continue;
       S.deliv.splice(S.deliv.indexOf(d), 1); Sim.dirty = true;
-      if (d.k) { S.stock[d.k] += d.q; K.all(`🚚 Le camion de ${COMP[d.from].name} a livré : ${d.name} (rangé en stock).`, 'good'); K.sfx('success'); continue; }
+      if (d.k) { S.stock[d.k] += d.q; K.all(`🚚 Le camion de ${COMP[d.from].name} a livré : ${d.name} (Sylvie l'a rangé en stock).`, 'good'); K.sfx('success'); continue; }
+      if (d.cart) {
+        const n = Object.values(d.cart).reduce((a, b) => a + b, 0), [x, z] = K.receptionSpot();
+        K.spawnItem({ type: 'colis', d: { c: d.cart, n, sz: n <= 6 ? 's' : n <= 16 ? 'm' : 'l' } }, x, 0, z);
+        K.big('📦 Colis livré !', '#ffd257'); K.all(`📦 Le livreur a déposé un colis de ${n} article(s) en RÉCEPTION (zone bleue) : R pour l'ouvrir, puis range les produits (E sur le rack / l'armoire).`, 'good'); K.sfx('success'); continue;
+      }
       const o = S.orders.find(x => x.id === d.oid);
       if (!o || K.stage(o) !== d.sub) continue;
       const [x, z] = K.receptionSpot(); K.spawnItem({ type: 'brut_sp', d: { oid: o.id, mat: d.sub === 'fonderie' ? 'fonte' : 'soude' } }, x, 0, z);
