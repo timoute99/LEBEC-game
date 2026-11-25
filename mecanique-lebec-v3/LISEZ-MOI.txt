@@ -1,0 +1,87 @@
+MÉCANIQUE LEBEC — usinage en équipe (V3, 1 à 5 joueurs)
+=========================================================
+En ligne : https://lebec-game.onrender.com
+
+JOUER TOUT SEUL
+  Double-clic sur JOUER.bat (ou sur index.html) → pseudo → choisir le mode → « Jouer en solo ».
+
+JOUER À PLUSIEURS EN LOCAL (même PC ou même réseau)
+  1. Installer Node.js (https://nodejs.org, version 18 ou plus) une seule fois.
+  2. Double-clic sur SERVEUR-LOCAL.bat : il installe "ws" puis lance le serveur
+     et ouvre http://localhost:8080/
+  3. Un joueur clique « Créer un salon » et donne le CODE (4 lettres) aux autres,
+     qui cliquent « Rejoindre ». L'hôte choisit le MODE puis lance la journée.
+
+METTRE À JOUR LE SERVEUR EN LIGNE (Render) — même méthode que pour la V1
+  1. Remplacer les fichiers du dépôt GitHub par ceux de ce dossier
+     (garder les dossiers css, js, lib, outils, server ; PAS server/node_modules, PAS server/data).
+  2. Render redéploie tout seul (Build : cd server && npm install · Start : node server/server.js).
+  3. COMPTES JOUEURS PERMANENTS (conseillé) : dans Render → ton service → Environment,
+     ajoute toi-même ces variables (ne les mets jamais dans le code, ne les partage pas) :
+       AUTH_SECRET   = une longue phrase secrète au hasard (signe les connexions)
+       GITHUB_TOKEN  = un jeton GitHub (droits « Contents : read and write » sur un dépôt)
+       GITHUB_REPO   = propriétaire/nom-du-dépôt où ranger le fichier des comptes
+     Sans GITHUB_TOKEN/GITHUB_REPO, les comptes marchent mais sont perdus quand Render
+     redémarre (son disque gratuit est effacé). /health indique le stockage utilisé.
+
+COMPTES
+  - Invité : ton apparence, tes jetons et tes achats sont gardés dans CE navigateur.
+  - Compte (pseudo + mot de passe) : tu retrouves tout sur n'importe quel PC.
+  - Bouton « Profil, apparence & boutique » : peau, cheveux, tenues, chapeaux,
+    klaxons, tuning de la Mégane (peinture, aileron, flammes, jantes dorées), succès.
+  - Les jetons se gagnent en jouant (score, étoiles) et avec les 16 succès débiles.
+
+MODES
+  Journée libre · Campagne (5 jours, budget, réputation, améliorations de l'atelier,
+  apprentis, sauvegardée sur le PC de l'HÔTE ; jour 5 = l'Inspecteur) · Inspection
+  (boss : règles absurdes qui changent) · Course de Mégane (5 manches) ·
+  Mode traître (case à cocher, 3 joueurs minimum : un joueur payé par UsiFlash, vote à la fin).
+
+NOUVEAU EN V3
+  - « Personnaliser mon perso » au menu : aperçu 3D, peau, cheveux, barbe, lunettes,
+    couleur du bleu de travail, taille, corpulence (+ boutique).
+  - RÔLES choisis au salon (un par joueur, sauf Polyvalent) : Médecin, Cariste (fenwick),
+    Livreur (camion), Maintenance (pannes, bacs à copeaux), Magasinier (fournisseurs).
+    Rôle sans joueur = un PNJ le fait, lentement (Docteur Gwenn, Gégé, Momo, Sylvie).
+  - VIE : 5 coups de pelle = KO ; feu, glissade, claques, chien de la casse font mal.
+    KO = on se traîne mains vides jusqu'à ce que le médecin soigne.
+  - Pièces en 3 tailles : petites (se lancent), moyennes (caisse), GROSSES (palette :
+    fenwick → camion → client, touche R).
+  - Bacs à copeaux : plein = machine bloquée → maintenance → benne à copeaux → bac remis.
+  - On lance les outils aux usineurs (ils les attrapent) et les caisses dans les bennes.
+  - Voitures à plusieurs : passager (E sur la portière d'une voiture conduite) et benne.
+  - Carte plein écran : touche M (clic = repère pour l'équipe). Le son passe sur K.
+  - Ville réaliste : rocade rapide, avenues sinueuses, impasses (entreprises au fond),
+    lotissements en boucle, passants, casse auto avec son chien.
+  - Lebec : fin, blouse verte, « C'EST ÉCRIT DANS LE POLY !! » dans le dos.
+
+CHAQUE PARTIE EST DIFFÉRENTE
+  Nouvelle ville (routes en désordre, entreprises dispersées), humeur de Lebec, météo,
+  événements surprises tirés au hasard, stock, essence, opérateurs mélangés sur les postes,
+  copeaux, flaques, cachettes des trouvailles.
+
+BUT DU JEU
+  Des tickets arrivent. Brut (racks) + outil (armoire rouge) → la bonne machine
+  (mini-jeu : prise d'origine) → la caisse sort en EXPÉDITION → (contrôle au marbre
+  au pied à coulisse : +5) → benne d'une voiture ou transpalette → livrer au client.
+  Fonderie, chaudronnerie, traitement thermique : certains tickets passent chez eux.
+  Chaos : feux de copeaux (extincteur), pannes (clé à molette), outil usé (plaquette neuve),
+  flaques d'huile (on glisse), pigeon voleur, caisses qui tombent en virage, essence,
+  radars, gendarmerie, circulation et feux rouges.
+  Visiteurs : audit de Jacky, Hervé et sa convention, Fred et Arexis, Mathieu,
+  saboteur d'UsiFlash, coupure de courant.
+
+TOUCHES (clavier/souris)
+  ZQSD bouger · Souris regarder · Maj courir · Espace sauter / frein à main
+  E interagir · G poser · Clic gauche : claque OU outil (extincteur maintenu, soufflette)
+  Clic droit : lancer · 1-3 / molette : main · 4-9 : émotes · T : ping « viens ici »
+  En voiture : Z/S, Q/D, Espace, V vue, H klaxon, F faire le plein (à la pompe), E descendre
+  M carte · K son · Tab aide · R fourches du fenwick / décharger le camion
+
+MANETTE (Xbox / PlayStation, branchée avant ou pendant la partie)
+  Sticks bouger/regarder · A sauter · X interagir · B poser · Y main suivante
+  RB action (claque/outil) · LB lancer · RT/LT accélérer/freiner · L3 courir · R3 klaxon
+  Croix : haut = ping, droite/bas/gauche = émotes · Start : aide · Select : vue voiture
+
+ATTENTION À LEBEC : s'il voit quelqu'un frapper (ou le souffler à la soufflette),
+sa colère monte. À 50 : COUP DE PELLE (vol plané et tout lâché).
