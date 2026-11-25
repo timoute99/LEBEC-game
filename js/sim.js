@@ -111,7 +111,7 @@
   K.big = (s, c, to) => ev.push({ e: 'big', s, c, to });
   K.ev = o => ev.push(o);
   K.stat = (to, k, n) => ev.push({ e: 'stat', to, k, n: n || 1 });
-  K.say = (n, s, speak) => { n.tmp = s; n.tmpT = 4; ev.push({ e: 'say', n: n.id, s, sp: speak ? 1 : 0 }); };
+  K.say = (n, s, speak) => { n.tmp = s; n.tmpT = Math.max(4, String(s).length / 15); ev.push({ e: 'say', n: n.id, s, sp: speak ? 1 : 0 }); };
   Sim.drain = () => { const e = ev; ev = []; return e; };
   const { note, all, sfx, big, say } = K;
 
@@ -561,6 +561,9 @@
     const M = S.machines[n.mid];
     switch (n.state) {
       case 'work': {
+        // il parle tout seul de temps en temps (répliques de persos.js)
+        n.chatT = (n.chatT === undefined ? 15 + rng() * 40 : n.chatT) - dt;
+        if (n.chatT <= 0) { n.chatT = 50 + rng() * 60; if (!(n.tmpT > 0)) say(n, ML.line(n.id)); }
         // un seul opérateur pour plusieurs machines : il va là où il y a du travail
         if (n.mids && n.mids.length > 1 && !busy(n.mid) && !n.path.length) {
           const other = n.mids.find(x => x !== n.mid && busy(x));

@@ -19,6 +19,8 @@ ML.PERSOS_TXT = `
 #  - Une liste (répliques:, pause:, colère:…) = une réplique par ligne,
 #    chaque ligne commence par « - ». Ajoute-en autant que tu veux :
 #    le jeu les tire au hasard sans répéter tant qu'il n'a pas tout dit.
+#  - Une ligne vide termine la liste. Les phrases écrites après une ligne
+#    vide (avec ou sans « - ») vont dans les répliques normales du perso.
 #  - Seul caractère interdit : l'accent grave (celui de la touche Alt Gr + 7).
 #    S'il y en a un, le jeu ignore ce fichier et garde ses anciennes répliques.
 #    Les apostrophes ' et les guillemets « » " sont autorisés.
@@ -57,6 +59,7 @@ rôle: Utilisées quand un personnage n'a pas sa propre liste
 renverse:
 - Eh oh ! Regarde où tu roules !
 - Ça va pas la tête ?!
+- BOMBOCLAAT !
 - Il y a un trottoir, tu sais !
 - Je vais le dire à Lebec !
 - Mon dos ! Mon pauvre dos !
@@ -174,6 +177,15 @@ retour:
 embauche:
 - Salut ! C'est où le parking ? J'ai une Mégane à garer.
 
+
+- Quelqu'un a vu mes injecteurs ?
+- Personne n'a 120 kg de patates à me vendre, par hasard ?
+- C'est quoi une fraction ?
+- 2 premières années de GMP ? Pourquoi pas 3 ? Jamais deux sans trois, non…
+- Triple zéro en RobotStudio, c'était un peu dur quand même…
+- Les bouteilles à Ublo, c'était marrant 2 mois…
+
+
 [marius]
 nom: Marius Challine
 rôle: Opérateur
@@ -205,6 +217,15 @@ lance:
 - Pièce chargée. Démarrage.
 embauche:
 - Initialisation terminée. Où est ma machine ?
+
+- Chuis un gros bot…
+- Alors voyons voir… couper la tomate en deux, la tourner de pi/2 radians, la recouper en deux, puis mettre dans le bol… Merci maman pour les instructions, je sais pas ce que je ferais sans toi !
+- En vrai, un cordon bleu au bain-marie, c'est pas si mauvais hein…
+- Ça va, la troisième c'est une classe qui se redouble bien en vrai…
+- Personne n'en parle, mais le brevet c'est vraiment pas si facile que ça hein…
+- Bon, je vous laisse, je vais réviser les maths !! J'ai hâte…
+- Vivement ce soir pour que je révise les maths !!!
+ROOOUXXXXX !!!!
 
 [matis]
 nom: Matis Caillou
@@ -248,6 +269,14 @@ miam:
 embauche:
 - Bonjour ! Il y a une machine à café ? Et des gâteaux ?
 
+- Maticaillou Super U ?
+- Je me demande où je vais dormir ce soir… Chez Timothée ou chez Noé ? Chez Amaury peut-être ?
+- Hmmmm, je devrais peut-être renvoyer un mail à l'IUT pour être payé du stage que j'ai fait il y a trois ans, non ?…
+- Ce matin, un lutin malicieux a éteint mon réveil à ma place… J'ai dormi jusqu'à 10 h…
+- J'ai dormi 3 h cette nuit ! Une petite poignée de minutes en plus et j'étais en forme royale aujourd'hui !!
+- Mati… PROUT !!!
+
+
 [brieuc]
 nom: Brieuc
 rôle: Opérateur
@@ -289,6 +318,7 @@ retour:
 - J'ai fini ma pause. Celle d'avant la prochaine.
 embauche:
 - … Salut. On commence à quelle heure ? Tard j'espère.
+
 
 [app1]
 nom: Kylian
@@ -517,6 +547,7 @@ boxe:
 - Mon coach disait : « frappe vite, frappe juste ». Comme une fraise à 12 000 tours.
 - L'uppercut, c'est vertical. Comme une perceuse. Bam !
 - Un bon boxeur, ça respire. Toi aussi, respire. Voilà. Tiens tes forets.
+
 
 [axel]
 nom: Axel Boulard
@@ -818,11 +849,14 @@ infraction:
   const TEXT = ['personnalite', 'dans le jeu', 'idees', 'idee', 'notes'], P = {}, L = {};
   let id = null, list = null, field = null;
   for (const raw of ML.PERSOS_TXT.split('\n')) {
-    const line = raw.trim(); if (!line || line.startsWith('#')) continue;
+    const line = raw.trim();
+    if (!line) { list = null; field = null; continue; }                  // une ligne vide termine la liste en cours
+    if (line.startsWith('#')) continue;
     let m;
     if ((m = line.match(/^\[([a-z0-9_]+)\]$/i))) { id = m[1].toLowerCase(); P[id] = P[id] || { lists: {} }; list = null; field = null; continue; }
     if (!id) continue;
-    if (line.startsWith('-')) { const t = line.replace(/^-\s*/, ''); if (list && t) (L[list] = L[list] || []).push(t); continue; }
+    const add = t => { if (t) (L[list || id] = L[list || id] || []).push(t); };   // hors liste → répliques
+    if (line.startsWith('-')) { add(line.replace(/^-\s*/, '')); continue; }
     if ((m = line.match(/^([^:]{1,40}):\s*$/))) {                       // « pause: » → une liste commence
       const k = norm(m[1]).replace(/\s+/g, '_'); list = k === 'repliques' ? id : id + '_' + k; field = null; P[id].lists[k] = 1; continue;
     }
@@ -830,6 +864,7 @@ infraction:
       const k = norm(m[1]); P[id][k] = m[2].trim(); field = TEXT.includes(k) ? k : null; list = null; continue;
     }
     if (field) P[id][field] += ' ' + line;                               // suite d'une note sur plusieurs lignes
+    else add(line);                                                      // phrase sans « - » : comptée quand même
   }
   for (const k in P) if (ML.PEOPLE[k]) { if (P[k].nom) ML.PEOPLE[k].name = P[k].nom; if (P[k].role) ML.PEOPLE[k].role = P[k].role; }
   for (const k in L) ML.LINES[k] = L[k];
