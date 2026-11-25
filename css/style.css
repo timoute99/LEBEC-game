@@ -212,3 +212,5 @@ input { background: #1d2230; color: #fff; border: 1px solid #556; border-radius:
 .lk input[type=range] { width: 120px; }
 #lobby.preview { background: transparent; pointer-events: none; }
 #lobby.preview > * { pointer-events: auto; }
+
+#version { position: fixed; right: 6px; bottom: 3px; font-size: 10px; opacity: .45; color: #fff; pointer-events: none; z-index: 50; }
