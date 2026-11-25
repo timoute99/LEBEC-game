@@ -5,6 +5,17 @@
    tourner l'atelier (sinon tout le monde serait figé).
    ===================================================================== */
 (function () {
+  ML.Main = {
+    /** Aperçu 3D du perso du joueur (on = true : (re)construit) */
+    preview: on => {
+      if (ML.Main.pv) { ML.People.dispose(ML.Main.pv); ML.Main.pv = null; }
+      if (!on || ML.Game.on) return;
+      const L = ML.Account.look(), suit = L.suit;
+      const v = ML.People.build({ skin: L.skin, shirt: L.shirt || suit, pants: suit, hair: L.hair, height: L.height, width: L.width, beard: L.beard, glasses: L.glasses },
+        { name: ML.Account.name() || 'Moi', helmet: L.hat ? null : 0xf5f5f5, hat: L.hat, vest: (ML.ROLES[ML.Lobby.myRole] || ML.ROLES.poly).color });
+      v.pos.set(0, 0, 22); v.target.copy(v.pos); v.yaw = 0.5; v.seen = true; ML.Main.pv = v;
+    },
+    menuScene: () => { ML.scene.background.copy(ML.light.day); ML.scene.fog.color.copy(ML.light.day); ML.scene.fog.near = 90; ML.scene.fog.far = 260; ML.light.sun.intensity = 0.85; ML.light.hemi.intensity = 0.8; } };
   async function boot() {
     const canvas = document.getElementById('gl');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -26,7 +37,7 @@
     ML.Input.init(canvas);
     document.getElementById('loading').textContent = 'Chargement des décors…';
     await ML.Assets.load();
-    ML.World.build(scene);
+    ML.World.build(1234567, {});                 // ville du menu (chaque partie a la sienne)
     ML.HUD.init(); ML.Dialogue.init(); ML.Lobby.init();
     document.getElementById('loading').classList.add('hidden');
     camera.position.set(30, 22, 60); camera.lookAt(0, 0, 0);
@@ -39,7 +50,14 @@
       requestAnimationFrame(loop);
       const now = performance.now(), raw = Math.min(0.5, (now - last) / 1000), dt = Math.min(0.05, raw); last = now;
       if (ML.Game.on) ML.Game.step(dt, true, raw);
-      else { menuT += dt * 0.05; camera.position.set(Math.sin(menuT) * 70, 28, 60 + Math.cos(menuT) * 50); camera.lookAt(0, 0, 40); sun.position.set(30, 60, 20); }
+      else if (ML.Main.pv) {                                      // aperçu du perso (menu « Mon perso »)
+        const v = ML.Main.pv; v.yaw += dt * 0.6; v.tYaw = v.yaw; ML.People.animate(v, dt, null);
+        camera.position.set(1.7, 1.3, 25.6); camera.lookAt(1.45, 1.0, 22);
+        sun.position.set(10, 30, 40); sun.target.position.set(0, 0, 22); sun.target.updateMatrixWorld();
+      } else {
+        menuT += dt * 0.05; camera.position.set(Math.sin(menuT) * 70, 28, 60 + Math.cos(menuT) * 50); camera.lookAt(0, 0, 40);
+        sun.position.set(30, 60, 20); sun.target.position.set(0, 0, 0); sun.target.updateMatrixWorld(); ML.Input.pollPad(dt);
+      }
       renderer.render(scene, camera);
       ML.Input.endFrame();
     }

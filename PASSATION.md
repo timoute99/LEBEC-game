@@ -1,79 +1,57 @@
-# Mécanique Lebec (multijoueur) : document de passation
+# Mécanique Lebec V3 (multijoueur) : document de passation
 
-Pour reprendre le projet sans contexte. Utilisateur francophone, étudiant BUT GMP : texte du jeu et commentaires en français, rendu soigné, vérifier avant de livrer.
+V3 (nov. 2026) : rôles + vie/KO + PNJ de secours (`js/sim_roles.js`, enregistré AVANT chaos/city/events pour pouvoir refuser une action), pièces 3 tailles + fenwick/camion, bacs à copeaux, passagers (`car.pass`, `P.ride`), carte plein écran (`HUD.toggleMap`), personnalisation avec aperçu 3D (`ML.Main.preview`), ville refaite (`citygen.js` : rocade en U, avenues, rues greffées en T, impasses `node.cul`, lotissements, noms de rues `city.labels`), passants (`f.ps`) et chien de la casse (`f.dog`). Rôles transmis par relais `{k:'role'}` dans le salon, figés par l'hôte dans `cfg.roles`. Profil : `look` accepte aussi suit, height, width, beard, glasses (whitelist serveur).
+
+
+Pour reprendre le projet sans contexte. Utilisateur francophone, étudiant BUT GMP : texte du jeu et commentaires en français, rendu soigné, vérifier avant de livrer. Style voulu : chaos 4/5, simple à comprendre.
 
 ## 1. Le projet
-Jeu coopératif 3D façon *Overcooked*, mais en atelier d'usinage, de 1 à 5 joueurs dans le navigateur.
-Des tickets arrivent : brut + outil → machine → caisse → (sous-traitant) → livraison au client en voiture.
-La V1 sert à valider le multijoueur. La V0 solo (avec quêtes, planning, Jacky, Hervé…) est dans un autre zip (« atelier-lebec »).
+Jeu coopératif 3D façon *Overcooked* en atelier d'usinage, 1 à 5 joueurs dans le navigateur, clavier/souris ou manette.
+V2 = V1 (multi validé) + les 4 vagues demandées : chaos, ville vivante, mini-jeux/événements/visiteurs/humeur, campagne/comptes/boutique/succès/traître/inspecteur.
 
 ## 2. Contraintes (à respecter)
-- **Marche en double-clic** (`file://`) : pas de modules ES, pas de `fetch`. Uniquement des `<script>` classiques, dans l'ordre de `index.html`.
-- **Tout est sous `window.ML`.** Chaque fichier est une IIFE qui ajoute son module (`ML.Sim`, `ML.Game`…).
-- **Three.js r128** (`lib/three.min.js` + `lib/GLTFLoader.js`), comme le projet Backrooms.
-- **Décors KayKit** : ils sont dans `assets-ville.js` (base64, ~1,4 Mo), extraits de l'`assets-data.js` de Backrooms par `outils/extraire-assets-ville.js`.
-  - Tous les modèles partagent un `MeshLambertMaterial` avec l'atlas, en encodage linéaire (pas de sRGB : les couleurs hex du code restent justes).
-- **Textures dessinées par code** (`textures.js`), pas de photos.
+- **Marche en double-clic** (`file://`) : pas de modules ES, pas de `fetch`. `<script>` classiques dans l'ordre de `index.html`.
+- **Tout est sous `window.ML`**, une IIFE par fichier. **Three.js r128** local. Décors KayKit en base64 (`assets-ville.js`).
+- **SECRETS** : `GITHUB_TOKEN`, `GITHUB_REPO`, `AUTH_SECRET` sont des variables d'environnement Render que l'utilisateur règle lui-même. Ne les demande pas, ne les affiche pas et ne les écris jamais dans le code. Ne jamais livrer `server/node_modules` ni `server/data`.
 
-## 3. Architecture réseau
-- **Serveur** (`server/server.js`, Node ≥ 18 + `ws`) : il ne fait que relayer.
-  - Salons à code de 4 lettres, 5 joueurs maximum.
-  - Il garde la place d'un joueur 20 s après une coupure (reprise de session via l'identifiant d'onglet `sid`, stocké dans sessionStorage), et envoie un ping toutes les 15 s.
-  - Limite de débit : 120 messages/s par joueur.
-  - Il sert aussi les fichiers du jeu, donc l'URL Render est directement jouable.
-  - Endpoint `/health`.
-- **L'hôte fait autorité** (`sim.js`, exécuté seulement chez lui) : tickets, stock, machines, PNJ, objets, sous-traitants, trouvailles, score, et position des voitures non conduites.
-- **Ce que chaque client envoie** (relais) :
-  - `{k:'p'}` sa pose, 15 fois par seconde, à tout le monde ; elle contient la voiture qu'il conduit ;
-  - `{k:'a', a:…}` ses intentions, à l'hôte seulement. Une intention porte la position `p` du joueur au moment de l'action.
-- **Ce que l'hôte diffuse** :
-  - `{k:'f'}` 10 fois par seconde : PNJ, objets en mouvement, voitures ;
-  - `{k:'s'}` l'état complet, dès qu'il change (au plus toutes les 0,1 s) et au moins une fois par seconde ;
-  - `{k:'e', l:[…]}` les événements : notification `n`, réplique `say`, gros texte `big`, son `sfx`, claque `stun`, coup de pelle `pelle`, fin de journée `end`.
-- **Intentions** (`a`) :
-  - `use` (id de cible), `drop`, `throw`, `hit`, `exit` (sortir de voiture) ;
-  - `eliott` (résultat du mini-jeu), `coco`, `sub` (commande à la fonderie ou la chaudronnerie).
-- **Identifiants de cibles** : `rack:alu`, `tool:fraise`, `mach:T1`, `npc:amaury`, `item:12`, `car:0:door`, `car:0:bed`, `pl:<id joueur>`, `reception`, `coffee`.
-  - `rules.js` calcule le texte [E] côté client, à partir de l'état répliqué `ML.Game.S`.
-  - `sim.js` applique les actions.
-- **Hôte qui rame** : la simulation avance au temps réel, par sous-pas de 50 ms (`G.step(dt, render, raw)`). Si l'onglet de l'hôte est masqué, une minuterie de 100 ms continue la partie (`main.js`).
-- **Départ de l'hôte** : la partie s'arrête chez les autres et ils retournent au salon (pas de migration de la simulation en V1).
+## 3. Réseau (inchangé sur le principe)
+- Serveur `server/server.js` (Node ≥ 18 + `ws`) : salons (code 4 lettres, 5 max), relais, reprise 20 s, ping, limite de débit, fichiers statiques, `/health`.
+  - V2 : `{t:'start', seed, cfg}` (cfg = mode de jeu, relayé à tous) et les **comptes** `{t:'acc', q, op:'register'|'login'|'resume'|'save'}` → `{t:'accr', q, ok, …}` (mots de passe scrypt, jetons HMAC, profil filtré par `cleanProfile`). Stockage : GitHub (contents API) si `GITHUB_TOKEN`+`GITHUB_REPO`, sinon `server/data/accounts.json`.
+- L'hôte fait autorité (`sim*.js`). Clients → `{k:'p'}` pose 15 Hz (avec voiture, essence `f`, effet `fx`), `{k:'a'}` intentions (avec position `p`), `{k:'look'}` apparence. Hôte → `{k:'f'}` 10 Hz (PNJ, objets en vol, voitures, circulation `tr`, gendarmerie `pol`, pigeon `pg`), `{k:'s'}` état complet sur changement, `{k:'e'}` événements.
+- Événements V2 : `stat` (succès, envoyé au joueur concerné), `secret` (traître), `emote`, `ping`, `horn`, `push`, `flash`, `arrest`, `fuel`, `vote`, `voted`, `end`.
+- Intentions V2 : `spray`, `blow`, `slip`, `repair`, `spill`, `horn`, `refuel`, `dry`, `audit`, `mathieu`, `vote`, `emote`, `ping` ; `use` peut porter `mg` (résultat de mini-jeu) ou `ctl` (contrôle au marbre).
+- Les secrets (identité du traître) restent dans `ML.Sim.K.priv`, jamais dans l'état diffusé.
 
 ## 4. Fichiers
 | Fichier | Rôle |
 |---|---|
-| `js/config.js` | **Équilibrage et contenu** : durées, stock de départ, pièces, machines, entreprises (position, quai), trouvailles, persos, répliques |
-| `js/util.js` | rng à graine, collisions cercle/boîte (`ML.colliders`), étiquettes sprite |
-| `js/textures.js` | textures canvas (béton, asphalte, herbe, brique, tôle, bardage, bois, quai) |
-| `js/assets.js` | chargement des modèles KayKit (`ML.Assets.clone(nom, échelle)`) |
-| `js/net.js` | client WebSocket (réveil de Render, reprise, événements) |
-| `js/items.js` | types d'objets + modèles 3D |
-| `js/people.js` | personnages low-poly (PNJ et avatars), animation, objet tenu |
-| `js/world.js` | carte déterministe (graine fixe) : atelier à 4 postes, routes, entreprises, décor KayKit, cachettes (`ML.LOC.hides`) |
-| `js/cars.js` | Méga Mégane et Kangoo : modèle, conduite locale du conducteur, caméra |
-| `js/rules.js` | textes [E] et interfaces locales (mini-jeux) |
-| `js/sim.js` | **simulation de l'hôte** |
-| `js/dialogue.js` | dialogues, écoute chronométrée, mini-jeu d'Eliott |
-| `js/hud.js` | tickets, équipe, mini-carte, inventaire, fin de journée, aide |
-| `js/game.js` | session : contrôles locaux, synchro, interpolation, rendu |
-| `js/lobby.js` | menus : solo, créer/rejoindre, salon |
-| `js/main.js` | démarrage et boucle |
+| `js/config.js` | **contenu et équilibrage** : machines, entreprises (tailles, plus de position), humeurs, météo, événements, règles de l'inspecteur, succès, boutique, améliorations, persos, répliques, quiz |
+| `js/citygen.js` | **ville générée par graine** : carrefours au hasard, arbre couvrant + raccourcis sans croisement, entreprises dispersées le long des routes, décor, radars, feux, cachettes, perchoirs |
+| `js/world.js` | construit la 3D à partir de la ville (`World.build(seed, upgrades)` à chaque partie), atelier (postes T3/F3 achetables), cibles, `ML.LOC` |
+| `js/sim.js` | **cœur de la simulation de l'hôte** + outillage partagé `Sim.K` ; les modules s'y branchent via `Sim.mods` (init/step/act/use/machineUse/npcUse/npcHit/brain/bubble/workMult/itemHit/fast/onEnd/voteStep) |
+| `js/sim_chaos.js` | copeaux → feux, pannes, usure d'outil, flaques, pigeon, extincteur, soufflette |
+| `js/sim_city.js` | véhicules (Mégane, Kangoo, Ducato, transpalette), essence, caisses qui tombent, circulation + feux, radars, gendarmerie, mode course |
+| `js/sim_events.js` | événements tirés au hasard (audit, coupure, sabotage, Hervé, Fred, Mathieu, panne), inspection (règles), traître (vote) |
+| `js/fx.js` | rendu des feux, tas de copeaux, flaques, pigeon, particules, pings |
+| `js/minigames.js` | mini-jeux locaux : origine, plaquette, serrer, pied à coulisse, quiz, Arexis |
+| `js/account.js` | profil, jetons, boutique, succès |
+| `js/cars.js` | modèles, conduite (essence, pluie, flaques, roulis), tuning, rendu circulation/gendarmerie |
+| `js/input.js` | clavier, souris, **manette** (touches virtuelles) |
+| `js/people.js` | personnages (chapeaux, ragdoll, émotes) |
+| `js/rules.js` | textes [E] et déclenchement (mini-jeux → intention) |
+| `js/hud.js` | tickets, bandeau d'événements, carte du jour, course, vote, succès, fin de journée + améliorations |
+| `js/game.js` | session : contrôles, synchro, rendu, météo |
+| `js/lobby.js` | menus, compte, profil/boutique, modes, **campagne** (`ML.Camp`, localStorage de l'hôte) |
 
-## 5. Tests (méthode)
-- **Solo en `file://`** : `index.html?debug` (pas de verrouillage de la souris).
-  - Pilotage par `ML.Game`, `ML.Sim.act(pid, {a, id, sel})`, `ML.Rules.use(id)`.
-- **Multijoueur réel** : `PORT=8099 node server/server.js`, puis 3 contextes Playwright sur `http://localhost:8099/?debug`.
-  - Testé : création et adhésion au salon, lancement, brut et outil donnés par 2 joueurs différents, passage d'objet entre joueurs, claque entre joueurs, voiture conduite vue par les autres, état identique chez tous, coupure d'un joueur (place libérée après 20 s), fin de journée, « Nouvelle journée », départ de l'hôte.
-  - Aucune erreur console.
-- **Vérifier la syntaxe** : `for f in js/*.js server/server.js; do node --check $f; done`.
-- **Livrer** : zipper sans `server/node_modules`.
+## 5. Tests réalisés (Playwright + serveur local, sans erreur console)
+- Solo : les 4 modes, 150 s d'avance rapide chacun ; tous les événements forcés (Hervé → convention signée par Lebec, coupure → tableau, Fred → Arexis, Mathieu, audit de Jacky) ; feu éteint à l'extincteur, panne, flaque, pigeon ; contrôle au marbre ; conduite avec caisse tombée en virage ; fin de journée.
+- Production complète : brut + prise d'origine + outil, usure → changement d'outil, caisse en expédition.
+- Campagne : fin du jour 1, achat du T3 (apprenti), jour 2 avec 5 machines ; jour 5 = inspection (infractions klaxon/claque), avis favorable → nouvelle saison.
+- Multi 3 navigateurs : création de compte + reconnexion depuis un autre navigateur (profil retrouvé), apparence transmise (couronne), même ville chez tous, émote, ping, soufflette qui pousse un joueur, circulation synchronisée, traître choisi et prévenu en secret, vote et révélation, mode course (arrivée et points).
+- Manette simulée (stick, regard), mini-jeux au clavier réel.
 
-## 6. Non vérifié / à faire
-- Pas encore testé en ligne sur Render, ni avec de vrais joueurs ; l'équilibrage (durée des tickets, étoiles) est à régler en jeu.
-- Pistes V2 (demandées) :
-  - remettre les quêtes de la V0 (Jacky et l'audit de la Réf A, Hervé et la convention, Fred et Arexis, la tirade de Lebec), Mathieu, UsiFlash ;
-  - avatars KayKit animés ;
-  - plus de sous-traitants (peinture, rectification) ;
-  - migration d'hôte ;
-  - version téléphone.
-- Novatics et Ublo sont des **clients** au look inventé : on ne connaît pas leur vrai métier, à demander à l'utilisateur.
+## 6. Non vérifié / pistes
+- Pas testé sur Render ni avec de vrais joueurs : équilibrage à régler (fréquence des feux/pannes `sim_chaos.js`, seuil des caisses qui tombent `game.js`, durée des tickets `config.js`).
+- Circulation simple (téléportation au carrefour, la gendarmerie « coupe » quand elle est bloquée).
+- Pas de migration d'hôte ; campagne liée au PC de l'hôte.
+- Vraie manette non testée (seulement simulée).

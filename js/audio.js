@@ -40,14 +40,28 @@
     fail: v => [392, 330, 262].forEach((f, i) => setTimeout(() => tone(f, 0.18, 'sawtooth', 0.1 * v), i * 140)),
     find: v => [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.12, 'triangle', 0.14 * v), i * 80)),
     horn: v => { tone(410, 0.35, 'square', 0.15 * v); tone(520, 0.35, 'square', 0.12 * v); },
-    bip: v => tone(1200, 0.05, 'square', 0.05 * v)
+    bip: v => tone(1200, 0.05, 'square', 0.05 * v),
+    fire: v => { noise(0.5, 0.25 * v, 900); setTimeout(() => noise(0.2, 0.2 * v, 1500), 200); },
+    dog: v => { tone(260, 0.12, 'sawtooth', 0.18 * v, 180); setTimeout(() => tone(240, 0.14, 'sawtooth', 0.18 * v, 160), 170); },
+    pigeon: v => { tone(420, 0.12, 'sine', 0.15 * v, 360); setTimeout(() => tone(400, 0.18, 'sine', 0.15 * v, 330), 160); },
+    blow: v => noise(0.35, 0.3 * v, 5000),
+    slip: v => tone(900, 0.45, 'sine', 0.15 * v, 180),
+    siren: v => { tone(700, 0.3, 'square', 0.07 * v); setTimeout(() => tone(950, 0.3, 'square', 0.07 * v), 300); },
+    flash: v => { noise(0.05, 0.4 * v, 8000); tone(2000, 0.08, 'sine', 0.1 * v); },
+    emote: v => tone(880, 0.08, 'triangle', 0.08 * v, 1320),
+    horn_base: v => { tone(410, 0.35, 'square', 0.15 * v); tone(520, 0.35, 'square', 0.12 * v); },
+    horn_canard: v => { tone(620, 0.12, 'sawtooth', 0.15 * v, 330); setTimeout(() => tone(600, 0.16, 'sawtooth', 0.15 * v, 300), 150); },
+    horn_cucaracha: v => [392, 392, 392, 523, 659, 0, 392, 392, 392, 523, 659].forEach((f, i) => f && setTimeout(() => tone(f, 0.11, 'square', 0.1 * v), i * 120)),
+    horn_sirene: v => { tone(500, 0.5, 'sawtooth', 0.09 * v, 1100); setTimeout(() => tone(1100, 0.5, 'sawtooth', 0.09 * v, 500), 500); },
+    horn_pelle: v => { tone(300, 0.2, 'square', 0.1 * v); S.speak('Coup de pelle !', { force: true, pitch: 0.6 }); }
   };
+  S.horn = (k, x, z) => { const n = 'horn_' + String(k || 'base').replace('klaxon_', ''); if (x === undefined) S.play(SOUNDS[n] ? n : 'horn_base'); else S.at(SOUNDS[n] ? n : 'horn_base', x, z); };
   S.play = (name, vol) => { if (SOUNDS[name]) SOUNDS[name](vol === undefined ? 1 : vol); };
   /** Son localisé : plus faible quand c'est loin de la caméra */
   S.at = (name, x, z) => {
     const c = ML.camera; if (!c) return S.play(name);
     const d = Math.hypot(c.position.x - x, c.position.z - z);
-    if (d < 45) S.play(name, Math.max(0.15, 1 - d / 45));
+    if (d < 60) S.play(name, Math.max(0.15, 1 - d / 60));
   };
   S.setEngine = (on, speed) => {
     if (!S.ctx) return;

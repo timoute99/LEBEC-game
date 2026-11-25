@@ -1,27 +1,77 @@
 /* =====================================================================
-   lobby.js — Menus : accueil (pseudo, solo, créer / rejoindre un salon),
-   salon (5 joueurs, code à partager, lancement par l'hôte).
+   lobby.js — Menus : accueil (compte / invité, solo, créer / rejoindre),
+   profil (apparence + boutique), salon (5 joueurs, mode de jeu choisi
+   par l'hôte), et la CAMPAGNE (sauvegardée sur le PC de l'hôte).
    ===================================================================== */
 (function () {
   const L = ML.Lobby = {};
-  const U = ML.U, N = ML.Net, $ = id => document.getElementById(id);
+  const U = ML.U, N = ML.Net, A = ML.Account, $ = id => document.getElementById(id);
 
+  /* ======================= Campagne (PC de l'hôte) ======================= */
+  const Camp = ML.Camp = {};
+  Camp.load = () => { let c; try { c = JSON.parse(localStorage.getItem('ml_campaign') || 'null'); } catch (e) { c = null; } return c && c.day ? c : { day: 1, budget: 0, rep: 50, up: {}, wins: 0 }; };
+  Camp.save = c => localStorage.setItem('ml_campaign', JSON.stringify(c));
+  Camp.reset = () => { localStorage.removeItem('ml_campaign'); };
+  Camp.applyEnd = res => {
+    const c = Camp.load(); let msg;
+    if (res.mode === 'inspection') {
+      if (res.inspection && res.inspection.pass) { c.wins = (c.wins || 0) + 1; c.day = 1; c.rep = Math.min(100, c.rep + 20); c.budget += res.score; msg = '🎓 <b>CAMPAGNE GAGNÉE !</b> L\'inspecteur donne un avis favorable. Une nouvelle saison commence (améliorations conservées).'; }
+      else msg = '🎓 Avis défavorable… L\'inspecteur reviendra demain (rejouez le jour 5).';
+    } else {
+      c.budget += res.score; c.rep = U.clamp(c.rep + (res.stars - 1) * 8 - res.failed * 2, 0, 100);
+      if (res.stars >= 1) { c.day++; msg = `Jour réussi ! Demain : jour ${c.day}${c.day === ML.CAMPAIGN.bossDay ? " — l'INSPECTEUR de l'Éducation Nationale !" : ''}.`; }
+      else msg = 'Aucune étoile : il faut refaire cette journée.';
+    }
+    Camp.save(c);
+    return { camp: `<div class="camp"><p>${msg}</p>${Camp.panel()}</div>`, nextLabel: 'Journée suivante' };
+  };
+  Camp.panel = () => {
+    const c = Camp.load();
+    const ups = Object.keys(ML.UPGRADES).map(k => {
+      const u = ML.UPGRADES[k], lvl = c.up[k] || 0, max = u.max || 1, done = lvl >= max;
+      return `<button class="up ${done ? 'own' : ''}" data-up="${k}" ${done ? 'disabled' : ''}>${U.esc(u.name)}${max > 1 ? ` (${lvl}/${max})` : ''}<span>${done ? '✔' : u.price + ' €'}</span></button>`;
+    }).join('');
+    return `<div class="camp-h">📅 Jour ${c.day}/${ML.CAMPAIGN.days} · 💶 Budget atelier : <b>${c.budget} €</b> · ⭐ Réputation ${c.rep}/100${c.wins ? ' · 🏆 ' + c.wins : ''}</div><div class="ups">${ups}</div>`;
+  };
+  Camp.buy = k => {
+    const c = Camp.load(), u = ML.UPGRADES[k]; if (!u) return 'Inconnu.';
+    const lvl = c.up[k] || 0; if (lvl >= (u.max || 1)) return 'Déjà au maximum.';
+    if (c.budget < u.price) return `Budget insuffisant (il manque ${u.price - c.budget} €).`;
+    c.budget -= u.price; c.up[k] = lvl + 1; Camp.save(c); ML.Sfx.play('cash'); return null;
+  };
+
+  /* ======================= Init ======================= */
   L.init = () => {
     L.el = $('lobby');
-    $('in-name').value = localStorage.getItem('ml_name') || '';
+    A.load();
+    $('in-name').value = A.name();
     $('in-server').value = N.defaultUrl();
     if (/^https?:/.test(location.protocol)) $('server-row').classList.add('hidden');
-    $('btn-solo').onclick = () => { if (!L.name()) return; ML.Sfx.init(); ML.Game.start({ solo: true, seed: Date.now() >>> 0, me: 'solo', host: 'solo', players: [{ id: 'solo', name: L.name(), idx: 0 }] }); };
+    L.renderAccount();
+    $('btn-solo').onclick = () => { if (!L.name()) return; ML.Sfx.init(); ML.Game.start({ solo: true, seed: Date.now() >>> 0, me: 'solo', host: 'solo', players: [{ id: 'solo', name: L.name(), idx: 0 }], game: L.gameCfg('h') }); };
     $('btn-create').onclick = async () => { if (!L.name() || !(await L.ensure())) return; N.send({ t: 'create', priv: $('in-priv').checked }); };
     $('btn-join').onclick = async () => { const code = $('in-code').value.trim().toUpperCase(); if (!L.name()) return; if (code.length !== 4) return ML.HUD.toast('Le code fait 4 lettres.'); if (!(await L.ensure())) return; N.send({ t: 'join', code }); };
     $('btn-list').onclick = async () => { if (!L.name() || !(await L.ensure())) return; N.send({ t: 'list' }); };
-    $('btn-start').onclick = () => N.send({ t: 'start', seed: (Math.random() * 1e9) >>> 0 });
+    $('btn-start').onclick = () => N.send({ t: 'start', seed: (Math.random() * 1e9) >>> 0, cfg: L.gameCfg('r') });
     $('btn-leave').onclick = () => { N.send({ t: 'leave' }); L.showHome(); };
     $('btn-copy').onclick = () => { try { navigator.clipboard.writeText(N.room.code); ML.HUD.toast('Code copié !'); } catch (e) { /* rien */ } };
+    $('btn-profile').onclick = () => L.showProfile();
+    $('btn-prof-back').onclick = () => L.showHome();
+    $('btn-login').onclick = () => L.auth('login');
+    $('btn-register').onclick = () => L.auth('register');
+    $('btn-logout').onclick = () => { A.logout(); L.renderAccount(); ML.HUD.toast('Déconnecté : tu joues en invité.'); };
+    for (const p of ['h', 'r']) { $(p + '-mode').onchange = () => L.renderModes(); $(p + '-camp-reset').onclick = () => { if (confirm('Recommencer la campagne au jour 1 (budget et améliorations perdus) ?')) { Camp.reset(); L.renderModes(); } }; }
+    L.renderModes();
 
     N.on('status', s => { $('status').textContent = s; });
-    N.on('relay', m => ML.Game.onRelay(m));
+    N.on('relay', m => {
+      if (m.d && m.d.k === 'role') { L.roles[m.from] = ML.ROLES[m.d.role] ? m.d.role : 'poly'; if (!ML.Game.on) L.renderRoles(); return; }
+      ML.Game.onRelay(m);
+    });
+    L.roles = {}; L.myRole = ML.ROLES[localStorage.getItem('ml_role')] ? localStorage.getItem('ml_role') : 'poly';
+    L.renderRoles();
     N.on('err', m => ML.HUD.toast(m));
+    N.on('welcome', () => { if (A.token) A.resume().then(ok => { if (ok) { L.renderAccount(); ML.HUD.toast('Compte ' + A.user + ' reconnecté.'); } }); });
     N.on('rooms', list => {
       $('room-list').innerHTML = list.length ? list.map(r => `<button class="rl" data-code="${r.code}">${r.code} — ${U.esc(r.host)} (${r.n}/${r.max})</button>`).join('') : '<p class="dim">Aucun salon public. Crée le tien !</p>';
       for (const b of $('room-list').querySelectorAll('button')) b.onclick = () => N.send({ t: 'join', code: b.dataset.code });
@@ -31,16 +81,14 @@
       if (!room) { if (G.on && !G.solo) G.stop(); L.showHome(); return; }
       if (G.on && !G.solo) {
         if (room.state === 'lobby') { G.stop('Retour au salon.'); L.showRoom(); return; }
-        // un joueur est parti pour de bon : l'hôte libère ses affaires
         if (G.isHost) for (const pid in (G.S ? G.S.pl : {})) if (!room.players.find(p => p.id === pid)) ML.Sim.removePlayer(pid);
         return;
       }
-      L.showRoom();
+      L.showRoom(); L.sendRole();
     });
     N.on('start', m => {
-      const r = m.room;
-      ML.Sfx.init();
-      ML.Game.start({ seed: m.seed, me: N.id, host: r.host, players: r.players.map(p => ({ id: p.id, name: p.name, idx: p.idx })) });
+      const r = m.room; ML.Sfx.init();
+      ML.Game.start({ seed: m.seed, me: N.id, host: r.host, players: r.players.map(p => ({ id: p.id, name: p.name, idx: p.idx })), game: m.cfg || { mode: 'coop' } });
     });
     N.on('host', id => { const G = ML.Game; if (G.on && !G.solo && id !== G.host) { G.stop("L'hôte a quitté la partie."); L.showRoom(); } else if (!G.on) L.showRoom(); });
     N.on('unstable', () => ML.HUD.toast('Connexion instable… reconnexion en cours.'));
@@ -49,44 +97,146 @@
     L.showHome();
   };
 
+  /* ======================= Compte ======================= */
+  L.renderAccount = () => {
+    const logged = A.logged();
+    $('acc-state').innerHTML = logged ? `Connecté·e : <b>${U.esc(A.user)}</b> · 🪙 ${A.prof.coins} jetons` : `Invité·e (profil gardé sur ce PC) · 🪙 ${A.prof.coins} jetons`;
+    $('acc-form').classList.toggle('hidden', logged); $('btn-logout').classList.toggle('hidden', !logged);
+    $('in-name').disabled = logged; if (logged) $('in-name').value = A.user;
+  };
+  L.auth = async op => {
+    const user = $('in-user').value.trim(), pass = $('in-pass').value;
+    if (!user || !pass) return ML.HUD.toast('Pseudo et mot de passe !');
+    if (!(await L.ensure(user))) return;
+    const r = await A.auth(op, user, pass);
+    if (!r.ok) return ML.HUD.toast(r.m || 'Erreur.');
+    $('in-pass').value = ''; L.renderAccount();
+    if (N.name !== A.user) { N.name = A.user; N.send({ t: 'name', name: A.user }); }
+    ML.HUD.toast(op === 'register' ? `Compte créé : bienvenue ${A.user} !` : `Re-bonjour ${A.user} !`);
+  };
   L.name = () => {
-    const n = $('in-name').value.trim().slice(0, 16);
+    const n = (A.logged() ? A.user : $('in-name').value.trim()).slice(0, 16);
     if (!n) { ML.HUD.toast('Choisis un pseudo !'); $('in-name').focus(); return null; }
-    localStorage.setItem('ml_name', n);
+    localStorage.setItem('ml_name', n); if (!A.logged() && A.prof.name !== n) { A.prof.name = n; A.save(); }
     if (N.online && n !== N.name) { N.name = n; N.send({ t: 'name', name: n }); }
     return n;
   };
-  L.ensure = async () => {
+  L.ensure = async nm => {
     if (N.online) return true;
     $('status').textContent = 'Connexion...';
-    return N.connect($('in-server').value.trim() || N.defaultUrl(), L.name());
+    return N.connect($('in-server').value.trim() || N.defaultUrl(), nm || L.name() || 'Joueur');
   };
 
+  /* ======================= Profil & boutique ======================= */
+  L.showProfile = () => {
+    $('scr-home').classList.add('hidden'); $('scr-room').classList.add('hidden'); $('scr-profile').classList.remove('hidden');
+    L.el.classList.add('preview'); L.renderProfile();
+  };
+  /* ---------- Rôles ---------- */
+  L.sendRole = () => { if (N.room) { L.roles[N.id] = L.myRole; N.relay({ k: 'role', role: L.myRole }); } };
+  /** Rôles finaux : premier arrivé, premier servi (sauf polyvalent) */
+  L.resolveRoles = () => {
+    const out = {}, taken = {};
+    for (const p of (N.room ? N.room.players : [])) { let r = p.id === N.id ? L.myRole : L.roles[p.id] || 'poly'; if (r !== 'poly' && taken[r]) r = 'poly'; taken[r] = 1; out[p.id] = r; }
+    return out;
+  };
+  L.renderRoles = noRoom => {
+    const taken = {}; if (N.room) for (const p of N.room.players) if (p.id !== N.id && L.roles[p.id] && L.roles[p.id] !== 'poly') taken[L.roles[p.id]] = (N.room.players.find(x => x.id === p.id) || {}).name;
+    for (const pre of ['h', 'r']) {
+      const box = $(pre + '-roles'); if (!box) continue;
+      box.innerHTML = Object.keys(ML.ROLES).map(k => { const R = ML.ROLES[k], t = pre === 'r' && taken[k]; return `<button class="${L.myRole === k ? 'on' : ''}" data-r="${k}" ${t ? 'disabled' : ''} title="${U.esc(R.desc)}">${R.icon} ${R.name}${t ? ' (' + U.esc(t) + ')' : ''}</button>`; }).join('');
+      for (const b of box.querySelectorAll('button')) b.onclick = () => { L.myRole = b.dataset.r; localStorage.setItem('ml_role', L.myRole); L.sendRole(); L.renderRoles(); };
+      $(pre + '-role-desc').textContent = ML.ROLES[L.myRole].desc + (pre === 'h' ? ' En solo, les autres rôles sont tenus par des PNJ (lents).' : '');
+    }
+    if (!noRoom && N.room && !ML.Game.on && !$('scr-room').classList.contains('hidden')) L.showRoom();
+  };
+  L.renderProfile = () => {
+    const P = A.prof, sw = (arr, cur, k) => arr.map(c => `<button class="sw ${c === cur ? 'on' : ''}" data-k="${k}" data-v="${c}" style="background:#${c.toString(16).padStart(6, '0')}"></button>`).join('');
+    const cats = { tenue: '👕 Tenues', chapeau: '🎩 Chapeaux', klaxon: '📯 Klaxons', peinture: '🎨 Peinture Mégane', aileron: '🏎 Aileron', flammes: '🔥 Flammes', jantes: '✨ Jantes' };
+    let shop = '';
+    for (const cat in cats) {
+      const items = Object.keys(ML.SHOP).filter(k => ML.SHOP[k].cat === cat);
+      shop += `<div class="shop-cat"><h4>${cats[cat]}</h4>` + items.map(k => {
+        const it = ML.SHOP[k], own = A.owns(k), eq = P.eq[cat] === k;
+        return `<button class="shop-it ${own ? 'own' : ''} ${eq ? 'eq' : ''}" data-id="${k}">${U.esc(it.name)}<span>${eq ? '✔ porté' : own ? 'équiper' : '🪙 ' + it.price}</span></button>`;
+      }).join('') + (P.eq[cat] ? `<button class="shop-it off" data-off="${cat}">Retirer</button>` : '') + '</div>';
+    }
+    const ach = Object.keys(ML.ACH).map(k => `<span class="ach ${P.ach.includes(k) ? 'on' : ''}" title="${U.esc(ML.ACH[k][1])}">🏆 ${U.esc(ML.ACH[k][0])}</span>`).join('');
+    const lk = P.look;
+    $('prof-body').innerHTML = `<div class="prof-top"><div class="coins">🪙 ${P.coins} jetons</div></div>
+      <div class="lk"><div>Peau ${sw(ML.SKINS, lk.skin, 'skin')}</div><div>Cheveux / barbe ${sw(ML.HAIRS, lk.hair, 'hair')}</div><div>Bleu de travail ${sw(ML.SUITS, lk.suit !== undefined ? lk.suit : 0x1f4e9a, 'suit')}</div></div>
+      <div class="lk"><label>Taille <input type="range" id="lk-h" min="1.55" max="2.0" step="0.01" value="${lk.height || 1.78}"> <span id="lk-hv">${Math.round((lk.height || 1.78) * 100)} cm</span></label>
+        <label>Corpulence <input type="range" id="lk-w" min="0.85" max="1.3" step="0.01" value="${lk.width || 1}"></label>
+        <label><input type="checkbox" id="lk-b" ${lk.beard ? 'checked' : ''}> Barbe</label><label><input type="checkbox" id="lk-g" ${lk.glasses ? 'checked' : ''}> Lunettes</label></div>
+      <p class="dim">Gagne des jetons en jouant (score, étoiles) et avec les succès. ${A.logged() ? 'Profil enregistré sur ton compte.' : 'Invité : profil gardé sur ce PC seulement — crée un compte pour le retrouver partout.'}</p>
+      <div class="shop">${shop}</div><h4>Succès (${P.ach.length}/${Object.keys(ML.ACH).length})</h4><div class="achs">${ach}</div>`;
+    for (const b of $('prof-body').querySelectorAll('.sw')) b.onclick = () => { P.look[b.dataset.k] = +b.dataset.v; A.save(); L.renderProfile(); };
+    const upd = () => { P.look.height = +$('lk-h').value; P.look.width = +$('lk-w').value; P.look.beard = $('lk-b').checked; P.look.glasses = $('lk-g').checked; $('lk-hv').textContent = Math.round(P.look.height * 100) + ' cm'; ML.Main.preview(true); };
+    $('lk-h').oninput = upd; $('lk-w').oninput = upd; $('lk-b').onchange = () => { upd(); A.save(); }; $('lk-g').onchange = () => { upd(); A.save(); };
+    $('lk-h').onchange = () => A.save(); $('lk-w').onchange = () => A.save();
+    ML.Main.preview(true);
+    for (const b of $('prof-body').querySelectorAll('.shop-it[data-id]')) b.onclick = () => {
+      const id = b.dataset.id, it = ML.SHOP[id];
+      if (A.owns(id)) A.equip(it.cat, id); else { const err = A.buy(id); if (err) return ML.HUD.toast(err); ML.HUD.toast(`Acheté : ${it.name} !`); }
+      if (it.cat === 'klaxon') ML.Sfx.horn(id); L.renderProfile(); L.renderAccount();
+    };
+    for (const b of $('prof-body').querySelectorAll('[data-off]')) b.onclick = () => { A.equip(b.dataset.off, null); L.renderProfile(); };
+  };
+
+  /* ======================= Modes de jeu ======================= */
+  L.renderModes = () => {
+    const c = Camp.load();
+    for (const p of ['h', 'r']) {
+      const mode = $(p + '-mode').value;
+      $(p + '-camp').classList.toggle('hidden', mode !== 'campagne');
+      $(p + '-camp-info').innerHTML = `Jour <b>${c.day}/${ML.CAMPAIGN.days}</b>${c.day === ML.CAMPAIGN.bossDay ? " (l'INSPECTEUR !)" : ''} · 💶 ${c.budget} € · ⭐ ${c.rep}/100 · ${Object.keys(c.up).length} amélioration(s) <span class="dim">(sauvegarde sur ce PC)</span>`;
+      const desc = { coop: 'Une journée normale, événements surprises au hasard.', campagne: '5 journées : réputation, budget, améliorations de l\'atelier, apprentis… et l\'inspecteur au jour 5.', inspection: "Boss : l'inspecteur de l'Éducation Nationale impose des règles absurdes qui changent.", course: 'Course de Mégane dans la ville : 5 manches, premier arrivé devant l\'entreprise indiquée !' }[mode];
+      $(p + '-desc').textContent = desc;
+    }
+  };
+  /** Configuration de la partie envoyée à tous */
+  L.gameCfg = p => {
+    const mode = $(p + '-mode').value, traitor = p === 'r' && $('r-traitor').checked;
+    if (mode === 'campagne') {
+      const c = Camp.load();
+      return { mode: c.day === ML.CAMPAIGN.bossDay ? 'inspection' : 'campagne', campaign: true, day: c.day, upgrades: c.up, traitor, roles: L.cfgRoles(p) };
+    }
+    return { mode, day: 1, upgrades: {}, traitor, roles: L.cfgRoles(p) };
+  };
+  L.cfgRoles = p => (p === 'h' ? { solo: L.myRole } : L.resolveRoles());
+  L.noop = () => {
+  };
+
+  /* ======================= Écrans ======================= */
   L.show = () => { L.el.classList.remove('hidden'); };
   L.hide = () => { L.el.classList.add('hidden'); };
-  L.showHome = () => { L.show(); $('scr-home').classList.remove('hidden'); $('scr-room').classList.add('hidden'); };
+  L.showHome = () => { L.show(); L.el.classList.remove('preview'); if (ML.Main.preview) ML.Main.preview(false); L.renderRoles(); $('scr-home').classList.remove('hidden'); $('scr-room').classList.add('hidden'); $('scr-profile').classList.add('hidden'); L.renderAccount(); L.renderModes(); };
   L.showRoom = () => {
     const r = N.room; if (!r) return L.showHome();
-    L.show(); $('scr-home').classList.add('hidden'); $('scr-room').classList.remove('hidden');
+    L.el.classList.remove('preview'); if (ML.Main.preview) ML.Main.preview(false);
+    L.show(); $('scr-home').classList.add('hidden'); $('scr-profile').classList.add('hidden'); $('scr-room').classList.remove('hidden');
     $('room-code').textContent = r.code;
     const slots = [];
     for (let i = 0; i < r.max; i++) {
       const p = r.players[i];
-      slots.push(p ? `<div class="pslot"><i style="background:${ML.COLORS[p.idx % 5].css}"></i>${U.esc(p.name)}${p.id === r.host ? ' 👑' : ''}${p.id === N.id ? ' (toi)' : ''}${p.on ? '' : ' <span class="dim">(reconnexion…)</span>'}</div>` : '<div class="pslot empty">— place libre —</div>');
+      const rr = p ? ML.ROLES[p.id === N.id ? L.myRole : L.roles[p.id] || 'poly'] : null;
+      slots.push(p ? `<div class="pslot"><i style="background:${ML.COLORS[p.idx % 5].css}"></i>${rr.icon} ${U.esc(p.name)} <span class="dim">${rr.name}</span>${p.id === r.host ? ' 👑' : ''}${p.id === N.id ? ' (toi)' : ''}${p.on ? '' : ' <span class="dim">(reconnexion…)</span>'}</div>` : '<div class="pslot empty">— place libre —</div>');
     }
     $('room-players').innerHTML = slots.join('');
     const host = r.host === N.id;
-    $('btn-start').classList.toggle('hidden', !host);
+    $('btn-start').classList.toggle('hidden', !host); $('room-opts').classList.toggle('hidden', !host);
     $('room-wait').classList.toggle('hidden', host);
-    $('room-wait').textContent = r.state === 'game' ? 'Partie en cours…' : "En attente que l'hôte lance la journée…";
+    $('room-wait').textContent = r.state === 'game' ? 'Partie en cours…' : "En attente que l'hôte choisisse le mode et lance la journée…";
+    L.renderModes(); L.renderRoles(true);
   };
   L.backToRoom = () => { if (N.room) L.showRoom(); else L.showHome(); };
 
   /** Fin de journée : rejouer (hôte ou solo) */
   L.replay = () => {
     const G = ML.Game;
-    if (G.solo) { const me = G.players[G.me]; G.start({ solo: true, seed: Date.now() >>> 0, me: G.me, host: G.me, players: [me] }); }
-    else if (G.isHost) N.send({ t: 'start', seed: (Math.random() * 1e9) >>> 0 });
+    const cfg = G.game && G.game.campaign ? L.gameCfg(G.solo ? 'h' : 'r') : Object.assign({}, G.game);
+    if (G.solo) { const me = G.players[G.me]; G.start({ solo: true, seed: Date.now() >>> 0, me: G.me, host: G.me, players: [me], game: cfg }); }
+    else if (G.isHost) N.send({ t: 'start', seed: (Math.random() * 1e9) >>> 0, cfg });
   };
   L.leaveAfterEnd = () => {
     const G = ML.Game;

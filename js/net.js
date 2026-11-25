@@ -42,6 +42,7 @@
         case 'host': if (N.room) N.room.host = m.id; N.emit('host', m.id); break;
         case 'relay': N.emit('relay', m); break;
         case 'err': N.emit('err', m.m); break;
+        case 'accr': { const cb = N.accWait[m.q]; delete N.accWait[m.q]; if (cb) cb(m); break; }
       }
     };
     ws.onclose = () => {
@@ -89,6 +90,13 @@
     if (N.wanted) N.emit('lost');
   }
 
+  /** Comptes joueurs : register / login / resume / save → promesse de la réponse du serveur */
+  N.accWait = {}; let accQ = 1;
+  N.acc = (op, data) => new Promise(res => {
+    if (!N.ws || N.ws.readyState !== 1) return res({ ok: false, m: 'Pas connecté au serveur.' });
+    const q = accQ++; N.accWait[q] = res; N.send(Object.assign({ t: 'acc', q, op }, data));
+    setTimeout(() => { if (N.accWait[q]) { delete N.accWait[q]; res({ ok: false, m: 'Le serveur ne répond pas.' }); } }, 10000);
+  });
   N.send = o => { if (N.ws && N.ws.readyState === 1) N.ws.send(JSON.stringify(o)); };
   N.relay = (d, to) => N.send({ t: 'relay', d, to });
   N.disconnect = () => { N.wanted = false; if (N.ws) N.ws.close(); N.ws = null; N.online = false; N.room = null; };
