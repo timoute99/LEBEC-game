@@ -38,7 +38,7 @@
     document.getElementById('loading').textContent = 'Chargement des décors…';
     await ML.Assets.load();
     ML.World.build(1234567, {});                 // ville du menu (chaque partie a la sienne)
-    ML.HUD.init(); ML.Dialogue.init(); ML.Lobby.init();
+    ML.HUD.init(); ML.ERP.init(); ML.Dialogue.init(); ML.Lobby.init();
     document.getElementById('loading').classList.add('hidden');
     camera.position.set(30, 22, 60); camera.lookAt(0, 0, 0);
 

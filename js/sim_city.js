@@ -10,17 +10,24 @@
 
   mod.init = cfg => {
     S = K.S; rng = K.rng; city = ML.World.city;
-    const up = S.up, sp = ML.LOC.carSpawn, capBig = up.grande_benne ? 6 : C.CAR.cap;
-    const car = (kind, i, extra) => Object.assign({ x: sp[i].x, z: sp[i].z, h: sp[i].h, s: 0, dr: null, pass: [], bed: [], kind, name: ML.VEHICLES[kind].name, cap: kind === 'tp' ? C.TP.cap : kind === 'camion' ? C.CAMION.cap : kind === 'fenwick' ? 0 : capBig, fuel: 100, color: ML.VEHICLES[kind].color, frozen: 0, load: null }, extra || {});
+    const sp = ML.LOC.carSpawn;
+    /** Capacité : nombre de caisses ; le camion compte en « places » (palette = 4, caisse = 1) */
+    K.capOf = kind => kind === 'tp' ? C.TP.cap : kind === 'camion' ? C.CAMION.cap : kind === 'fenwick' ? 0 : kind === 'kangoo' ? 2 : kind === 'ducato' ? 6 : S.up.grande_benne ? 6 : C.CAR.cap;
+    K.bedUse = c => c.bed.reduce((a, it) => a + (c.kind === 'camion' && it.type === 'palette' ? 4 : 1), 0);
+    K.bedFree = c => c.cap - K.bedUse(c);
+    const car = (kind, p, extra) => Object.assign({ x: p.x, z: p.z, h: p.h || 0, s: 0, dr: null, pass: [], bed: [], kind, name: ML.VEHICLES[kind].name, cap: K.capOf(kind), fuel: 100, color: ML.VEHICLES[kind].color, frozen: 0, load: null }, extra || {});
+    K.addCar = (kind, p) => { const c = car(kind, p, { fuel: kind === 'tp' || kind === 'fenwick' ? 100 : 80 }); S.cars.push(c); Sim.dirty = true; return c; };
     if (S.mode === 'course') {
-      const n = Math.min(5, Math.max(2, S.n));
-      for (let i = 0; i < n; i++) S.cars.push(car('megane', i, { name: 'Mégane n°' + (i + 1), color: ML.RACE_COLORS[i], fuel: 100 }));
+      const n = Math.min(6, Math.max(2, S.n));
+      for (let i = 0; i < n; i++) S.cars.push(car('megane', sp[i], { name: 'Mégane n°' + (i + 1), color: ML.RACE_COLORS[i], fuel: 100 }));
     } else {
-      S.cars.push(car('megane', 0, { fuel: Math.round(35 + rng() * 55) }), car('kangoo', 1, { fuel: Math.round(30 + rng() * 60) }));
-      if (up.ducato) S.cars.push(car('ducato', 2, { fuel: Math.round(50 + rng() * 50) }));
-      const t = ML.LOC.tpSpawn; S.cars.push(Object.assign(car('tp', 0), { x: t.x, z: t.z, h: t.h }));
-      const f = ML.LOC.fenSpawn, cm = ML.LOC.camSpawn;
-      S.cars.push(Object.assign(car('fenwick', 0), { x: f.x, z: f.z, h: f.h }), Object.assign(car('camion', 0), { x: cm.x, z: cm.z, h: cm.h, fuel: Math.round(50 + rng() * 50) }));
+      const o = S.owned, fuel = () => Math.round(35 + rng() * 60);
+      if (o.includes('megane')) S.cars.push(car('megane', sp[0], { fuel: fuel() }));
+      S.cars.push(car('kangoo', sp[1], { fuel: fuel() }));
+      if (o.includes('ducato')) S.cars.push(car('ducato', sp[2], { fuel: fuel() }));
+      if (o.includes('tp')) S.cars.push(car('tp', ML.LOC.tpSpawn));
+      if (o.includes('fenwick')) S.cars.push(car('fenwick', ML.LOC.fenSpawn));
+      if (o.includes('camion')) S.cars.push(car('camion', ML.LOC.camSpawn, { fuel: fuel() }));
     }
     // passants sur les trottoirs
     peds = K.peds = [];
@@ -90,8 +97,8 @@
         if (opts.length) { const k = rng.pick(opts); p.e = k; p.dir = city.edges[k].a === q.end ? 1 : -1; p.d = 2; } else { p.dir = -p.dir; p.d = 2; p.side = -p.side; }
       }
       for (const c of S.cars) if (c.dr && Math.abs(c.s || 0) > 4 && Math.hypot(c.x - q.x, c.z - q.z) < 1.9) {
-        p.down = 4; S.score = Math.max(0, S.score - 3); K.ev({ e: 'ped', i: peds.indexOf(p) });
-        K.all(`🚶 ${S.pl[c.dr] ? S.pl[c.dr].name : '?'} a renversé un passant ! (−3) Il se relève en râlant.`, 'warn'); K.sfx('punch', q.x, q.z);
+        p.down = 4; K.fine(ML.ECO.fines.ped); K.ev({ e: 'ped', i: peds.indexOf(p) });
+        K.all(`🚶 ${S.pl[c.dr] ? S.pl[c.dr].name : '?'} a renversé un passant ! Amende : −${ML.ECO.fines.ped} €. Il se relève en râlant.`, 'warn'); K.sfx('punch', q.x, q.z);
       }
     }
   }
@@ -106,8 +113,8 @@
         const key = c.dr + ':' + ri;
         const lim = city.radars[ri] && city.radars[ri].ring && S.rule !== 'speed30' ? 25 : limit;
         if (sp > lim && Math.hypot(r.x - c.x, r.z - c.z) < 15 && (K.radarCd[key] || 0) < S.rt) {
-          K.radarCd[key] = S.rt + 5; S.score = Math.max(0, S.score - 5);
-          K.ev({ e: 'flash', to: c.dr, r: ri, kmh }); K.all(`📸 ${name} flashé·e à ${kmh} km/h ! (−5)`, 'warn');
+          K.radarCd[key] = S.rt + 5; K.fine(ML.ECO.fines.radar);
+          K.ev({ e: 'flash', to: c.dr, r: ri, kmh }); K.all(`📸 ${name} flashé·e à ${kmh} km/h ! (−${ML.ECO.fines.radar} €)`, 'warn');
           if (kmh >= 90) K.stat(c.dr, 'flash90');
         }
       });
@@ -135,9 +142,9 @@
     }
     const name = S.pl[pol.pid] ? S.pl[pol.pid].name : '?';
     if (d < 4.5 && (!tgt || Math.abs(tgt.s || 0) < 4)) {
-      S.score = Math.max(0, S.score - 15);
+      K.fine(ML.ECO.fines.police);
       if (tgt) tgt.frozen = S.rt + 6;
-      K.ev({ e: 'arrest', to: pol.pid }); K.big('🚨 ARRÊTÉ·E !', '#3498db', pol.pid); K.all(`🚨 ${name} s'est fait arrêter : PV de 15 points et 6 s de contrôle.`, 'warn');
+      K.ev({ e: 'arrest', to: pol.pid }); K.big('🚨 ARRÊTÉ·E !', '#3498db', pol.pid); K.all(`🚨 ${name} s'est fait arrêter : amende de ${ML.ECO.fines.police} € et 6 s de contrôle.`, 'warn');
       pol = K.pol = null; Sim.dirty = true; return;
     }
     if (d > 120 || pol.t > 40 || !S.pl[pol.pid]) {
@@ -237,8 +244,7 @@
     if (c.kind === 'fenwick') { K.note(pid, 'Le fenwick se conduit (E côté conducteur) ; R pour lever/poser les fourches.'); return true; }
     if (held && IT.heavy(held)) return true;
     if (held && (IT.bulky(held) || held.type === 'piece')) {
-      if (c.kind === 'camion') { K.note(pid, 'Le camion ne prend que les PALETTES (chargées au fenwick).', 'warn'); return true; }
-      if (c.bed.length >= c.cap) { K.note(pid, c.kind === 'tp' ? 'Le transpalette est plein (4 caisses).' : 'La benne est pleine.', 'warn'); return true; }
+      if (K.bedFree(c) < 1) { K.note(pid, c.kind === 'tp' ? 'Le transpalette est plein (4 caisses).' : c.kind === 'camion' ? 'Le plateau du camion est plein.' : 'La benne est pleine.', 'warn'); return true; }
       P.inv[sel] = null; c.bed.push(held); K.sfx('drop', c.x, c.z); return true;
     }
     if (!c.bed.length) {
@@ -248,10 +254,11 @@
       }
       return true;
     }
-    if (c.kind === 'camion') { K.note(pid, 'Les palettes se déchargent au fenwick ou avec R (livreur) chez le client.'); return true; }
+    if (c.kind === 'camion' && !c.bed.some(it => it.type !== 'palette')) { K.note(pid, 'Les palettes se déchargent au fenwick ou avec R (livreur) chez le client.'); return true; }
     let idx = c.bed.length - 1, here = null;
+    if (c.kind === 'camion') for (let i = c.bed.length - 1; i >= 0; i--) if (c.bed[i].type !== 'palette') { idx = i; break; }
     for (const k in ML.LOC.comp) if (Math.hypot(ML.LOC.comp[k].dock.x - c.x, ML.LOC.comp[k].dock.z - c.z) < 25) here = k;
-    const fits = it => { if (!K.isPart(it)) return here === null && U.inWorkshop({ x: c.x, z: c.z - 10 }); const o = S.orders.find(x => x.id === it.d.oid); return o && ((here === o.client && K.stage(o) === 'livraison') || (here === 'tth' && K.stage(o) === 'tth')); };
+    const fits = it => { if (it.type === 'palette') return false; if (!K.isPart(it)) return here === null && U.inWorkshop({ x: c.x, z: c.z - 10 }); const o = S.orders.find(x => x.id === it.d.oid); return o && ((here === o.client && K.stage(o) === 'livraison') || (here === 'tth' && K.stage(o) === 'tth')); };
     const j = c.bed.findIndex(fits); if (j >= 0) idx = j;
     if (K.give(pid, c.bed[idx], sel)) { c.bed.splice(idx, 1); K.sfx('pickup', c.x, c.z); }
     return true;

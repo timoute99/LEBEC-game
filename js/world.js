@@ -1,19 +1,20 @@
 /* =====================================================================
    world.js — Construction 3D du monde à partir de la ville générée
    (citygen.js). Le monde est RECONSTRUIT à chaque partie (nouvelle
-   graine) : World.build(seed, upgrades). Tout est rangé dans World.root
-   pour pouvoir le supprimer d'un coup.
+   graine) : World.build(seed, upgrades, machines). Tout est rangé dans
+   World.root pour pouvoir le supprimer d'un coup. Une machine achetée
+   en cours de journée est ajoutée à la volée (World.syncMachines).
    ===================================================================== */
 (function () {
   const W = ML.World = { targets: [], machines: {}, root: null };
   const U = ML.U, T = ML.Tex, A = ML.Assets;
   let root, rng;
 
-  W.build = (seed, upgrades) => {
+  W.build = (seed, upgrades, mach) => {
     if (W.root) { ML.scene.remove(W.root); }
     root = W.root = new THREE.Group(); ML.scene.add(root);
     ML.colliders.length = 0; W.targets = []; W.machines = {}; W.radars = []; W.lights = []; W.lampHeads = null;
-    ML.mapRects = []; W.up = upgrades || {};
+    ML.mapRects = []; W.up = upgrades || {}; W.owned = mach || ML.MACHINES.map(m => m.id); W.partCars = [];
     rng = U.rng(seed ^ 0x5bd1e995);
     const city = W.city = ML.CityGen.generate(seed);
     ML.LOC = { comp: city.companies, hides: city.hides.slice(), perches: city.perches, radars: city.radars };
@@ -78,9 +79,12 @@
       reception: { x: -12.5, z: 10.3 }, expedition: { minX: 8.4, maxX: 14.6, minZ: 8.4, maxZ: 12.3 },
       coffee: [{ x: -18.3, z: 9.5 }, { x: -17, z: 11.8 }, { x: -16.5, z: 9.7 }],
       patrol: [{ x: 8, z: -1 }, { x: 0, z: -1.2 }, { x: -8, z: -1.2 }, { x: -16, z: -1 }, { x: 12, z: -6 }, { x: 14, z: 5 }, { x: 0, z: 6 }],
-      carSpawn: [{ x: -5, z: 21, h: 0 }, { x: 5, z: 21, h: 0 }, { x: 12, z: 21, h: 0 }, { x: -12, z: 21, h: 0 }, { x: 0, z: 26, h: 0 }],
+      carSpawn: [{ x: -5, z: 21, h: 0 }, { x: 5, z: 21, h: 0 }, { x: 12, z: 21, h: 0 }, { x: -9, z: 26, h: 0 }, { x: 0, z: 26, h: 0 }, { x: 9, z: 26, h: 0 }],
       tpSpawn: { x: 2, z: 10, h: Math.PI },
-      spawn: [{ x: 8, z: 2 }, { x: 10, z: 2 }, { x: 8, z: 4 }, { x: 10, z: 4 }, { x: 12, z: 3 }],
+      spawn: [{ x: 8, z: 2 }, { x: 10, z: 2 }, { x: 8, z: 4 }, { x: 10, z: 4 }, { x: 12, z: 3 }, { x: 6, z: 3 }],
+      counter: { x: 4.5, z: 12.5 },                                    // comptoir : les particuliers attendent ici
+      parkSlots: [{ x: -21, z: 23, h: 0 }, { x: -25, z: 23, h: 0 }, { x: -29, z: 23, h: 0 }],
+      aiSpots: { tony: { x: 16.5, z: 16, yaw: Math.PI }, jojo: { x: 15.5, z: 9.5, yaw: -Math.PI / 2 } },
       hooks: [{ type: 'extincteur', x: -19.2, y: 0, z: 2.6 }, { type: 'extincteur', x: 19.2, y: 0, z: -11.5 }, { type: 'cle', x: -19.2, y: 0.95, z: 4.6 },
               { type: 'cle', x: -19.2, y: 0.95, z: 5.4 }, { type: 'soufflette', x: -19.2, y: 0.95, z: 6.3 }, { type: 'soufflette', x: -19.2, y: 0.95, z: 7.1 }],
       doorIn: { x: 0, z: 12 },
@@ -127,10 +131,17 @@
     // bureau du chef, imprimante, PC, marbre, tableau électrique, boîte de casques
     U.box(2.4, 0.8, 1.2, 0x5d4037, 12, 0.4, -8, root); U.boxCollider(12, -8, 2.4, 1.2, 'desk');
     const lb = U.label('Bureau du chef', { size: 0.3 }); lb.position.set(12, 1.9, -8); add(lb);
+    // comptoir clients (à droite de la porte) + parking clients (à gauche, dehors)
+    U.box(2.2, 1.05, 0.7, 0x8d6e63, 4.5, 0.52, 11.2, root); U.box(2.4, 0.08, 0.9, 0xd7ccc8, 4.5, 1.08, 11.2, root); U.boxCollider(4.5, 11.2, 2.2, 0.7, 'counter');
+    const lco = U.label('COMPTOIR', { size: 0.26, color: '#ffc6e0' }); lco.position.set(4.5, 1.45, 10.8); add(lco);
+    plane(16, 11, T.mat('asphalte', 3, 2), -25, 23, 0.027);
+    for (let x = -32; x <= -18; x += 4) plane(0.15, 5, 0xffffff, x, 23, 0.045);
+    const lpk = U.label('P  PARKING CLIENTS', { size: 0.55, color: '#fff', bg: 'rgba(31,78,154,0.92)' }); lpk.position.set(-25, 3.2, 17.4); add(lpk);
+    U.box(0.12, 2.6, 0.12, 0xdddddd, -25, 1.3, 17.6, root); U.boxCollider(-25, 17.6, 0.3, 0.3, 'pole');
     U.box(0.8, 0.8, 0.7, 0x95a5a6, 15, 0.4, -8, root); U.box(0.7, 0.35, 0.6, 0xecf0f1, 15, 0.98, -8, root); U.boxCollider(15, -8, 0.8, 0.7, 'printer');
     W.targets.push({ id: 'printer', x: 15, y: 1, z: -7.5, r: 2.4 });
     U.box(1.6, 0.8, 0.9, 0x6d4c41, 18.6, 0.4, 6.5, root); U.box(0.06, 0.5, 0.8, 0x111111, 18.9, 1.1, 6.5, root); U.box(0.02, 0.42, 0.7, U.mat(0x2e86de, 0x1b4f8a), 18.85, 1.1, 6.5, root);
-    U.boxCollider(18.6, 6.5, 1.6, 0.9, 'pc'); const lp = U.label('PC (Arexis)', { size: 0.26 }); lp.position.set(18.6, 1.8, 6.5); add(lp);
+    U.boxCollider(18.6, 6.5, 1.6, 0.9, 'pc'); const lp = U.label('💻 PC DE GESTION', { size: 0.34, color: '#9fd3ff' }); lp.position.set(18.6, 2.0, 6.5); add(lp);
     W.targets.push({ id: 'pc', x: 18.4, y: 1.1, z: 6.5, r: 2.4 });
     U.box(2.2, 0.9, 1.4, 0x2d3436, 12, 0.45, 2.5, root); U.boxCollider(12, 2.5, 2.2, 1.4, 'marbre');
     const lm = U.label('MARBRE : contrôle des caisses', { size: 0.3 }); lm.position.set(12, 1.9, 2.5); add(lm);
@@ -149,9 +160,11 @@
   };
 
   /* ---------- Machines ---------- */
-  W.machinesBuild = () => {
-    for (const def of ML.MACHINES) {
-      if (def.upgrade && !W.up[def.upgrade]) continue;
+  W.machinesBuild = () => { for (const def of ML.MACHINES) if (W.owned.includes(def.id)) W.buildMachine(def); };
+  /** Machines achetées en cours de partie : construites dès qu'elles apparaissent dans l'état de l'hôte */
+  W.syncMachines = S => { for (const id in S.machines) if (!W.machines[id]) { const def = ML.MACHINES.find(m => m.id === id); if (def) W.buildMachine(def, true); } };
+  W.buildMachine = (def, fresh) => {
+    {
       const g = add(new THREE.Group()); g.position.set(def.x, 0, def.z);
       const m = { def, group: g, lightMat: new THREE.MeshLambertMaterial({ color: 0x777777, emissive: 0x222222 }) };
       const paint = U.mat(0xdfe6ec), dark = U.mat(0x223344);
@@ -179,22 +192,36 @@
       W.targets.push({ id: 'mach:' + def.id, x: def.x + (def.type === 'fraiseuse' ? 0.6 : 0.9), y: 1.2, z: front, r: 2.6 });
       W.targets.push({ id: 'bac:' + def.id, x: m.chips.x, y: 0.5, z: m.chips.z, r: 1.9 });
       W.machines[def.id] = m;
+      if (fresh) { const nl = U.label('★ NEUVE !', { size: 0.4, color: '#ffd257' }); nl.position.set(0, 4.4, 0); g.add(nl); setTimeout(() => g.remove(nl), 60000); }
     }
   };
 
   W.updateVisuals = (dt, S, rt) => {
     if (!S) return;
+    W.syncMachines(S);
+    // voitures des particuliers sur le parking clients
+    ML.LOC.parkSlots.forEach((sp, i) => {
+      const on = (S.parts || []).some(p => p.slot === i); let m = W.partCars[i];
+      if (on && !m) {
+        m = A.clone(['city_car_hatchback', 'city_car_sedan', 'city_car_stationwagon'][i % 3], 4.6);
+        if (m) m.position.set(sp.x, 0.33, sp.z); else { m = new THREE.Group(); U.box(1.8, 0.8, 4.2, 0xe84393, 0, 0.7, 0, m); m.position.set(sp.x, 0, sp.z); }
+        add(m); W.partCars[i] = m;
+      }
+      if (m) m.visible = on;
+    });
     const t = performance.now() / 1000;
     for (const id in W.machines) {
       const m = W.machines[id], st = S.machines[id] || {}, j = st.job, opId = st.op, op = ML.PEOPLE[opId] || { name: '?' };
       const status = st.status || 'idle';
-      const col = { idle: 0x777777, wait: 0xff9f1a, run: 0x2ecc71, stop: 0xf1c40f, panne: 0xe74c3c, usure: 0xe67e22, off: 0x222222 }[status] || 0x777777;
+      const col = { idle: 0x777777, wait: 0xff9f1a, run: 0x2ecc71, stop: 0xf1c40f, panne: 0xe74c3c, usure: 0xe67e22, off: 0x222222, noop: 0x555555 }[status] || 0x777777;
       const blink = (status === 'panne' || status === 'usure') && Math.floor(t * 3) % 2;
       m.lightMat.color.setHex(col); m.lightMat.emissive.setHex(status === 'idle' || status === 'off' || blink ? 0x111111 : col).multiplyScalar(0.6);
       if (status === 'run') { if (m.def.type === 'fraiseuse') m.spinner.rotation.y += dt * 25; else m.spinner.rotation.x += dt * 25; }
       m.smoke.visible = status === 'panne'; if (m.smoke.visible) { m.smoke.position.y = 3 + (t % 1) * 1.5; m.smoke.scale.setScalar(0.6 + (t % 1)); }
-      const nm = opId && opId.startsWith('app') && S.appNames ? S.appNames[opId] : op.name.split(' ')[0];
+      const nm = opId ? op.name.split(' ')[0] : 'sans opérateur';
       let txt = `${id} ${ML.MTYPE[m.def.type]} · ${nm}`;
+      if (!opId) txt = `${id} · SANS OPÉRATEUR (embauche au PC)`;
+      else if (st.plan && !j) txt += ` · prévu #${st.plan}`;
       if (status === 'panne') txt = `${id} EN PANNE : clé à molette !`;
       else if (status === 'off') txt = `${id} · plus de courant`;
       else if (status === 'usure') txt = `${id} · outil usé : ${ML.TOOLS[j ? j.need : 'plaquette'].label} neuve !`;
@@ -261,6 +288,17 @@
         break;
       }
       case 'concurrent': { const z = U.box(1.5, 2.5, 0.3, U.mat(0xf1c40f, 0x806000), 0, C.h + 3.8, C.d / 2 - 0.5, g); z.rotation.z = 0.4; break; }
+      case 'concession': {                                              // voitures en vitrine + fanions
+        const ca = Math.cos(g.rotation.y), sa = Math.sin(g.rotation.y);
+        [0xf4c430, 0x95a5a6, 0x2c6fbb].forEach((col, i) => {
+          const lx = C.w / 2 + 3, lz = -4.5 + i * 4.5;
+          U.box(1.8, 1.1, 4.2, col, lx, 0.75, lz, g); U.box(1.6, 0.6, 2, 0x9fd3ff, lx, 1.55, lz - 0.2, g);
+          U.boxCollider(P.x + lx * ca + lz * sa, P.z - lx * sa + lz * ca, P.rot % 2 ? 4.2 : 1.8, P.rot % 2 ? 1.8 : 4.2, 'vitrine');
+        });
+        for (let i = 0; i < 7; i++) U.box(0.5, 0.5, 0.05, [0xe74c3c, 0xf1c40f, 0x3498db][i % 3], -C.w / 2 + 2 + i * 3, C.h + 0.6, C.d / 2 + 0.3, g).rotation.z = Math.PI / 4;
+        const l = U.label('🚗 VÉHICULES : parlez à Bernard', { size: 0.45, color: '#fff', bg: 'rgba(192,57,43,0.9)' }); l.position.set(3, 3.4, C.d / 2 + 1); g.add(l);
+        break;
+      }
     }
   };
 

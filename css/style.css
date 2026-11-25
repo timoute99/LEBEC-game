@@ -235,3 +235,53 @@ button.go { background: #2e9e57; border-color: #1f7a42; font-size: 16px; padding
 .guide { text-align: left; font-size: 14px; max-height: 60vh; overflow-y: auto; }
 .guide .tips li { margin: 3px 0; }
 #scr-solo, #scr-multi, #scr-room, #scr-account { max-width: 640px; }
+
+/* ================= V4 : économie, PC de gestion, campagne ================= */
+#score.neg { color: #ff6b6b; }
+.props { margin-top: 4px; padding: 3px 8px; border-radius: 10px; background: rgba(46, 134, 222, .85); color: #fff; font-size: 12px; font-weight: bold; text-align: center; animation: evp 1.6s infinite; }
+#evbar .ev.info { background: rgba(20, 60, 110, .85); border-color: #74b9ff; animation: none; }
+#evbar .ev.part { background: rgba(130, 20, 80, .88); border-color: #ff7eb6; }
+.tk-price { float: right; color: #ffd257; font-weight: bold; font-size: 11px; }
+.tk-plan { color: #9fd3ff; font-size: 11px; }
+.campbox { margin-top: 8px; padding: 8px 10px; background: rgba(255,255,255,.05); border-radius: 8px; text-align: left; line-height: 1.5; }
+.campbox .row2 { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; align-items: center; }
+.campbox input { flex: 1 1 120px; min-width: 110px; padding: 5px 8px; }
+.code { font-family: monospace; letter-spacing: 2px; color: #ffd257; }
+.camp .code { font-size: 15px; }
+#endcard .won { margin: 8px 0 12px; padding: 12px; border: 2px solid #ffd257; border-radius: 10px; background: rgba(255,210,87,.12); text-align: center; }
+#endcard .won h2 { color: #ffd257; margin: 0 0 6px; font-size: 28px; }
+#endcard td.ok { color: #3ecf6e; } #endcard td.ko { color: #ff6b6b; } #endcard td.dim { color: #999; }
+
+#erp { z-index: 40; }
+#erp-card { width: min(1040px, 96vw); max-height: 92vh; display: flex; flex-direction: column; padding: 14px 16px; text-align: left; }
+.erp-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; }
+.erp-kpi { display: flex; gap: 12px; align-items: center; }
+.erp-kpi .money { font-size: 18px; font-weight: bold; color: #9dffb8; } .erp-kpi .money.neg { color: #ff6b6b; }
+.erp-alert { margin: 8px 0 0; padding: 6px 10px; background: rgba(160, 90, 0, .5); border: 1px solid #ffb347; border-radius: 8px; }
+.erp-tabs { display: flex; gap: 4px; margin: 10px 0 6px; flex-wrap: wrap; }
+.erp-tabs button { background: rgba(255,255,255,.08); color: #ddd; padding: 6px 12px; font-size: 14px; border-radius: 8px 8px 0 0; }
+.erp-tabs button.on { background: #2e86de; color: #fff; }
+.erp-tabs .badge { font-style: normal; background: #e74c3c; color: #fff; border-radius: 9px; padding: 0 6px; font-size: 12px; margin-left: 4px; }
+.erp-body { overflow-y: auto; flex: 1; padding-right: 4px; }
+.erp-body h3 { margin: 12px 0 6px; font-size: 15px; color: #ffd257; }
+.erp-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 7px 10px; margin: 4px 0; background: rgba(255,255,255,.05); border-radius: 8px; border-left: 3px solid #2e86de; font-size: 13px; }
+.erp-row.urgent { border-left-color: #e74c3c; } .erp-row.part { border-left-color: #ff7eb6; background: rgba(255,126,182,.08); }
+.erp-act { display: flex; gap: 6px; align-items: center; flex-shrink: 0; white-space: nowrap; }
+.erp-act button, .erp-item button { padding: 4px 10px; font-size: 13px; }
+.erp-row .price, .erp-item .price { color: #ffd257; }
+.chip { display: inline-block; padding: 0 6px; margin: 0 2px; border-radius: 6px; background: rgba(255,255,255,.15); font-size: 11px; }
+.chip.big { background: #e67e22; color: #111; }
+.steps { font-size: 12px; } .steps .done { opacity: .35; } .steps .cur { outline: 1px solid #ffd257; border-radius: 4px; } .steps i { opacity: .4; font-style: normal; margin: 0 2px; }
+button.mini { padding: 1px 8px; font-size: 12px; margin: 0 2px; background: rgba(255,255,255,.12); color: #fff; }
+button.mini.on { background: #2e86de; }
+.erp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.erp-item { display: flex; flex-direction: column; gap: 4px; padding: 9px 10px; background: rgba(255,255,255,.05); border-radius: 8px; font-size: 13px; }
+.erp-item.own { opacity: .6; }
+.erp-mach { padding: 8px; border-radius: 8px; background: rgba(255,255,255,.05); font-size: 12px; border-left: 3px solid #777; }
+.erp-mach.run { border-left-color: #2ecc71; } .erp-mach.wait, .erp-mach.usure { border-left-color: #ff9f1a; } .erp-mach.panne, .erp-mach.noop, .erp-mach.bac, .erp-mach.stop { border-left-color: #e74c3c; }
+.erp-stock { display: flex; gap: 14px; flex-wrap: wrap; font-size: 14px; }
+.erp-tab { border-collapse: collapse; } .erp-tab td { padding: 3px 14px 3px 0; } .erp-tab td.ok { color: #3ecf6e; } .erp-tab td.red { color: #ff6b6b; } .erp-tab td.dim { color: #999; }
+.erp-body .red { color: #ff6b6b; } .erp-body .ok { color: #3ecf6e; }
+.erp-body .bar { height: 8px; background: rgba(255,255,255,.1); border-radius: 4px; overflow: hidden; max-width: 400px; } .erp-body .bar i { display: block; height: 100%; background: #ffd257; }
+.erp-body select { padding: 3px; }
+#erp-card { max-width: none; overflow: hidden; }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mécanique Lebec — en équipe (V3.2)</title>
+<title>Mécanique Lebec — en équipe (V4.0)</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" href="data:,">
 </head>
@@ -15,7 +15,8 @@
 <div id="hud" class="hidden">
   <div id="tl" class="box">
     <div id="clock">07:00</div>
-    <div class="row">Score d'équipe <b id="score">0</b></div>
+    <div class="row">💶 Caisse <b id="score">0</b></div>
+    <div id="props" class="props hidden"></div>
     <div class="gauge"><span>Satisfaction client</span><div class="bar"><i id="sat"></i></div></div>
     <div class="row"><span class="dim">Trouvailles cachées</span><b id="finds">★ 0/6</b></div>
   </div>
@@ -36,7 +37,7 @@
   <div id="big"></div>
   <div id="flash"></div>
   <div id="hostlost" class="hidden">⚠ L'hôte ne répond plus… (attente)</div>
-  <div class="hint">Tab : aide · M : carte · T : ping · 4-9 : émotes · K : son</div>
+  <div class="hint">Tab : aide · M : carte · T : ping · 4-9 : émotes · K : son · 💻 PC de gestion : bureau</div>
   <div id="daycard" class="hidden"></div>
 </div>
 <div id="mini" class="hidden"></div>
@@ -50,16 +51,17 @@
 <div id="help" class="overlay hidden"><div class="card wide">
   <h2>Comment ça marche ?</h2>
   <ol class="how">
-    <li><b>Un ticket arrive</b> en haut de l'écran : pièce, matière, machine, outil et étapes.</li>
+    <li><b>Une demande arrive au 💻 PC de gestion</b> (bureau, mur droit) : accepte-la (onglet Commandes) avant qu'elle expire. Elle devient un ticket en haut de l'écran : pièce, matière, machine, outil, étapes et prix. Tu peux y prévoir la machine.</li>
     <li><b>Prends le brut</b> de la bonne matière aux racks (fond de l'atelier) et donne-le à une machine du bon type (Tour / Fraiseuse) : <b>E</b> sur l'opérateur ou la machine.</li>
     <li><b>Prends l'outil</b> demandé dans l'armoire rouge et donne-le à la même machine. Elle usine toute seule… si l'opérateur bosse !</li>
     <li>La <b>caisse</b> sort en zone EXPÉDITION (verte). Charge-la dans la benne d'une voiture, file chez le client, reprends-la et <b>livre-la</b> (E sur le client).</li>
-    <li>Étapes spéciales : 🔥 <b>Fonderie</b> / ⚙️ <b>Chaudronnerie</b> (va commander le brut chez eux, il apparaît sur leur quai), ♨️ <b>Traitement thermique</b> (apporte la caisse usinée à TTH Ouest avant de livrer).</li>
-    <li><b>Stock vide ?</b> Matière chez Eliott (Aciers de l'Ouest, il parle très vite), outils chez Coco (Outi'Pro). Dépose les caisses en RÉCEPTION (zone bleue).</li>
+    <li>Étapes spéciales : 🔥 <b>Fonderie</b> / ⚙️ <b>Chaudronnerie</b> (commande le brut au PC, livré à l'atelier en ~2 min, ou va le chercher chez eux : moins cher et plus rapide), ♨️ <b>Traitement thermique</b> (apporte la caisse usinée à TTH Ouest avant de livrer).</li>
+    <li><b>Stock vide ?</b> Commande au PC (livré par camion en 2-3 min) ou, plus vite, le MAGASINIER va chez Eliott (matière) et Coco (outils) puis dépose les caisses en RÉCEPTION (zone bleue).</li>
+    <li><b>💶 Argent :</b> chaque livraison rapporte (plus si c'est rapide et contrôlé au marbre). Matière, outils, sous-traitance, amendes et salaires coûtent. Investis au PC (machines, fenwick, embauches) et au Garage Pasquier (véhicules). <b>🙋 Particuliers</b> au comptoir : pièces urgentes payées très cher.</li>
   </ol>
   <p><b>Équipe :</b> passe un objet à un coéquipier (E sur lui). Une claque (clic gauche) réveille un opérateur en pause… ou fait lâcher ce que tient un coéquipier. Si Lebec te voit frapper : <b>COUP DE PELLE</b>.</p>
   <p><b>Chaos :</b> 🔥 les copeaux prennent feu (EXTINCTEUR, clic gauche maintenu) · 🔧 pannes (CLÉ À MOLETTE) · 💨 SOUFFLETTE (copeaux, flaques… et collègues) · 💧 flaques d'huile : ça glisse · 🐦 le pigeon vole les plaquettes (lance-lui un truc !) · 📦 en virage, les caisses tombent de la benne · ⛽ surveille l'essence (station Total-Lebec) · 📸 radars à 60 km/h, 🚨 gendarmerie.</p>
-  <p><b>Mini-jeux :</b> prise d'origine en lançant une pièce, changement de plaquette usée, contrôle au pied à coulisse au MARBRE (+5 points par caisse contrôlée).</p>
+  <p><b>Mini-jeux :</b> prise d'origine en lançant une pièce, changement de plaquette usée, contrôle au pied à coulisse au MARBRE (+15 € par caisse contrôlée).</p>
   <p><b>Visiteurs surprise :</b> audit de Jacky (caisse au marbre), Hervé et sa convention (imprimante → signature Lebec → Hervé), Fred et Arexis (PC), Mathieu (va l'écouter), saboteur d'UsiFlash (une claque !), coupure de courant (tableau électrique).</p>
   <p><b>Rôles :</b> ⛑ Médecin (seul à soigner) · 🚜 Cariste (fenwick, palettes) · 🚚 Livreur (camion, grosses pièces) · 🔧 Maintenance (pannes, bacs à copeaux) · 📦 Magasinier (fournisseurs) · 🛠 Polyvalent. Sans joueur pour un rôle, un PNJ s'en charge… lentement.</p>
   <p><b>Vie :</b> 5 coups de pelle = KO (feu, glissade, claques, chien de la casse font mal aussi). KO = tu te traînes, mains vides, jusqu'au médecin. <b>Pièces :</b> petites (se lancent), moyennes (caisse), GROSSES (palette : fenwick → camion → client). Monte à plusieurs : passager (E sur la portière d'une voiture conduite) ou dans la benne. Lance outils aux usineurs et caisses dans les bennes !</p>
@@ -69,6 +71,7 @@
   <p class="dim">Tab pour fermer</p>
 </div></div>
 
+<div id="erp" class="overlay hidden"><div id="erp-card" class="card"></div></div>
 <div id="end" class="overlay hidden"><div id="endcard" class="card"></div></div>
 <div id="pause" class="overlay hidden"><div class="card"><h2>Pause</h2><p>Clique pour reprendre.</p><p class="dim">En multijoueur, la partie continue pour les autres !</p></div></div>
 
@@ -99,14 +102,17 @@
   <div id="scr-guide" class="card wide hidden">
     <h2>📖 Guide</h2>
     <div class="guide">
-      <p><b>Le but :</b> des tickets tombent en haut de l'écran. Fabrique la pièce et livre-la au client avant la fin du chrono.</p>
-      <ol><li>Prends un <b>brut</b> au rack (bonne matière) et un <b>outil</b> à l'armoire rouge.</li>
+      <p><b>Le but :</b> faire tourner l'atelier et gagner de l'argent. Les clients envoient leurs demandes au <b>💻 PC de gestion</b> (bureau, mur droit) : accepte-les, fabrique la pièce et livre-la avant la fin du chrono.</p>
+      <ol><li>Au PC : <b>accepte</b> la demande (et prévois la machine). Prends un <b>brut</b> au rack et un <b>outil</b> à l'armoire rouge.</li>
         <li>Donne-les à la <b>bonne machine</b> (tour ou fraiseuse, indiqué sur le ticket) : mini-jeu de prise d'origine.</li>
         <li>La pièce sort en <b>expédition</b> : petite (se lance), caisse, ou GROSSE (palette : fenwick puis camion).</li>
         <li>Charge la Mégane et <b>livre</b> le client (E sur l'accueil). Certains tickets passent par la fonderie, la chaudronnerie ou le traitement thermique.</li></ol>
+      <p><b>💶 L'argent :</b> livrer rapporte ; la matière, les outils, la sous-traitance, les amendes et les salaires (le soir) coûtent. Au PC : achète des machines (T2, F2, puis T3/F3 après l'agrandissement), un fenwick, embauche des opérateurs, des apprentis, un cariste et un livreur. Les véhicules s'achètent au <b>Garage Pasquier</b>, en ville.</p>
+      <p><b>🙋 Particuliers :</b> ils se garent sur le parking clients et viennent au <b>comptoir</b> (à droite de la porte) : pièce urgente, payée très cher.</p>
+      <p><b>🏭 Campagne :</b> l'atelier démarre tout petit (T1, F1, un opérateur qui jongle, le vieux Kangoo) et grandit jour après jour. Elle est sauvegardée sur le serveur avec un <b>code</b> : n'importe qui peut la reprendre, et on peut rejoindre une partie en cours. Quand l'atelier est prêt, l'<b>inspecteur de l'Éducation Nationale</b> vient : avis favorable = jeu terminé !</p>
       <p><b>Rôles :</b> ⛑ Médecin · 🚜 Cariste · 🚚 Livreur · 🔧 Maintenance · 📦 Magasinier · 🛠 Polyvalent. Un rôle sans joueur est tenu par un PNJ… lent.</p>
       <p><b>Lebec :</b> il ne supporte pas la violence dans SON atelier. 5 coups de pelle = KO, et il faut le médecin.</p>
-      <p><b>Difficultés :</b> 🙂 Facile · 😐 Normal · 😤 Difficile · 🔥 LEBEC EN FEU (tout brûle, points ×1,5).</p>
+      <p><b>Difficultés :</b> 🙂 Facile · 😐 Normal · 😤 Difficile · 🔥 LEBEC EN FEU (tout brûle, gains ×1,5). En campagne, le rythme monte aussi avec la taille de l'atelier.</p>
       <p class="keys"><kbd>ZQSD</kbd> bouger · <kbd>Maj</kbd> courir · <kbd>E</kbd> interagir · <kbd>G</kbd> poser · <kbd>clic G</kbd> claque/outil · <kbd>clic D</kbd> lancer · <kbd>M</kbd> carte · <kbd>T</kbd> ping · <kbd>Tab</kbd> aide · manette compatible</p>
       <h3>💡 Astuces</h3><ul id="guide-tips" class="tips"></ul>
     </div>
@@ -121,8 +127,10 @@
       <button id="btn-profile-h" class="bigperso">👕 Mon perso<br><span class="dim">apparence, tenue, boutique</span></button>
       <div class="rolepick"><b>Ton rôle</b><div id="h-roles" class="roles"></div><div id="h-role-desc" class="dim small"></div></div>
     </div>
-    <div class="modes box2"><label>Mode <select id="h-mode"><option value="coop">Journée libre</option><option value="campagne">Campagne (5 jours)</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label> <label>Difficulté <select id="h-diff"><option value="facile">🙂 Facile</option><option value="normal" selected>😐 Normal</option><option value="difficile">😤 Difficile</option><option value="feu">🔥 LEBEC EN FEU</option></select></label>
-      <div id="h-desc" class="dim small"></div><div id="h-camp" class="hidden small"><span id="h-camp-info"></span> <button id="h-camp-reset" class="sec tiny">recommencer</button></div></div>
+    <div class="modes box2"><label>Mode <select id="h-mode"><option value="coop">Journée libre</option><option value="campagne">Campagne (mon entreprise)</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label> <label>Difficulté <select id="h-diff"><option value="facile">🙂 Facile</option><option value="normal" selected>😐 Normal</option><option value="difficile">😤 Difficile</option><option value="feu">🔥 LEBEC EN FEU</option></select></label>
+      <div id="h-desc" class="dim small"></div><div id="h-camp" class="hidden small campbox"><div id="h-camp-info"></div>
+        <div class="row2"><input id="h-camp-name" maxlength="30" placeholder="Nom de la nouvelle entreprise"><button id="h-camp-new" class="sec tiny">Créer</button>
+        <input id="h-camp-code" maxlength="8" placeholder="Code de sauvegarde"><button id="h-camp-load" class="sec tiny">Charger</button></div></div></div>
     <div class="tipbox" id="tip-h"></div>
     <div class="actions"><button id="btn-solo" class="go">LANCER LA JOURNÉE</button><button class="sec back">Retour</button></div>
   </div>
@@ -155,16 +163,18 @@
       <button id="btn-profile-r" class="bigperso">👕 Mon perso<br><span class="dim">apparence, tenue, boutique</span></button>
       <div class="rolepick"><b>Ton rôle</b> <span class="dim small">(un par joueur, sauf Polyvalent)</span><div id="r-roles" class="roles"></div><div id="r-role-desc" class="dim small"></div></div>
     </div>
-    <div id="room-opts" class="modes box2"><label>Mode <select id="r-mode"><option value="coop">Journée libre</option><option value="campagne">Campagne (5 jours)</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label> <label>Difficulté <select id="r-diff"><option value="facile">🙂 Facile</option><option value="normal" selected>😐 Normal</option><option value="difficile">😤 Difficile</option><option value="feu">🔥 LEBEC EN FEU</option></select></label>
+    <div id="room-opts" class="modes box2"><label>Mode <select id="r-mode"><option value="coop">Journée libre</option><option value="campagne">Campagne (mon entreprise)</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label> <label>Difficulté <select id="r-diff"><option value="facile">🙂 Facile</option><option value="normal" selected>😐 Normal</option><option value="difficile">😤 Difficile</option><option value="feu">🔥 LEBEC EN FEU</option></select></label>
       <label class="chk"><input type="checkbox" id="r-traitor"> 🕵 Traître (3 joueurs min.)</label>
-      <div id="r-desc" class="dim small"></div><div id="r-camp" class="hidden small"><span id="r-camp-info"></span> <button id="r-camp-reset" class="sec tiny">recommencer</button></div></div>
+      <div id="r-desc" class="dim small"></div><div id="r-camp" class="hidden small campbox"><div id="r-camp-info"></div>
+        <div class="row2"><input id="r-camp-name" maxlength="30" placeholder="Nom de la nouvelle entreprise"><button id="r-camp-new" class="sec tiny">Créer</button>
+        <input id="r-camp-code" maxlength="8" placeholder="Code de sauvegarde"><button id="r-camp-load" class="sec tiny">Charger</button></div></div></div>
     <div id="room-cfg" class="dim small"></div>
     <div class="tipbox" id="tip-r"></div>
     <div class="actions"><button id="btn-start" class="go">LANCER LA JOURNÉE</button><span id="room-wait" class="dim"></span><button id="btn-leave" class="sec">Quitter</button></div>
   </div>
 </div>
 <div id="toasts"></div>
-<div id="version">V3.2</div>
+<div id="version">V4.0</div>
 
 <!-- Three.js r128 + chargeur glTF (copies locales : marche hors ligne et en double-clic) -->
 <script src="lib/three.min.js"></script>
@@ -172,6 +182,7 @@
 <script src="assets-ville.js"></script>   <!-- décors KayKit en base64 -->
 <script src="js/config.js"></script>      <!-- réglages, persos, entreprises, pièces -->
 <script src="js/util.js"></script>
+<script src="js/company.js"></script>     <!-- l'entreprise : ce qui est sauvegardé en campagne -->
 <script src="js/textures.js"></script>
 <script src="js/assets.js"></script>
 <script src="js/audio.js"></script>
@@ -189,10 +200,12 @@
 <script src="js/sim_chaos.js"></script>   <!-- feux, pannes, flaques, pigeon -->
 <script src="js/sim_city.js"></script>    <!-- véhicules, circulation, radars, police, course -->
 <script src="js/sim_events.js"></script>  <!-- visiteurs, inspection, traître -->
+<script src="js/sim_eco.js"></script>     <!-- économie : PC de gestion, achats, particuliers, personnel IA -->
 <script src="js/minigames.js"></script>
 <script src="js/account.js"></script>     <!-- profil, jetons, succès -->
 <script src="js/dialogue.js"></script>
 <script src="js/hud.js"></script>
+<script src="js/erp.js"></script>         <!-- fenêtre du PC de gestion -->
 <script src="js/game.js"></script>        <!-- session : joueur local + synchro -->
 <script src="js/lobby.js"></script>
 <script src="js/main.js"></script>

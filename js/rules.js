@@ -15,7 +15,7 @@
   R.compOf = npc => COMP_OF[npc];
   const S_ = () => ML.Game.S;
   const midOf = npc => { const S = S_(); for (const id in S.machines) if (S.machines[id].op === npc) return id; return null; };
-  const opName = npc => (npc && npc.startsWith('app') && S_().appNames ? S_().appNames[npc] : short(npc));
+  const opName = npc => short(npc);
   const fireAt = mid => (S_().fires || []).find(f => f.mid === mid);
   const myRole = () => { const S = S_(); return S && S.pl[ML.Game.me] ? S.pl[ML.Game.me].role : 'poly'; };
   R.myRole = myRole;
@@ -24,13 +24,14 @@
   function machineLabel(mid, held) {
     const S = S_(), M = S.machines[mid], def = ML.MACHINES.find(m => m.id === mid);
     if (!M) return null;
+    if (!M.op) return `${mid} : SANS OPÉRATEUR — embauche au PC de gestion (onglet Personnel)`;
     if (fireAt(mid)) return held && held.type === 'extincteur' ? `🔥 Éteindre : maintiens le CLIC GAUCHE vers le feu` : `🔥 FEU sur ${mid} ! Prends un extincteur (mur gauche)`;
     if (M.broken) return held && held.type === 'cle' ? (myRole() === 'maintenance' ? `🔧 Réparer ${mid} (clé à molette)` : `${mid} en panne : réservé MAINTENANCE 🔧`) : `${mid} EN PANNE : clé à molette (maintenance)`;
     if (M.bin === false || M.chips >= 100) return `🗑 ${mid} bloquée : bac à copeaux ${M.bin === false ? 'ABSENT' : 'PLEIN'} (maintenance)`;
     if (M.worn && M.job) return held && IT.def(held).kind === 'tool' ? `Changer l'outil usé de ${mid}` : `${mid} : outil usé → ${ML.TOOLS[M.job.need].label} neuf(ve)`;
     if (held) {
       const t = IT.def(held);
-      if (t.kind === 'brut') return M.job ? `${mid} est occupée` : `Lancer « ${IT.name(held)} » sur ${mid} (${ML.MTYPE[def.type]}) — prise d'origine`;
+      if (t.kind === 'brut') return M.job ? `${mid} est occupée` : `Lancer « ${IT.name(held)} » sur ${mid} (${ML.MTYPE[def.type]}) — prise d'origine${M.plan ? ` · prévu : #${M.plan}` : ''}`;
       if (t.kind === 'tool') return !M.job ? `${mid} : donne d'abord un brut` : M.job.tool ? `${mid} a déjà son outil` : `Donner « ${IT.name(held)} » à ${mid}`;
     }
     if (!S.power) return `${mid} : plus de courant !`;
@@ -50,7 +51,7 @@
       case 'casques': return 'Prendre un casque de sécurité';
       case 'reception': return held && held.type === 'matiere' ? 'Déposer la caisse en réception (+ stock)' : null;
       case 'printer': return S.evs && S.evs.herve ? '📝 Imprimer la convention de stage' : null;
-      case 'pc': return S.evs && S.evs.fred ? '💻 Remplir ARÉXIS (Fred partira)' : null;
+      case 'pc': { const n = S.props.length + S.parts.filter(p => p.st === 'wait').length; return `💻 PC de gestion : commandes, achats, embauches${n ? ` — 📥 ${n} demande${n > 1 ? 's' : ''} !` : ''}${S.evs && S.evs.fred ? ' · ARÉXIS' : ''}`; }
       case 'panel': return !S.power ? '⚡ Réarmer le disjoncteur' : G.traitor ? '🕵 Couper le courant (discrètement…)' : null;
       case 'marbre':
         if (!isPart(held)) return S.evs && S.evs.audit ? '🔍 Jacky attend une CAISSE ici' : null;
@@ -100,6 +101,9 @@
       return `Parler à ${opName(n)}`;
     }
     switch (n) {
+      case 'tony': return 'Tony (cariste) : il charge les palettes dans le camion';
+      case 'jojo': return S.tour ? null : 'Jojo (livreur) : il part en tournée dès qu\'il y a des colis à l\'EXPÉDITION';
+      case 'vendeur': return '🚗 Garage Pasquier : acheter un véhicule';
       case 'lebec': return held && held.type === 'convention' && !held.d.signee ? '✍ Faire signer la convention à Lebec' : S.rule === 'no_lebec' ? 'Parler à Lebec (INTERDIT par l\'inspecteur !)' : 'Parler à François Lebec';
       case 'jacky': return 'Jacky : apporte une caisse au MARBRE';
       case 'herve': return held && held.type === 'convention' ? (held.d.signee ? '📝 Rendre la convention SIGNÉE à Hervé' : 'La convention n\'est pas signée (Lebec !)') : 'Hervé : « La convention ? »';
@@ -107,6 +111,12 @@
       case 'mathieu': return '🐌 Écouter Mathieu à la place de l\'opérateur';
       case 'saboteur': return 'Gars louche… (une claque le ferait fuir)';
       case 'inspecteur': return 'Parler à l\'inspecteur';
+    }
+    if (ML.PARTICULIERS.includes(n)) {
+      const p = (S.parts || []).find(x => x.id === n); if (!p) return null;
+      if (p.st === 'wait') return `🙋 ${P_(n).name} : écouter sa demande (${p.price} €)`;
+      if (p.st === 'order') return isPart(held) ? `Donner la pièce #${held.d.oid} à ${P_(n).name}` : `${P_(n).name} attend sa pièce (#${p.oid})`;
+      return null;
     }
     const comp = COMP_OF[n], C = comp && COMP[comp];
     if (!C) return null;
@@ -146,7 +156,7 @@
         if (!held.d.mes) { ML.HUD.notify('Cette caisse n\'a pas de fiche de cote. Livre-la telle quelle.'); return; }
         return Mini.run('pied', { mes: held.d.mes }, r => { if (r !== null) G.intent({ a: 'use', id, ctl: r }); });
       }
-      case 'pc': if (S.evs && S.evs.fred) return Mini.run('arexis', {}, r => { if (r === 'ok') G.intent({ a: 'use', id, mg: 'ok' }); }); break;
+      case 'pc': return ML.ERP.open();
       case 'panel': if (!S.power) return Mini.run('serrer', { title: '⚡ Réarmer le disjoncteur', text: 'Remonte le levier : tape <b>Espace</b> !', need: 8 }, r => { if (r === 'ok') G.intent({ a: 'use', id, mg: 'ok' }); }); break;
       case 'pl': {
         const T = S.pl[a];
@@ -155,6 +165,16 @@
       }
       case 'npc': {
         if (P_(a).op && held && ['brut', 'tool'].includes(IT.def(held).kind) && midOf(a)) return R.use('mach:' + midOf(a));
+        if (ML.PARTICULIERS.includes(a)) {
+          const p = (S.parts || []).find(x => x.id === a);
+          if (p && p.st === 'wait') return ML.Dialogue.choice(P_(a).name, `${ML.LINES[a][0]} Il me faudrait : « ${p.part} » en ${ML.MATERIALS[p.mat].label} (${ML.MTYPE[p.mtype]}, ${ML.TOOLS[p.tool].label.toLowerCase()}). C'est urgent : ${Math.round(p.dur / 60 * 10) / 10} min maximum. Je paie ${p.price} € !`,
+            [{ label: `Accepter (${p.price} €)`, fn: () => G.intent({ a: 'part', id: a, ok: 1 }) }, { label: 'Refuser', fn: () => G.intent({ a: 'part', id: a, ok: 0 }) }, { label: 'Je réfléchis…', fn: null }]);
+          break;
+        }
+        if (a === 'vendeur') {
+          const opts = Object.keys(ML.DEALER).map(k => { const D = ML.DEALER[k], own = S.owned.includes(k); return { label: own ? `✔ ${D.name} (déjà à vous)` : `${D.name} — ${D.price.toLocaleString('fr-FR')} € : ${D.desc}`, fn: own ? null : () => G.intent({ a: 'buycar', k }) }; });
+          return ML.Dialogue.choice(P_('vendeur').name, `${ML.U.pick(ML.LINES.vendeur)} Dans la caisse de l'atelier, vous avez ${S.money.toLocaleString('fr-FR')} €.`, opts.concat([{ label: 'Juste regarder', fn: null }]));
+        }
         if (a === 'mathieu') return ML.Dialogue.listen(P_('mathieu').name, ML.LINES.mathieu.concat(['Et… du coup… voilà… quoi.']), 7, () => G.intent({ a: 'mathieu' }), null, () => G.npcDist('mathieu') < 6);
         const comp = COMP_OF[a], C = comp && COMP[comp];
         if (C && (C.kind === 'matiere' || C.kind === 'outils') && myRole() !== 'magasinier') break;

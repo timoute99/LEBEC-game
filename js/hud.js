@@ -11,7 +11,7 @@
 
   H.init = () => {
     H.el = {};
-    for (const id of ['hud', 'clock', 'score', 'sat', 'finds', 'tickets', 'team', 'prompt', 'notifs', 'subtitle', 'big', 'flash', 'inventory', 'stamina', 'drive', 'pause', 'help', 'end', 'endcard', 'hostlost', 'minimap', 'toasts', 'evbar', 'daycard', 'raceboard', 'vote', 'secret', 'hp', 'hpbox', 'rolebadge', 'ko', 'bigmap'])
+    for (const id of ['hud', 'props', 'clock', 'score', 'sat', 'finds', 'tickets', 'team', 'prompt', 'notifs', 'subtitle', 'big', 'flash', 'inventory', 'stamina', 'drive', 'pause', 'help', 'end', 'endcard', 'hostlost', 'minimap', 'toasts', 'evbar', 'daycard', 'raceboard', 'vote', 'secret', 'hp', 'hpbox', 'rolebadge', 'ko', 'bigmap'])
       H.el[id] = $(id);
     H.el.inventory.innerHTML = [0, 1, 2].map(i => `<div class="slot"><span class="k">${i + 1}</span><span class="ic"></span><span class="nm"></span></div>`).join('');
     H.slots = [...H.el.inventory.querySelectorAll('.slot')];
@@ -29,11 +29,12 @@
   /** Carte de début de journée : mode, humeur de Lebec, météo */
   H.dayCard = S => {
     const Hm = ML.HUMEURS[S.humeur], W = ML.WEATHER[S.weather];
-    const mode = { coop: 'Journée libre', campagne: `Campagne — jour ${S.day}/${ML.CAMPAIGN.days}`, inspection: "INSPECTION de l'Éducation Nationale", course: 'Course de Mégane' }[S.mode] || S.mode;
+    const mode = S.campaign ? (S.mode === 'inspection' ? `🎓 ${S.co.name} — INSPECTION de l'Éducation Nationale` : `${S.co.name} — jour ${S.co.day}`) : ({ coop: 'Journée libre', inspection: "INSPECTION de l'Éducation Nationale", course: 'Course de Mégane' }[S.mode] || S.mode);
     const Dd = ML.DIFFS[S.diff] || ML.DIFFS.normal;
     H.el.daycard.innerHTML = `<div class="dc-mode">${U.esc(mode)} · ${Dd.icon} ${U.esc(Dd.name)}</div><div class="dc-h">😤 ${U.esc(Hm.name)}</div><div class="dim">${U.esc(Hm.desc)}</div><div class="dc-w">${S.weather === 'pluie' ? '🌧' : S.weather === 'brouillard' ? '🌫' : '☀️'} ${U.esc(W.name)}</div>` +
       (S.mode === 'inspection' ? '<div class="dc-x">Respecte ses règles absurdes (elles changent !). 5 infractions = échec.</div>' : S.mode === 'course' ? '<div class="dc-x">5 manches : le premier arrivé EN VOITURE devant l\'entreprise indiquée gagne.</div>' : '') +
-      (S.traitorMode ? '<div class="dc-x">🕵 Un traître se cache parmi vous…</div>' : '');
+      (S.traitorMode ? '<div class="dc-x">🕵 Un traître se cache parmi vous…</div>' : '') +
+      (S.mode !== 'course' ? `<div class="dc-x">💶 ${S.money.toLocaleString('fr-FR')} € en caisse · les demandes des clients arrivent au 💻 PC de gestion (bureau)</div>` : '');
     H.el.daycard.classList.remove('hidden'); clearTimeout(H._dc); H._dc = setTimeout(() => H.el.daycard.classList.add('hidden'), 7500);
   };
 
@@ -72,7 +73,9 @@
     H.tick -= dt; if (H.tick > 0 || !S) return; H.tick = 0.2;
     const min = G.clockMin();
     H.el.clock.textContent = S.mode === 'course' ? `🏁 ${S.race ? S.race.round + '/' + S.race.total : '…'}` : U.fmt(Math.min(min, ML.CFG.DAY_END)) + (min >= 17 * 60 ? ' 🌙' : '');
-    H.el.score.textContent = S.score;
+    H.el.score.textContent = S.mode === 'course' ? S.score : `${S.money.toLocaleString('fr-FR')} €`; H.el.score.classList.toggle('neg', S.money < 0);
+    const np = (S.props || []).length + (S.parts || []).filter(p => p.st === 'wait').length;
+    H.el.props.textContent = np ? `📥 ${np} demande${np > 1 ? 's' : ''} au PC` : ''; H.el.props.classList.toggle('hidden', !np);
     H.el.sat.style.width = S.sat + '%'; H.el.sat.style.background = S.sat < 30 ? '#e74c3c' : S.sat < 55 ? '#f39c12' : '#3ecf6e';
     H.el.finds.textContent = `★ ${S.finds.got}/${S.finds.total}`;
     const inv = S.pl[G.me] ? S.pl[G.me].inv : [];
@@ -89,9 +92,9 @@
   /* ---------- Tickets ---------- */
   function stepState(o, st) {
     if (st === 'usinage') return o.m ? `sur ${o.m}` : o.src ? 'brut prêt → machine' : `brut ${ML.MATERIALS[o.mat].label} → ${ML.MTYPE[o.mtype]}`;
-    if (st === 'fonderie' || st === 'chaudro') return o.q ? 'en cours...' : `commander chez ${ML.COMPANIES[st].name.split(' ')[0]}`;
+    if (st === 'fonderie' || st === 'chaudro') return o.q ? 'brut en route...' : `brut : PC ou ${ML.COMPANIES[st].name.split(' ')[0]}`;
     if (st === 'tth') return o.q ? 'au four...' : 'caisse → TTH Ouest';
-    return `livrer à ${ML.COMPANIES[o.client].name}`;
+    return o.client === 'part' ? `rapporter au COMPTOIR (${ML.PEOPLE[o.who].name})` : `livrer à ${ML.COMPANIES[o.client].name}`;
   }
   H.renderTickets = S => {
     const html = S.mode === 'course' ? '' : S.orders.slice().sort((a, b) => a.dl - b.dl).map(o => {
@@ -99,19 +102,19 @@
       const col = frac > 0.5 ? '#3ecf6e' : frac > 0.25 ? '#f39c12' : '#e74c3c';
       const steps = o.steps.map((s, i) => `<span class="${i < o.si ? 'done' : i === o.si ? 'cur' : ''}">${STEP_ICON[s]}</span>`).join('<i>›</i>');
       return `<div class="ticket ${frac < 0.25 ? 'urgent' : ''}" style="--c:#${new THREE.Color(C.roof).getHexString()}">
-        <div class="tk-head"><b>#${o.id}</b> ${U.esc(C.name)}<span>${Math.ceil(left)} s</span></div>
-        <div class="tk-part">${U.esc(o.part)}</div>
+        <div class="tk-head"><b>#${o.id}</b> ${U.esc(o.client === 'part' ? '🙋 ' + ML.PEOPLE[o.who].name : C.name)}<span>${Math.ceil(left)} s</span></div>
+        <div class="tk-part">${U.esc(o.part)} <span class="tk-price">${o.price} €</span>${o.plan && !o.m ? ` <span class="tk-plan">→ ${o.plan}</span>` : ''}</div>
         <div class="tk-chips"><span style="background:${ML.MATERIALS[o.mat].css};color:#111">${ML.MATERIALS[o.mat].label}</span><span>${ML.MTYPE[o.mtype]}</span><span style="background:${ML.TOOLS[o.tool].css};color:#111">${ML.TOOLS[o.tool].label}</span></div>
         <div class="tk-steps">${steps}</div>
         <div class="tk-now">${U.esc(stepState(o, st))}</div>
         <div class="tk-bar"><i style="width:${(frac * 100).toFixed(1)}%;background:${col}"></i></div></div>`;
-    }).join('') || (S.mode === 'course' ? '' : '<div class="ticket empty">Pas de ticket pour l\'instant…</div>');
+    }).join('') || (S.mode === 'course' ? '' : `<div class="ticket empty">${(S.props || []).length ? '📥 Des demandes attendent au PC de gestion : accepte-les !' : 'Pas de commande pour l\'instant…'}</div>`);
     if (html !== H._tk) { H.el.tickets.innerHTML = html; H._tk = html; }
   };
   H.renderTeam = S => {
     const G = ML.Game;
     const html = Object.keys(S.pl).map(pid => {
-      const P = S.pl[pid], c = ML.COLORS[P.idx % 5], sel = pid === G.me ? G.p.sel : (G.remote[pid] ? G.remote[pid].sel || 0 : 0), it = P.inv[sel];
+      const P = S.pl[pid], c = ML.COLORS[P.idx % 6], sel = pid === G.me ? G.p.sel : (G.remote[pid] ? G.remote[pid].sel || 0 : 0), it = P.inv[sel];
       const off = !G.solo && ML.Net.room && !(ML.Net.room.players.find(x => x.id === pid) || {}).on;
       const rp = S.race && S.race.pts ? ` · ${S.race.pts[pid] || 0} pts` : '';
       const hp = P.ko ? ' <b style="color:#ff6b6b">KO</b>' : P.hp < 100 ? ` <span class="dim">${P.hp}♥</span>` : '';
@@ -127,6 +130,9 @@
     if ((S.fires || []).length) out.push(`<span class="ev hot">🔥 Feu sur ${S.fires.map(f => f.mid).join(', ')}</span>`);
     for (const id in S.machines) if (S.machines[id].broken) out.push(`<span class="ev">🔧 ${id} en panne</span>`);
     if (S.rule) out.push(`<span class="ev rule">📏 ${U.esc(ML.RULES[S.rule])} · infractions ${S.viol}/5</span>`);
+    for (const d of (S.deliv || []).slice(0, 3)) out.push(`<span class="ev info">🚚 ${U.esc(d.name)} : ${Math.max(0, Math.ceil(d.eta - S.rt))} s</span>`);
+    if (S.tour) out.push(`<span class="ev info">🚚 Jojo en tournée (${S.tour.n} colis) : ${Math.max(0, Math.ceil(S.tour.end - S.rt))} s</span>`);
+    for (const p of (S.parts || [])) if (p.st === 'wait') out.push(`<span class="ev part">🙋 Client au COMPTOIR : ${Math.max(0, Math.ceil(p.exp - S.rt))} s</span>`);
     const html = out.join('');
     if (html !== H._ev) { H.el.evbar.innerHTML = html; H._ev = html; }
   };
@@ -177,29 +183,33 @@
   H.showEnd = (r, extra) => {
     const G = ML.Game; extra = extra || {};
     ML.ui.modal = 'end'; ML.Input.unlock(); H.showPause(false); H.el.vote.classList.add('hidden'); H.votePlayers = null; H.voted = false;
+    const eur = n => `${Math.round(n).toLocaleString('fr-FR')} €`;
     const stars = [1, 2, 3].map(i => `<span class="${i <= r.stars ? 'on' : ''}">★</span>`).join('');
-    const verdict = r.stars >= 3 ? "« Pas mal. Pour des jeunes formés par l'Éducation Nationale. »" : r.stars >= 1 ? '« Ça passe. Demain on ne traîne pas ! »' : '« Si UsiFlash voit ça... COUP DE PELLE ! »';
+    const verdict = r.stars >= 3 ? "« Pas mal. Pour des jeunes formés par l'Éducation Nationale. »" : r.stars >= 1 ? '« Ça passe. Demain on ne traîne pas ! »' : r.profit < 0 ? '« On perd de l\'argent ! C\'est écrit dans le poly : on vend PLUS qu\'on ne dépense ! »' : '« Si UsiFlash voit ça... COUP DE PELLE ! »';
     let more = '';
+    const won = !r.won ? '' : `<div class="won"><h2>🏆 JEU TERMINÉ !</h2><p>L'inspecteur de l'Éducation Nationale donne un <b>AVIS FAVORABLE</b> à ${U.esc(r.co ? r.co.name : 'l\'atelier')}.<br>François Lebec : « … C'était écrit dans le poly. » (il sourit, presque)</p><p class="dim">Vous pouvez continuer à faire tourner l'atelier : la sauvegarde reste ouverte.</p></div>`;
     if (r.race) more += `<h3>🏁 Classement</h3><table>${r.race.map(([id, n, p], i) => `<tr><td>${['🥇', '🥈', '🥉'][i] || i + 1 + 'e'} ${U.esc(n)}</td><td><b>${p}</b> pts</td></tr>`).join('')}</table>`;
-    if (r.inspection) more += `<h3>🎓 Inspection : ${r.inspection.pass ? '<span class="ok">AVIS FAVORABLE</span>' : '<span class="ko">AVIS DÉFAVORABLE</span>'}</h3><p class="dim">${r.inspection.viol} infraction(s) · il fallait ≤ 4 et au moins ${r.need[0]} points.</p>`;
-    if (r.traitor) more += `<h3>🕵 Le traître était… <b>${U.esc(r.traitor.name)}</b> !</h3><p>${r.traitor.caught ? "Démasqué·e par l'équipe : +40 points !" : "Il/elle s'en sort sans être démasqué·e…"} <span class="dim">(bilan du traître : ${r.traitor.usi} caisse(s) livrée(s) chez UsiFlash, ${r.traitor.cuts} coupure(s) de courant, ${r.traitor.fails} ticket(s) raté(s) dans la journée)</span></p>`;
-    if (extra.coins !== undefined) more += `<p class="coins">🪙 +${extra.coins} jetons (total ${ML.Account.prof.coins})</p>`;
+    if (r.inspection) more += `<h3>🎓 Inspection : ${r.inspection.pass ? '<span class="ok">AVIS FAVORABLE</span>' : '<span class="ko">AVIS DÉFAVORABLE</span>'}</h3><p class="dim">${r.inspection.viol} infraction(s) · il fallait ≤ 4 et au moins ${eur(r.need[0])} de bénéfice.</p>`;
+    if (r.traitor) more += `<h3>🕵 Le traître était… <b>${U.esc(r.traitor.name)}</b> !</h3><p>${r.traitor.caught ? "Démasqué·e par l'équipe : bravo !" : "Il/elle s'en sort sans être démasqué·e…"} <span class="dim">(bilan du traître : ${r.traitor.usi} caisse(s) livrée(s) chez UsiFlash, ${r.traitor.cuts} coupure(s) de courant, ${r.traitor.fails} ticket(s) raté(s) dans la journée)</span></p>`;
+    if (extra.coins !== undefined) more += `<p class="coins">🪙 +${extra.coins} jetons pour ton profil (total ${ML.Account.prof.coins})</p>`;
     if (extra.camp) more += extra.camp;
     let btns;
     if (G.solo) btns = `<button id="end-again">${extra.nextLabel || 'Rejouer'}</button><button id="end-menu" class="sec">Menu</button>`;
     else if (G.isHost) btns = `<button id="end-again">${extra.nextLabel || 'Nouvelle journée (même équipe)'}</button><button id="end-menu" class="sec">Retour au salon</button>`;
     else btns = '<p class="dim">En attente de l\'hôte…</p><button id="end-menu" class="sec">Quitter le salon</button>';
-    const score = r.mode === 'course' ? '' : `<tr><td>Score d'équipe</td><td><b>${r.score}</b></td></tr><tr><td>Tickets livrés / ratés</td><td>${r.served} / ${r.failed}</td></tr>
-      <tr><td>Trouvailles</td><td>${r.finds}/${r.findsTotal}</td></tr><tr><td>Satisfaction client</td><td>${r.sat} %</td></tr>
-      <tr><td>Étoiles</td><td class="dim">★ ${r.need[0]} · ★★ ${r.need[1]} · ★★★ ${r.need[2]}</td></tr>`;
-    H.el.endcard.innerHTML = `<h1>${r.mode === 'course' ? 'Fin de la course' : 'Fin de journée'}</h1>${r.mode === 'course' ? '' : `<div class="stars">${stars}</div>`}
-      <table>${score}</table>${more}
+    const T = r.today || {}, row = (l, v, c) => `<tr><td>${l}</td><td class="${c || ''}">${v}</td></tr>`;
+    const table = r.mode === 'course' ? '' : row('Chiffre d\'affaires', '+' + eur(T.ca || 0), 'ok') + (T.bonus ? row('Primes', '+' + eur(T.bonus), 'ok') : '') +
+      row('Achats (matière, outils, sous-traitance)', '−' + eur(T.achat || 0), 'ko') + (T.amende ? row('Amendes et casse', '−' + eur(T.amende), 'ko') : '') + row('Salaires', '−' + eur(T.salaires || 0), 'ko') +
+      row('<b>Bénéfice de la journée</b>', `<b>${eur(r.profit || 0)}</b>`, (r.profit || 0) >= 0 ? 'ok' : 'ko') + (T.invest ? row('Investissements', '−' + eur(T.invest), 'dim') : '') +
+      row('<b>En caisse</b>', `<b>${eur(r.money || 0)}</b>`) + row('Réputation', `${r.rep}/100 (${r.rep - r.rep0 >= 0 ? '+' : ''}${r.rep - r.rep0})`) +
+      row('Commandes livrées / ratées', `${r.served} / ${r.failed}`) + row('Trouvailles', `${r.finds}/${r.findsTotal}`) + row('Étoiles (bénéfice)', `<span class="dim">★ ${eur(r.need[0])} · ★★ ${eur(r.need[1])} · ★★★ ${eur(r.need[2])}</span>`);
+    H.el.endcard.innerHTML = `<h1>${r.mode === 'course' ? 'Fin de la course' : 'Bilan de la journée'}</h1>${r.mode === 'course' ? '' : `<div class="stars">${stars}</div>`}
+      ${won}<table>${table}</table>${more}
       ${r.mode === 'course' ? '' : `<p><i>François Lebec : ${verdict}</i></p>`}<div class="btns">${btns}</div>`;
     H.el.end.classList.remove('hidden');
     const again = $('end-again'), menu = $('end-menu');
     if (again) again.onclick = () => ML.Lobby.replay();
     menu.onclick = () => ML.Lobby.leaveAfterEnd();
-    for (const b of H.el.endcard.querySelectorAll('[data-up]')) b.onclick = () => { const m = ML.Camp.buy(b.dataset.up); if (m) H.toast(m); else H.showEnd(r, Object.assign({}, extra, { camp: ML.Camp.panel() })); };
   };
 
   /* ---------- Grande carte (touche M) ---------- */
@@ -248,7 +258,7 @@
     // objectifs des tickets
     const t = performance.now() / 300;
     for (const o of S.orders) {
-      const st = o.steps[o.si], k = st === 'livraison' ? o.client : st === 'tth' || st === 'fonderie' || st === 'chaudro' ? st : null; if (!k || !ML.LOC.comp[k]) continue;
+      const st = o.steps[o.si], k = st === 'livraison' ? o.client : st === 'tth' || ((st === 'fonderie' || st === 'chaudro') && !o.q) ? st : null; if (!k || !ML.LOC.comp[k]) continue;
       const L = ML.LOC.comp[k]; c.strokeStyle = '#ffd257'; c.lineWidth = 3; c.beginPath(); c.arc(X(L.dock.x), Z(L.dock.z), 10 + Math.sin(t) * 3, 0, 7); c.stroke();
       c.font = 'bold 12px Arial'; c.textAlign = 'center'; c.fillStyle = '#ffd257'; c.fillText(`#${o.id} ${st === 'livraison' ? 'livrer' : ML.STEP[st]}`, X(L.dock.x), Z(L.dock.z) - 16);
     }
@@ -258,7 +268,7 @@
     if (ML.Fx.dog) dot(ML.Fx.dog.position.x, ML.Fx.dog.position.z, '#8d6e63', 4, '🐕');
     for (const p of ML.Fx.pings) dot(p.g.position.x, p.g.position.z, '#ffd257', 7, '📍');
     for (const pid in S.pl) {
-      const P = S.pl[pid], col = ML.COLORS[P.idx % 5].css, me = pid === G.me;
+      const P = S.pl[pid], col = ML.COLORS[P.idx % 6].css, me = pid === G.me;
       const pos = me ? (G.p.car !== null ? ML.Cars.list[G.p.car].pos : G.p.pos) : G.avatars[pid] && G.avatars[pid].seen ? G.avatars[pid].pos : null;
       if (pos) dot(pos.x, pos.z, col, me ? 7 : 6, (me ? '▶ ' : '') + P.name + (P.ko ? ' (KO)' : ''));
     }
@@ -293,7 +303,7 @@
     for (const p of ML.Fx.pings) dot(p.g.position.x, p.g.position.z, '#ffd257', 3.5);
     const L = G.npcViews.lebec; if (L && L.seen) dot(L.pos.x, L.pos.z, L.st === 'c' ? '#ff0000' : '#2c5aa0', 2.5);
     for (const pid in S.pl) {
-      const c = ML.COLORS[S.pl[pid].idx % 5].css;
+      const c = ML.COLORS[S.pl[pid].idx % 6].css;
       if (pid === G.me) {
         const pos = G.p.car !== null ? ML.Cars.list[G.p.car].pos : G.p.pos, a = G.p.car !== null ? ML.Cars.list[G.p.car].h : G.p.yaw + Math.PI;
         ctx.save(); ctx.translate(mx(pos.x), mz(pos.z)); ctx.rotate(-a); ctx.fillStyle = c; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2;

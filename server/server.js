@@ -1,9 +1,10 @@
 // =====================================================================
-// server.js — Serveur de MÉCANIQUE LEBEC (v2)
+// server.js — Serveur de MÉCANIQUE LEBEC (V4)
 // ---------------------------------------------------------------------
 // 1) SALONS + RELAIS : le serveur ne fait pas tourner le jeu ; il gère des
-//    salons (code de 4 lettres, 5 joueurs), relaie les messages et garde
+//    salons (code de 4 lettres, 6 joueurs), relaie les messages et garde
 //    la place d'un joueur 20 s après une coupure. L'HÔTE simule l'atelier.
+//    On peut rejoindre une partie EN COURS (drop-in).
 // 2) COMPTES : pseudo + mot de passe (scrypt), jeton signé, profil
 //    (apparence, jetons, objets, succès). Stockage :
 //      - fichier server/data/accounts.json (par défaut, local) ;
@@ -11,7 +12,10 @@
 //        d'environnement GITHUB_TOKEN et GITHUB_REPO sont définies
 //        (Render efface ses fichiers à chaque redémarrage).
 //    AUTH_SECRET (variable d'environnement) signe les jetons.
-// 3) Sert les fichiers du jeu (dossier parent) : http://localhost:8080/
+// 3) SAUVEGARDES DE CAMPAGNE (entreprises) : un code de 6 caractères,
+//    n'importe qui ayant le code peut charger / sauvegarder. Même stockage
+//    que les comptes (fichier local ou dépôt GitHub privé, autre fichier).
+// 4) Sert les fichiers du jeu (dossier parent) : http://localhost:8080/
 //
 // Protocole JSON (client → serveur) :
 //   {t:'hello', name, sid}  {t:'list'}  {t:'create', priv}  {t:'join', code}
@@ -19,6 +23,8 @@
 //   {t:'relay', d, to?}  {t:'ping'}
 //   {t:'acc', q, op:'register'|'login'|'resume'|'save', user, pass, token, profile}
 //     → {t:'accr', q, ok, m?, token?, user?, profile?}
+//   {t:'camp', q, op:'create'|'load'|'put', code?, name?, data?}
+//     → {t:'campr', q, ok, m?, code?, data?}
 // =====================================================================
 'use strict';
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
@@ -27,52 +33,52 @@ const { WebSocketServer } = require('ws');
 const PORT = process.env.PORT || 8080;
 const ROOT = path.join(__dirname, '..');
 const DATA = path.join(__dirname, 'data');
-const VERSION = 2;
-const MAX_PLAYERS = 5, GRACE_MS = 20000, RATE_PER_SEC = 150, MAX_MSG = 512 * 1024;
+const VERSION = 4;
+const MAX_PLAYERS = 6, GRACE_MS = 20000, RATE_PER_SEC = 150, MAX_MSG = 512 * 1024;
 
-/* ======================= Comptes : stockage ======================= */
-const GH = { token: process.env.GITHUB_TOKEN, repo: process.env.GITHUB_REPO, file: process.env.GITHUB_PATH || 'lebec-accounts.json', sha: null };
+/* ======================= Stockage (comptes, sauvegardes) ======================= */
+const GH = { token: process.env.GITHUB_TOKEN, repo: process.env.GITHUB_REPO };
 const useGitHub = !!(GH.token && GH.repo);
-let accounts = {};               // clé = pseudo en minuscules
-let saveTimer = null;
 let SECRET = process.env.AUTH_SECRET;
-
 function ensureData() { try { fs.mkdirSync(DATA, { recursive: true }); } catch (e) { /* rien */ } }
 if (!SECRET) {
   ensureData();
   const f = path.join(DATA, 'secret.txt');
   try { SECRET = fs.readFileSync(f, 'utf8').trim(); } catch (e) { SECRET = crypto.randomBytes(32).toString('hex'); try { fs.writeFileSync(f, SECRET); } catch (e2) { /* lecture seule */ } }
 }
-async function ghApi(method, body) {
-  const url = `https://api.github.com/repos/${GH.repo}/contents/${encodeURIComponent(GH.file)}`;
-  const r = await fetch(url, { method, headers: { Authorization: `Bearer ${GH.token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'lebec-relay' }, body: body ? JSON.stringify(body) : undefined });
-  return r;
-}
-async function loadAccounts() {
-  if (useGitHub) {
-    try {
-      const r = await ghApi('GET');
-      if (r.status === 200) { const j = await r.json(); GH.sha = j.sha; accounts = JSON.parse(Buffer.from(j.content, 'base64').toString('utf8')) || {}; }
-      else if (r.status !== 404) console.warn('GitHub : lecture impossible', r.status);
-    } catch (e) { console.warn('GitHub : erreur', e.message); }
-  } else {
-    try { accounts = JSON.parse(fs.readFileSync(path.join(DATA, 'accounts.json'), 'utf8')); } catch (e) { accounts = {}; }
-  }
-  console.log(`Comptes chargés : ${Object.keys(accounts).length} (stockage ${useGitHub ? 'github' : 'fichier'})`);
-}
-function scheduleSave() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
-    const txt = JSON.stringify(accounts);
+/** Un fichier JSON stocké soit dans server/data, soit dans le dépôt GitHub privé (Render efface ses fichiers) */
+function makeStore(ghFile, localFile, label) {
+  const st = { data: {}, sha: null, timer: null };
+  const api = (method, body) => fetch(`https://api.github.com/repos/${GH.repo}/contents/${encodeURIComponent(ghFile)}`, { method, headers: { Authorization: `Bearer ${GH.token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'lebec-relay' }, body: body ? JSON.stringify(body) : undefined });
+  st.load = async () => {
     if (useGitHub) {
       try {
-        const r = await ghApi('PUT', { message: 'comptes Lebec', content: Buffer.from(txt).toString('base64'), sha: GH.sha || undefined });
-        if (r.ok) { const j = await r.json(); GH.sha = j.content.sha; }
-        else { console.warn('GitHub : écriture refusée', r.status); if (r.status === 409) { const g = await ghApi('GET'); if (g.ok) GH.sha = (await g.json()).sha; scheduleSave(); } }
-      } catch (e) { console.warn('GitHub : erreur', e.message); }
-    } else { ensureData(); try { fs.writeFileSync(path.join(DATA, 'accounts.json'), txt); } catch (e) { console.warn('Écriture impossible', e.message); } }
-  }, 1500);
+        const r = await api('GET');
+        if (r.status === 200) { const j = await r.json(); st.sha = j.sha; st.data = JSON.parse(Buffer.from(j.content, 'base64').toString('utf8')) || {}; }
+        else if (r.status !== 404) console.warn(`GitHub (${label}) : lecture impossible`, r.status);
+      } catch (e) { console.warn(`GitHub (${label}) : erreur`, e.message); }
+    } else { try { st.data = JSON.parse(fs.readFileSync(path.join(DATA, localFile), 'utf8')); } catch (e) { st.data = {}; } }
+    console.log(`${label} chargés : ${Object.keys(st.data).length} (stockage ${useGitHub ? 'github' : 'fichier'})`);
+  };
+  st.save = () => {
+    clearTimeout(st.timer);
+    st.timer = setTimeout(async () => {
+      const txt = JSON.stringify(st.data);
+      if (useGitHub) {
+        try {
+          const r = await api('PUT', { message: label + ' Lebec', content: Buffer.from(txt).toString('base64'), sha: st.sha || undefined });
+          if (r.ok) { const j = await r.json(); st.sha = j.content.sha; }
+          else { console.warn(`GitHub (${label}) : écriture refusée`, r.status); if (r.status === 409 || r.status === 422) { const g = await api('GET'); if (g.ok) st.sha = (await g.json()).sha; st.save(); } }
+        } catch (e) { console.warn(`GitHub (${label}) : erreur`, e.message); }
+      } else { ensureData(); try { fs.writeFileSync(path.join(DATA, localFile), txt); } catch (e) { console.warn('Écriture impossible', e.message); } }
+    }, 2000);
+  };
+  return st;
 }
+const ACC = makeStore(process.env.GITHUB_PATH || 'lebec-accounts.json', 'accounts.json', 'Comptes');
+const SAVES = makeStore(process.env.GITHUB_SAVES || 'lebec-saves.json', 'saves.json', 'Sauvegardes');
+let accounts = {};               // clé = pseudo en minuscules (= ACC.data)
+const scheduleSave = () => ACC.save();
 
 /* ======================= Comptes : logique ======================= */
 const hashPass = (pass, salt) => crypto.scryptSync(pass, salt, 32).toString('hex');
@@ -85,6 +91,31 @@ function verify(token) {
   return Buffer.from(p, 'base64url').toString('utf8');
 }
 const ID = /^[a-z0-9_]{1,32}$/;
+
+/* ======================= Sauvegardes de campagne ======================= */
+const MAX_SAVES = 3000, SAVE_MAX_LEN = 16000;
+const CODE_L = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function newSaveCode() { for (;;) { let c = ''; for (let i = 0; i < 6; i++) c += CODE_L[crypto.randomInt(CODE_L.length)]; if (!SAVES.data[c]) return c; } }
+function campOp(m) {
+  const code = String(m.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  const okData = d => d && typeof d === 'object' && !Array.isArray(d) && JSON.stringify(d).length <= SAVE_MAX_LEN;
+  switch (m.op) {
+    case 'create': {
+      if (!okData(m.data)) return { ok: false, m: 'Sauvegarde invalide.' };
+      const keys = Object.keys(SAVES.data);
+      if (keys.length >= MAX_SAVES) { keys.sort((a, b) => SAVES.data[a].t - SAVES.data[b].t); for (const k of keys.slice(0, 100)) delete SAVES.data[k]; }
+      const c = newSaveCode(); SAVES.data[c] = { t: Date.now(), d: Object.assign({}, m.data, { code: c }) }; SAVES.save();
+      return { ok: true, code: c, data: SAVES.data[c].d };
+    }
+    case 'load': { const e = SAVES.data[code]; return e ? { ok: true, code, data: e.d } : { ok: false, m: 'Aucune entreprise avec ce code.' }; }
+    case 'put': {
+      const e = SAVES.data[code]; if (!e) return { ok: false, m: 'Code inconnu.' };
+      if (!okData(m.data)) return { ok: false, m: 'Sauvegarde trop grosse.' };
+      e.t = Date.now(); e.d = Object.assign({}, m.data, { code }); SAVES.save(); return { ok: true, code };
+    }
+  }
+  return { ok: false, m: 'Opération inconnue.' };
+}
 /** On ne garde qu'un profil de forme connue (le client n'est pas digne de confiance) */
 function cleanProfile(p, name) {
   p = p && typeof p === 'object' ? p : {};
@@ -138,7 +169,7 @@ const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
   if (url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-    res.end(JSON.stringify({ ok: true, v: VERSION, rooms: rooms.size, players: clients.size, accounts: Object.keys(accounts).length, storage: useGitHub ? 'github' : 'fichier' }));
+    res.end(JSON.stringify({ ok: true, v: VERSION, rooms: rooms.size, players: clients.size, accounts: Object.keys(accounts).length, saves: Object.keys(SAVES.data).length, storage: useGitHub ? 'github' : 'fichier' }));
     return;
   }
   const file = path.normalize(path.join(ROOT, url === '/' ? 'index.html' : url));
@@ -171,8 +202,10 @@ function leaveRoom(c) {
 function joinRoom(c, r) {
   leaveRoom(c);
   const used = new Set(r.players.map(id => clients.get(id) && clients.get(id).idx));
-  c.idx = [0, 1, 2, 3, 4].find(i => !used.has(i)) || 0;
+  c.idx = [0, 1, 2, 3, 4, 5].find(i => !used.has(i)) || 0;
   r.players.push(c.id); c.room = r.code; broadcastRoom(r);
+  // partie en cours : le nouveau venu démarre directement (drop-in), l'hôte l'ajoute à sa simulation
+  if (r.state === 'game') send(c, { t: 'start', seed: r.seed, cfg: r.cfg, room: roomInfo(r), late: true });
 }
 
 /* ======================= WebSocket ======================= */
@@ -209,14 +242,17 @@ wss.on('connection', ws => {
         if (res.ok && res.user) c.name = cleanName(res.user);
         send(c, Object.assign({ t: 'accr', q: m.q }, res)); break;
       }
-      case 'list': send(c, { t: 'rooms', list: [...rooms.values()].filter(x => !x.priv && x.state === 'lobby').map(x => { const h = clients.get(x.host); return { code: x.code, n: x.players.length, max: MAX_PLAYERS, host: h ? h.name : '?' }; }) }); break;
+      case 'camp': {
+        let res; try { res = campOp(m); } catch (e) { res = { ok: false, m: 'Erreur serveur.' }; }
+        send(c, Object.assign({ t: 'campr', q: m.q }, res)); break;
+      }
+      case 'list': send(c, { t: 'rooms', list: [...rooms.values()].filter(x => !x.priv).map(x => { const h = clients.get(x.host); return { code: x.code, n: x.players.length, max: MAX_PLAYERS, host: h ? h.name : '?', game: x.state === 'game' }; }) }); break;
       case 'create': { const room = { code: newCode(), host: c.id, players: [], state: 'lobby', priv: !!m.priv, seed: 0, cfg: null }; rooms.set(room.code, room); joinRoom(c, room); break; }
       case 'join': {
         const room = rooms.get(String(m.code || '').toUpperCase().trim());
         if (!room) { send(c, { t: 'err', m: 'Salon introuvable. Vérifie le code.' }); break; }
         if (room.players.includes(c.id)) { broadcastRoom(room); break; }
-        if (room.players.length >= MAX_PLAYERS) { send(c, { t: 'err', m: 'Salon complet (5 joueurs).' }); break; }
-        if (room.state !== 'lobby') { send(c, { t: 'err', m: 'La partie a déjà commencé dans ce salon.' }); break; }
+        if (room.players.length >= MAX_PLAYERS) { send(c, { t: 'err', m: `Salon complet (${MAX_PLAYERS} joueurs).` }); break; }
         joinRoom(c, room); break;
       }
       case 'leave': leaveRoom(c); send(c, { t: 'room', room: null }); break;
@@ -244,4 +280,4 @@ wss.on('connection', ws => {
 });
 setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; try { ws.ping(); } catch (e) { /* ignoré */ } } }, 15000);
 
-loadAccounts().then(() => server.listen(PORT, () => console.log(`Mécanique Lebec v2 — serveur prêt : http://localhost:${PORT}/`)));
+Promise.all([ACC.load(), SAVES.load()]).then(() => { accounts = ACC.data; server.listen(PORT, () => console.log(`Mécanique Lebec V4 — serveur prêt : http://localhost:${PORT}/`)); });

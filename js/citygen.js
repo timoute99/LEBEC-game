@@ -158,7 +158,7 @@
     }
     for (let tries = 0; tries < 300 && N.length < 60; tries++) grow(Math.floor(r() * E.length), r() < 0.5);
     const deadEnds = () => N.map((n, i) => i).filter(i => i > 1 && deg(i) === 1 && Math.hypot(N[i].x, N[i].z) > 45);
-    const nComp = Object.keys(ML.COMPANIES).length;
+    const nComp = Object.keys(ML.COMPANIES).filter(k => !ML.COMPANIES[k].virtual).length;
     for (let tries = 0; tries < 700 && deadEnds().length < nComp + 6; tries++) grow(Math.floor(r() * E.length), true);
     E.forEach(e => { e.len = len(e); e.name = city.streets[e.st].name; });
     for (const i of deadEnds()) N[i].cul = true;
@@ -185,7 +185,7 @@
       const off = RW + gap + depth;
       return fitAt(px + nx * off, pz + nz * off, hx, hz, best, margin);
     }
-    const keys = Object.keys(ML.COMPANIES).sort((a, b) => (ML.COMPANIES[b].w * ML.COMPANIES[b].d) - (ML.COMPANIES[a].w * ML.COMPANIES[a].d));
+    const keys = Object.keys(ML.COMPANIES).filter(k => !ML.COMPANIES[k].virtual).sort((a, b) => (ML.COMPANIES[b].w * ML.COMPANIES[b].d) - (ML.COMPANIES[a].w * ML.COMPANIES[a].d));
     const placed = [], used = {};
     const place = (k, spot, culNode) => {
       const C = ML.COMPANIES[k];

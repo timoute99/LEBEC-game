@@ -43,6 +43,7 @@
         case 'relay': N.emit('relay', m); break;
         case 'err': N.emit('err', m.m); break;
         case 'accr': { const cb = N.accWait[m.q]; delete N.accWait[m.q]; if (cb) cb(m); break; }
+        case 'campr': { const cb = N.accWait['c' + m.q]; delete N.accWait['c' + m.q]; if (cb) cb(m); break; }
       }
     };
     ws.onclose = () => {
@@ -96,6 +97,12 @@
     if (!N.ws || N.ws.readyState !== 1) return res({ ok: false, m: 'Pas connecté au serveur.' });
     const q = accQ++; N.accWait[q] = res; N.send(Object.assign({ t: 'acc', q, op }, data));
     setTimeout(() => { if (N.accWait[q]) { delete N.accWait[q]; res({ ok: false, m: 'Le serveur ne répond pas.' }); } }, 10000);
+  });
+  /** Sauvegardes de campagne : create / load / put → promesse de la réponse */
+  N.camp = (op, data) => new Promise(res => {
+    if (!N.ws || N.ws.readyState !== 1) return res({ ok: false, m: 'Pas connecté au serveur.' });
+    const q = accQ++; N.accWait['c' + q] = res; N.send(Object.assign({ t: 'camp', q, op }, data));
+    setTimeout(() => { if (N.accWait['c' + q]) { delete N.accWait['c' + q]; res({ ok: false, m: 'Le serveur ne répond pas.' }); } }, 10000);
   });
   N.send = o => { if (N.ws && N.ws.readyState === 1) N.ws.send(JSON.stringify(o)); };
   N.relay = (d, to) => N.send({ t: 'relay', d, to });

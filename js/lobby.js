@@ -7,37 +7,47 @@
   const L = ML.Lobby = {};
   const U = ML.U, N = ML.Net, A = ML.Account, $ = id => document.getElementById(id);
 
-  /* ======================= Campagne (PC de l'hôte) ======================= */
-  const Camp = ML.Camp = {};
-  Camp.load = () => { let c; try { c = JSON.parse(localStorage.getItem('ml_campaign') || 'null'); } catch (e) { c = null; } return c && c.day ? c : { day: 1, budget: 0, rep: 50, up: {}, wins: 0 }; };
-  Camp.save = c => localStorage.setItem('ml_campaign', JSON.stringify(c));
-  Camp.reset = () => { localStorage.removeItem('ml_campaign'); };
+  /* ======================= Campagne : l'entreprise (sauvegardée sur le serveur + ce PC) ======================= */
+  const Camp = ML.Camp = { cur: null };
+  const Co = () => ML.Company;
+  Camp.loadLocal = () => { try { const d = JSON.parse(localStorage.getItem('ml_company') || 'null'); return d ? Co().clean(d) : null; } catch (e) { return null; } };
+  Camp.get = () => Camp.cur || (Camp.cur = Camp.loadLocal());
+  Camp.setCur = E => { Camp.cur = E; try { localStorage.setItem('ml_company', JSON.stringify(E)); } catch (e) { /* plein */ } };
+  Camp.create = async name => {
+    const E = Co().fresh(name || 'Mécanique Lebec');
+    if (await L.ensure()) { const r = await N.camp('create', { name: E.name, data: E }); if (r.ok) E.code = r.code; else ML.HUD.toast('Sauvegarde serveur impossible : ' + (r.m || '?') + ' (gardée sur ce PC).'); }
+    else ML.HUD.toast('Serveur injoignable : l\'entreprise est gardée sur ce PC seulement.');
+    Camp.setCur(E); return E;
+  };
+  Camp.fetch = async code => {
+    if (!(await L.ensure())) { ML.HUD.toast('Serveur injoignable.'); return null; }
+    const r = await N.camp('load', { code }); if (!r.ok) { ML.HUD.toast(r.m || 'Code inconnu.'); return null; }
+    const E = Co().clean(r.data); E.code = r.code; Camp.setCur(E); return E;
+  };
+  Camp.push = E => { Camp.setCur(E); if (E.code && N.online) N.camp('put', { code: E.code, data: E }).then(r => { if (!r.ok) console.warn('Sauvegarde :', r.m); }); };
+  /** Sauvegarde automatique en cours de journée (hôte) */
+  Camp.autosave = snap => { const E = Camp.get(); if (E && snap) Camp.push(Co().merge(E, snap)); };
+  /** Fin de journée (hôte) : on enregistre l'entreprise, jour suivant, l'inspecteur viendra-t-il ? */
   Camp.applyEnd = res => {
-    const c = Camp.load(); let msg;
+    const E = Co().merge(Camp.get() || Co().fresh(), res.snap);
+    E.tot.ca += (res.today && res.today.ca) || 0; E.tot.served += res.served || 0; E.tot.days++; E.tot.best = Math.max(E.tot.best, res.profit || 0);
+    let msg = '';
     if (res.mode === 'inspection') {
-      if (res.inspection && res.inspection.pass) { c.wins = (c.wins || 0) + 1; c.day = 1; c.rep = Math.min(100, c.rep + 20); c.budget += res.score; msg = '🎓 <b>CAMPAGNE GAGNÉE !</b> L\'inspecteur donne un avis favorable. Une nouvelle saison commence (améliorations conservées).'; }
-      else msg = '🎓 Avis défavorable… L\'inspecteur reviendra demain (rejouez le jour 5).';
-    } else {
-      c.budget += res.score; c.rep = U.clamp(c.rep + (res.stars - 1) * 8 - res.failed * 2, 0, 100);
-      if (res.stars >= 1) { c.day++; msg = `Jour réussi ! Demain : jour ${c.day}${c.day === ML.CAMPAIGN.bossDay ? " — l'INSPECTEUR de l'Éducation Nationale !" : ''}.`; }
-      else msg = 'Aucune étoile : il faut refaire cette journée.';
+      E.insp = null;
+      if (res.inspection && res.inspection.pass) { if (!E.won) msg = '🏆 <b>CAMPAGNE TERMINÉE !</b> '; E.won = true; }
+      else { E.inspNext = E.day + 1 + ML.CAMPAIGN.retry; msg = "🎓 Avis défavorable… L'inspecteur reviendra dans quelques jours. Améliorez l'atelier ! "; }
     }
-    Camp.save(c);
-    return { camp: `<div class="camp"><p>${msg}</p>${Camp.panel()}</div>`, nextLabel: 'Journée suivante' };
+    E.day++;
+    if (Co().inspReady(E)) { E.insp = 'due'; msg += "📨 Courrier recommandé : l'INSPECTEUR de l'Éducation Nationale vient DEMAIN ! "; }
+    if (E.money < 0) msg += '💸 La caisse est dans le rouge : vendez, économisez, licenciez si besoin ! ';
+    E.log = (E.log || []).concat([`Jour ${E.day - 1} : ${Math.round(res.profit || 0)} €`]).slice(-8);
+    Camp.push(E);
+    return { camp: `<div class="camp">${msg ? `<p>${msg}</p>` : ''}<p>${Co().summary(E)}</p><p class="dim">${Co().goal(E)}</p></div>`, nextLabel: `Jour ${E.day} →` };
   };
-  Camp.panel = () => {
-    const c = Camp.load();
-    const ups = Object.keys(ML.UPGRADES).map(k => {
-      const u = ML.UPGRADES[k], lvl = c.up[k] || 0, max = u.max || 1, done = lvl >= max;
-      return `<button class="up ${done ? 'own' : ''}" data-up="${k}" ${done ? 'disabled' : ''}>${U.esc(u.name)}${max > 1 ? ` (${lvl}/${max})` : ''}<span>${done ? '✔' : u.price + ' €'}</span></button>`;
-    }).join('');
-    return `<div class="camp-h">📅 Jour ${c.day}/${ML.CAMPAIGN.days} · 💶 Budget atelier : <b>${c.budget} €</b> · ⭐ Réputation ${c.rep}/100${c.wins ? ' · 🏆 ' + c.wins : ''}</div><div class="ups">${ups}</div>`;
-  };
-  Camp.buy = k => {
-    const c = Camp.load(), u = ML.UPGRADES[k]; if (!u) return 'Inconnu.';
-    const lvl = c.up[k] || 0; if (lvl >= (u.max || 1)) return 'Déjà au maximum.';
-    if (c.budget < u.price) return `Budget insuffisant (il manque ${u.price - c.budget} €).`;
-    c.budget -= u.price; c.up[k] = lvl + 1; Camp.save(c); ML.Sfx.play('cash'); return null;
+  /** Configuration d'une journée de campagne */
+  Camp.cfg = (diff, traitor, roles) => {
+    const E = Camp.get(); if (!E) return null;
+    return { mode: E.insp === 'due' ? 'inspection' : 'campagne', campaign: true, day: E.day, E, city: E.city, code: E.code, traitor, diff, roles };
   };
 
   /* ======================= Init ======================= */
@@ -64,13 +74,13 @@
     $('btn-profile-h').onclick = () => L.showProfile(); $('btn-profile-r').onclick = () => L.showProfile();
     $('btn-prof-back').onclick = () => { if (L.cur === 'scr-room' && N.room) { L.showRoom(); } else L.screen(L.cur || 'scr-home'); };
     // solo
-    $('btn-solo').onclick = () => { const n = L.name('h'); if (!n) return; ML.Sfx.init(); ML.Game.start({ solo: true, seed: Date.now() >>> 0, me: 'solo', host: 'solo', players: [{ id: 'solo', name: n, idx: 0 }], game: L.gameCfg('h') }); };
+    $('btn-solo').onclick = () => { const n = L.name('h'); if (!n) return; const game = L.gameCfg('h'); if (!game) return; ML.Sfx.init(); ML.Game.start({ solo: true, seed: Date.now() >>> 0, me: 'solo', host: 'solo', players: [{ id: 'solo', name: n, idx: 0 }], game }); };
     // multi
     $('btn-create').onclick = async () => { if (!(await L.ensure())) return; N.send({ t: 'create', priv: $('in-priv').checked }); };
     $('btn-join').onclick = async () => { const code = $('in-code').value.trim().toUpperCase(); if (code.length !== 4) return ML.HUD.toast('Le code fait 4 lettres.'); if (!(await L.ensure())) return; N.send({ t: 'join', code }); };
     $('btn-list').onclick = async () => { if (!(await L.ensure())) return; N.send({ t: 'list' }); };
     // salon
-    $('btn-start').onclick = () => { if (!L.name('r')) return; N.send({ t: 'start', seed: (Math.random() * 1e9) >>> 0, cfg: L.gameCfg('r') }); };
+    $('btn-start').onclick = () => { if (!L.name('r')) return; const cfg = L.gameCfg('r'); if (!cfg) return; N.send({ t: 'start', seed: (Math.random() * 1e9) >>> 0, cfg }); };
     $('btn-leave').onclick = () => { N.send({ t: 'leave' }); L.showHome(); };
     $('btn-copy').onclick = () => { try { navigator.clipboard.writeText(N.room.code); ML.HUD.toast('Code copié !'); } catch (e) { /* rien */ } };
     $('r-name').onchange = () => L.name('r');
@@ -81,7 +91,16 @@
     // modes
     for (const p of ['h', 'r']) {
       $(p + '-mode').onchange = $(p + '-diff').onchange = () => { L.renderModes(); if (p === 'r') L.sendCfg(); };
-      $(p + '-camp-reset').onclick = () => { if (confirm('Recommencer la campagne au jour 1 (budget et améliorations perdus) ?')) { Camp.reset(); L.renderModes(); } };
+      $(p + '-camp-new').onclick = async () => {
+        const cur = Camp.get(), nm = $(p + '-camp-name').value.trim();
+        if (cur && !confirm(`Créer une NOUVELLE entreprise ? « ${cur.name} »${cur.code ? ` reste récupérable avec son code ${cur.code}` : ' (sauvegardée sur ce PC seulement) sera remplacée'}.`)) return;
+        const E = await Camp.create(nm || 'Mécanique Lebec'); L.renderModes(); if (p === 'r') L.sendCfg();
+        ML.HUD.toast(E.code ? `Entreprise créée ! Code de sauvegarde : ${E.code}` : 'Entreprise créée (sur ce PC).');
+      };
+      $(p + '-camp-load').onclick = async () => {
+        const code = $(p + '-camp-code').value.trim().toUpperCase(); if (code.length < 4) return ML.HUD.toast('Entre le code de sauvegarde (6 caractères).');
+        const E = await Camp.fetch(code); if (E) { ML.HUD.toast(`Entreprise « ${E.name} » chargée (jour ${E.day}).`); $(p + '-camp-code').value = ''; L.renderModes(); if (p === 'r') L.sendCfg(); }
+      };
     }
     $('r-traitor').onchange = () => L.sendCfg();
     const lastDiff = localStorage.getItem('ml_diff'); if (ML.DIFFS[lastDiff]) { $('h-diff').value = lastDiff; $('r-diff').value = lastDiff; }
@@ -89,14 +108,18 @@
 
     N.on('status', s => { $('status').textContent = s; });
     N.on('relay', m => {
-      if (m.d && m.d.k === 'role') { L.roles[m.from] = ML.ROLES[m.d.role] ? m.d.role : 'poly'; if (!ML.Game.on) L.renderRoles(); return; }
+      if (m.d && m.d.k === 'role') {
+        L.roles[m.from] = ML.ROLES[m.d.role] ? m.d.role : 'poly';
+        if (!ML.Game.on) L.renderRoles(); else if (ML.Game.isHost) ML.Sim.setRole(m.from, L.roles[m.from]);
+        return;
+      }
       if (m.d && m.d.k === 'cfg') { L.hostCfg = m.d; if (!ML.Game.on) L.renderHostCfg(); return; }
       ML.Game.onRelay(m);
     });
     N.on('err', m => ML.HUD.toast(m));
     N.on('welcome', () => { if (A.token) A.resume().then(ok => { if (ok) { L.renderAccount(); ML.HUD.toast('Compte ' + A.user + ' reconnecté.'); } }); });
     N.on('rooms', list => {
-      $('room-list').innerHTML = list.length ? list.map(r => `<button class="rl" data-code="${r.code}">${r.code} — ${U.esc(r.host)} (${r.n}/${r.max})</button>`).join('') : '<p class="dim small">Aucun salon public pour l\'instant. Crée le tien !</p>';
+      $('room-list').innerHTML = list.length ? list.map(r => `<button class="rl" data-code="${r.code}" ${r.n >= r.max ? 'disabled' : ''}>${r.code} — ${U.esc(r.host)} (${r.n}/${r.max})${r.game ? ' · 🔨 partie en cours : rejoindre' : ''}</button>`).join('') : '<p class="dim small">Aucun salon public pour l\'instant. Crée le tien !</p>';
       for (const b of $('room-list').querySelectorAll('button')) b.onclick = () => N.send({ t: 'join', code: b.dataset.code });
     });
     N.on('room', room => {
@@ -105,6 +128,10 @@
       if (G.on && !G.solo) {
         if (room.state === 'lobby') { G.stop('Retour au salon.'); L.showRoom(); return; }
         if (G.isHost) for (const pid in (G.S ? G.S.pl : {})) if (!room.players.find(p => p.id === pid)) ML.Sim.removePlayer(pid);
+        for (const p of room.players) if (!G.players[p.id]) {                // arrivée en cours de partie (drop-in)
+          G.players[p.id] = { id: p.id, name: p.name, idx: p.idx }; if (p.id !== G.me) G.addAvatar(G.players[p.id]);
+          if (G.isHost) ML.Sim.addPlayer(G.players[p.id], L.roles[p.id]);
+        }
         return;
       }
       if ($('scr-profile').classList.contains('hidden')) L.showRoom(); else L.cur = 'scr-room';
@@ -112,9 +139,22 @@
     });
     N.on('start', m => {
       const r = m.room; ML.Sfx.init();
-      ML.Game.start({ seed: m.seed, me: N.id, host: r.host, players: r.players.map(p => ({ id: p.id, name: p.name, idx: p.idx })), game: m.cfg || { mode: 'coop' } });
+      ML.Game.start({ seed: m.seed, me: N.id, host: r.host, players: r.players.map(p => ({ id: p.id, name: p.name, idx: p.idx })), game: m.cfg || { mode: 'coop' }, late: !!m.late });
+      if (m.late) ML.HUD.toast('Tu rejoins la partie en cours !');
     });
-    N.on('host', id => { const G = ML.Game; if (G.on && !G.solo && id !== G.host) { G.stop("L'hôte a quitté la partie."); L.showRoom(); } else if (!G.on) L.showRoom(); });
+    N.on('host', async id => {
+      const G = ML.Game;
+      if (G.on && !G.solo && id !== G.host) {
+        const code = G.game && G.game.campaign && G.game.code, diff = G.game.diff;
+        if (code) {                                                   // campagne : la partie continue avec un nouvel hôte
+          G.stop(id === N.id ? "L'hôte est parti : tu reprends l'atelier (dernière sauvegarde)…" : "L'hôte est parti : reprise de l'atelier par un autre joueur…");
+          L.showRoom();
+          if (id === N.id) { const E = await Camp.fetch(code); if (E && N.room && N.room.host === N.id) N.send({ t: 'start', seed: (Math.random() * 1e9) >>> 0, cfg: Camp.cfg(diff, false, L.resolveRoles()) }); }
+          return;
+        }
+        G.stop("L'hôte a quitté la partie."); L.showRoom();
+      } else if (!G.on) L.showRoom();
+    });
     N.on('unstable', () => ML.HUD.toast('Connexion instable… reconnexion en cours.'));
     N.on('resumed', () => ML.HUD.toast('Reconnecté !'));
     N.on('lost', () => { ML.Game.stop('Connexion perdue.'); L.showHome(); ML.HUD.toast('Connexion au serveur perdue.'); });
@@ -214,34 +254,37 @@
 
   /* ======================= Modes de jeu ======================= */
   L.renderModes = () => {
-    const c = Camp.load();
+    const c = Camp.get();
     for (const p of ['h', 'r']) {
       const mode = $(p + '-mode').value;
       $(p + '-camp').classList.toggle('hidden', mode !== 'campagne');
-      $(p + '-camp-info').innerHTML = `Jour <b>${c.day}/${ML.CAMPAIGN.days}</b>${c.day === ML.CAMPAIGN.bossDay ? " (l'INSPECTEUR !)" : ''} · 💶 ${c.budget} € · ⭐ ${c.rep}/100 · ${Object.keys(c.up).length} amélioration(s) <span class="dim">(sauvegarde sur ce PC)</span>`;
-      const desc = { coop: 'Une journée normale, événements surprises au hasard.', campagne: '5 journées : réputation, budget, améliorations de l\'atelier, apprentis… et l\'inspecteur au jour 5.', inspection: "Boss : l'inspecteur de l'Éducation Nationale impose des règles absurdes qui changent.", course: 'Course de Mégane dans la ville : 5 manches, premier arrivé devant l\'entreprise indiquée !' }[mode];
+      $(p + '-camp-info').innerHTML = c ? `${ML.Company.summary(c)}<br><span class="dim">${ML.Company.goal(c)}</span>` : '<b>Aucune entreprise.</b> Donne-lui un nom et crée-la, ou charge une entreprise avec son code.';
+      const desc = { coop: 'Une journée seule : petit atelier (T1, F1, un opérateur, le vieux Kangoo) et 1 500 € pour investir au PC.', campagne: 'Fais grandir ton atelier jour après jour : argent, machines, embauches, véhicules. Sauvegardé sur le serveur avec un CODE (n\'importe qui peut reprendre). L\'inspecteur vient quand l\'atelier est prêt : le réussir termine le jeu.', inspection: "Boss : l'inspecteur de l'Éducation Nationale impose des règles absurdes qui changent.", course: 'Course de Mégane dans la ville : 5 manches, premier arrivé devant l\'entreprise indiquée !' }[mode];
       const D = ML.DIFFS[$(p + '-diff').value] || ML.DIFFS.normal;
       $(p + '-desc').textContent = desc + ' — ' + D.icon + ' ' + D.name + ' : ' + D.desc;
     }
   };
   /** Configuration de la partie envoyée à tous */
-  L.sendCfg = () => { if (N.room && N.room.host === N.id) N.relay({ k: 'cfg', mode: $('r-mode').value, diff: $('r-diff').value, traitor: $('r-traitor').checked }); };
+  L.sendCfg = () => { if (N.room && N.room.host === N.id) { const c = Camp.get(); N.relay({ k: 'cfg', mode: $('r-mode').value, diff: $('r-diff').value, traitor: $('r-traitor').checked, co: c && $('r-mode').value === 'campagne' ? { name: c.name, day: c.day, code: c.code } : null }); } };
   L.renderHostCfg = () => {
     const c = L.hostCfg, el = $('room-cfg'); if (!el) return;
     if (!c || (N.room && N.room.host === N.id)) { el.textContent = ''; return; }
     const D = ML.DIFFS[c.diff] || ML.DIFFS.normal, M = { coop: 'Journée libre', campagne: 'Campagne', inspection: 'Inspection (boss)', course: 'Course de Mégane' }[c.mode] || c.mode;
-    el.innerHTML = `Choix de l'hôte : <b>${U.esc(M)}</b> · ${D.icon} <b>${D.name}</b>${c.traitor ? ' · 🕵 traître' : ''}`;
+    el.innerHTML = `Choix de l'hôte : <b>${U.esc(M)}</b>${c.co ? ` « ${U.esc(c.co.name)} », jour ${c.co.day}${c.co.code ? ` (code ${U.esc(c.co.code)})` : ''}` : ''} · ${D.icon} <b>${D.name}</b>${c.traitor ? ' · 🕵 traître' : ''}`;
   };
   L.gameCfg = p => {
     const mode = $(p + '-mode').value, traitor = p === 'r' && $('r-traitor').checked, diff = $(p + '-diff').value;
     localStorage.setItem('ml_diff', diff);
     if (mode === 'campagne') {
-      const c = Camp.load();
-      return { mode: c.day === ML.CAMPAIGN.bossDay ? 'inspection' : 'campagne', campaign: true, day: c.day, upgrades: c.up, traitor, diff, roles: L.cfgRoles(p) };
+      const cfg = Camp.cfg(diff, traitor, L.cfgRoles(p));
+      if (!cfg) ML.HUD.toast('Campagne : crée ton entreprise (ou charge-la avec son code) d\'abord !');
+      return cfg;
     }
-    return { mode, day: 1, upgrades: {}, traitor, diff, roles: L.cfgRoles(p) };
+    return L.freeCfg(mode, diff, traitor, L.cfgRoles(p));
   };
   L.cfgRoles = p => (p === 'h' ? { solo: L.myRole } : L.resolveRoles());
+  /** Journée hors campagne : petit atelier de départ, 1 500 € pour investir, nouvelle ville */
+  L.freeCfg = (mode, diff, traitor, roles) => ({ mode, day: 1, E: ML.Company.fresh(mode === 'coop' ? 'Journée libre' : 'Mécanique Lebec', mode === 'course' ? 0 : ML.ECO.freeMoney), city: (Math.random() * 1e9) >>> 0, traitor, diff, roles });
   L.noop = () => {
   };
 
@@ -258,13 +301,13 @@
     for (let i = 0; i < r.max; i++) {
       const p = r.players[i];
       const rr = p ? ML.ROLES[p.id === N.id ? L.myRole : L.roles[p.id] || 'poly'] : null;
-      slots.push(p ? `<div class="pslot"><i style="background:${ML.COLORS[p.idx % 5].css}"></i>${rr.icon} ${U.esc(p.name)} <span class="dim">${rr.name}</span>${p.id === r.host ? ' 👑' : ''}${p.id === N.id ? ' (toi)' : ''}${p.on ? '' : ' <span class="dim">(reconnexion…)</span>'}</div>` : '<div class="pslot empty">— place libre —</div>');
+      slots.push(p ? `<div class="pslot"><i style="background:${ML.COLORS[p.idx % 6].css}"></i>${rr.icon} ${U.esc(p.name)} <span class="dim">${rr.name}</span>${p.id === r.host ? ' 👑' : ''}${p.id === N.id ? ' (toi)' : ''}${p.on ? '' : ' <span class="dim">(reconnexion…)</span>'}</div>` : '<div class="pslot empty">— place libre —</div>');
     }
     $('room-players').innerHTML = slots.join('');
     const host = r.host === N.id;
     $('btn-start').classList.toggle('hidden', !host); $('room-opts').classList.toggle('hidden', !host);
     $('room-wait').classList.toggle('hidden', host);
-    $('room-wait').textContent = r.state === 'game' ? 'Partie en cours…' : "En attente que l'hôte choisisse le mode et lance la journée…";
+    $('room-wait').textContent = r.state === 'game' ? 'Partie en cours… (tu vas la rejoindre)' : "En attente que l'hôte choisisse le mode et lance la journée…";
     L.renderModes(); L.renderRoles(true); L.renderHostCfg();
   };
   L.backToRoom = () => { if (N.room) L.showRoom(); else L.showHome(); };
@@ -272,7 +315,8 @@
   /** Fin de journée : rejouer (hôte ou solo) */
   L.replay = () => {
     const G = ML.Game;
-    const cfg = G.game && G.game.campaign ? L.gameCfg(G.solo ? 'h' : 'r') : Object.assign({}, G.game);
+    const g = G.game || {}, cfg = g.campaign ? Camp.cfg(g.diff, g.traitor, G.solo ? g.roles : L.resolveRoles()) : L.freeCfg(g.mode, g.diff, g.traitor, G.solo ? g.roles : L.resolveRoles());
+    if (!cfg) return;
     if (G.solo) { const me = G.players[G.me]; G.start({ solo: true, seed: Date.now() >>> 0, me: G.me, host: G.me, players: [me], game: cfg }); }
     else if (G.isHost) N.send({ t: 'start', seed: (Math.random() * 1e9) >>> 0, cfg });
   };

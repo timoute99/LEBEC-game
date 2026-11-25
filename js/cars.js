@@ -87,7 +87,9 @@
   Cars.sync = list => {
     const key = list.map(c => c.kind + c.color).join(',');
     if (key === Cars.key) return false;
-    Cars.clear(); Cars.key = key;
+    const grow = Cars.key && key.startsWith(Cars.key + ',');           // véhicule acheté : on ajoute seulement le nouveau
+    if (grow) { for (let i = Cars.list.length; i < list.length; i++) { const c = Cars.build(i, list[i]); c.isNew = true; } Cars.key = key; return 'grow'; }
+    for (const c of Cars.list) if (c) ML.scene.remove(c.group); Cars.list = []; Cars.key = key;
     list.forEach((s, i) => Cars.build(i, s));
     return true;
   };
@@ -124,7 +126,7 @@
 
   /** Conduite locale (seulement par le conducteur). Renvoie l'accélération latérale. */
   Cars.drive = (c, dt, input, env) => {
-    const I = ML.Input, tp = c.kind === 'tp' || c.kind === 'fenwick', P = c.kind === 'tp' ? ML.CFG.TP : c.kind === 'fenwick' ? ML.CFG.FENWICK : c.kind === 'camion' ? ML.CFG.CAMION : CF, S = ML.Game.S;
+    const I = ML.Input, tp = c.kind === 'tp' || c.kind === 'fenwick', P = c.kind === 'tp' ? ML.CFG.TP : c.kind === 'fenwick' ? ML.CFG.FENWICK : c.kind === 'camion' ? ML.CFG.CAMION : c.kind === 'kangoo' ? ML.CFG.KANGOO : c.kind === 'ducato' ? ML.CFG.DUCATO : CF, S = ML.Game.S;
     const turbo = !tp && S && S.buffs.turbo > S.rt ? 1.3 : 1, frozen = env.frozen, dry = !tp && c.fuel <= 0;
     let thr = 0, st = 0;
     if (input && !frozen) {
@@ -142,8 +144,8 @@
     else c.speed -= Math.sign(c.speed) * Math.min(Math.abs(c.speed), 3 * dt);
     c.speed = U.clamp(c.speed, -P.rev, P.max * turbo);
     const grip = env.rain ? 0.75 : 1;
-    const target = st * P.steer * (1 - 0.45 * Math.min(1, Math.abs(c.speed) / P.max));
-    c.steer = U.lerp(c.steer, target, Math.min(1, 8 * grip * dt));
+    const target = st * P.steer * (1 - 0.55 * Math.min(1, Math.abs(c.speed) / P.max));     // V4 : direction plus douce à haute vitesse
+    c.steer = U.lerp(c.steer, target, Math.min(1, 6 * grip * dt));
     const yawRate = c.speed * Math.tan(c.steer) / P.wb;
     c.h += yawRate * dt;
     if (env.puddle && Math.abs(c.speed) > 6) c.h += (Math.random() - 0.5) * 3 * dt;   // aquaplaning
@@ -183,7 +185,15 @@
     const key = JSON.stringify(bedItems || []);
     if (key !== c.bedKey) {
       c.bedKey = key; c.bed.clear();
-      (bedItems || []).forEach((it, j) => { const m = ML.Items.mesh(it); const s = c.slots[j] || c.slots[0]; m.position.set(s[0], s[1], s[2]); c.bed.add(m); });
+      if (c.kind === 'camion') {                     // plateau : palettes devant, caisses derrière (2 colonnes)
+        let z = 1.0, ci = 0; const items = (bedItems || []).slice().sort((a, b) => (b.type === 'palette') - (a.type === 'palette'));
+        for (const it of items) {
+          const m = ML.Items.mesh(it);
+          if (it.type === 'palette') { m.position.set(0, 1.2, z - 1.1); z -= 2.4; }
+          else { m.position.set(ci % 2 ? 0.6 : -0.6, 1.2, z - 0.5 - Math.floor(ci / 2) * 0.95); ci++; }
+          c.bed.add(m);
+        }
+      } else (bedItems || []).forEach((it, j) => { const m = ML.Items.mesh(it); const s = c.slots[j] || c.slots[0]; m.position.set(s[0], s[1], s[2]); c.bed.add(m); });
     }
   };
 

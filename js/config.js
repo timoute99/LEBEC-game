@@ -1,5 +1,5 @@
 /* =====================================================================
-   config.js — Données & réglages de MÉCANIQUE LEBEC v2
+   config.js — Données & réglages de MÉCANIQUE LEBEC (V4)
    C'est LE fichier à modifier pour l'équilibrage et le contenu :
    persos, entreprises, pièces, événements, humeurs, succès, boutique.
    ===================================================================== */
@@ -18,7 +18,9 @@ ML.CFG = {
   HP: { max: 100, pelle: 20, slap: 5, slip: 10, fire: 7, dog: 15, koSpeed: 1.7 },
   SIZE: { s: { name: 'petite', pts: 0.8, prod: 0.8 }, m: { name: 'moyenne', pts: 1, prod: 1 }, l: { name: 'GROSSE', pts: 1.7, prod: 1.5 } },
   FENWICK: { accel: 7, brake: 18, max: 7, rev: 4, steer: 0.8, wb: 1.5, cap: 1 },
-  CAMION: { accel: 8, brake: 18, max: 21, rev: 5, steer: 0.45, wb: 4.2, cap: 2, fuelUse: 0.05 },
+  CAMION: { accel: 9, brake: 20, max: 24, rev: 5, steer: 0.45, wb: 4.2, cap: 8, fuelUse: 0.05 },   // plateau : 8 places (palette = 4)
+  KANGOO: { accel: 9, brake: 20, max: 19, rev: 5, steer: 0.55, wb: 2.5, fuelUse: 0.045 },             // le vieux Kangoo : poussif
+  DUCATO: { accel: 11, brake: 22, max: 24, rev: 6, steer: 0.5, wb: 3, fuelUse: 0.05 },
   ORDER: { base: 165, perStep: 60, far: 20, interval: 44, firstAt: 2 },
   PROD_SEC: 17, SUB_SEC: 18,
   START_STOCK: { acier: 4, alu: 4, inox: 3, plaquette: 3, fraise: 3, foret: 3 },
@@ -30,7 +32,7 @@ ML.CFG = {
 ML.COLORS = [
   { name: 'Rouge', hex: 0xe74c3c, css: '#e74c3c' }, { name: 'Bleu', hex: 0x3498db, css: '#3498db' },
   { name: 'Vert', hex: 0x2ecc71, css: '#2ecc71' }, { name: 'Jaune', hex: 0xf1c40f, css: '#f1c40f' },
-  { name: 'Violet', hex: 0x9b59b6, css: '#9b59b6' }
+  { name: 'Violet', hex: 0x9b59b6, css: '#9b59b6' }, { name: 'Orange', hex: 0xe67e22, css: '#e67e22' }
 ];
 ML.MATERIALS = {
   acier: { label: 'ACIER', color: 0x8c9199, css: '#9aa0a8' }, alu: { label: 'ALU', color: 0xdfe5ea, css: '#e8edf1' },
@@ -51,7 +53,7 @@ ML.PARTS = {
 /* Cotes pour le contrôle au pied à coulisse : [désignation, nominal, tolérance] */
 ML.COTES = [['Ø extérieur', 40, 0.05], ['Longueur', 120, 0.1], ['Alésage', 25, 0.02], ['Épaisseur', 12, 0.05], ['Entraxe', 64, 0.03]];
 
-/* Postes de l'atelier. Les deux derniers s'achètent en campagne. */
+/* Postes de l'atelier. Au départ : T1 + F1. Les autres s'achètent au PC (T3/F3 : après l'agrandissement). */
 ML.MACHINES = [
   { id: 'T1', type: 'tour', name: 'Tour CN', x: -12, z: -6, len: 4 },
   { id: 'T2', type: 'tour', name: 'Tour CN', x: -4, z: -6, len: 4 },
@@ -61,6 +63,7 @@ ML.MACHINES = [
   { id: 'F3', type: 'fraiseuse', name: 'Fraiseuse CN', x: 4, z: 4, upgrade: 'machine_F3' }
 ];
 ML.OPERATORS = ['amaury', 'marius', 'matis', 'brieuc'];
+ML.MACHINE_ORDER = ['T1', 'F1', 'T2', 'F2', 'T3', 'F3'];
 
 /* Entreprises : taille du bâtiment, métier. La POSITION est tirée au hasard à chaque partie (citygen.js). */
 ML.COMPANIES = {
@@ -73,29 +76,32 @@ ML.COMPANIES = {
   tth: { name: 'TTH Ouest', sub: 'Sous-traitant — traitement thermique', kind: 'tth', npc: 'maurseau', w: 20, d: 16, h: 8, wall: 'beton', color: 0xc0392b, roof: 0x641e16 },
   aerotech: { name: 'AéroTech', sub: 'Client', kind: 'client', npc: 'vasseur', w: 24, d: 16, h: 10, wall: 'beton', color: 0xdfe6e9, roof: 0x0984e3 },
   agrimeca: { name: 'AgriMéca', sub: 'Client', kind: 'client', npc: 'moreau', w: 24, d: 18, h: 9, wall: 'tole', color: 0x6ab04c, roof: 0x1e5631 },
-  novatics: { name: 'Novatics', sub: 'Client', kind: 'client', npc: 'novatics', w: 22, d: 16, h: 11, wall: 'beton', color: 0x2d3e50, roof: 0x00a8e8, unlock: 2 },
-  ublo: { name: 'Ublo', sub: 'Client', kind: 'client', npc: 'ublo', w: 20, d: 16, h: 9, wall: 'beton', color: 0xfdf2e9, roof: 0xff6f61, unlock: 3 },
+  novatics: { name: 'Novatics', sub: 'Client', kind: 'client', npc: 'novatics', w: 22, d: 16, h: 11, wall: 'beton', color: 0x2d3e50, roof: 0x00a8e8, unlockRep: 55 },
+  ublo: { name: 'Ublo', sub: 'Client', kind: 'client', npc: 'ublo', w: 20, d: 16, h: 9, wall: 'beton', color: 0xfdf2e9, roof: 0xff6f61, unlockRep: 70 },
   casse: { name: 'Casse Auto Jacquot', sub: 'Attention au chien !', kind: 'casse', npc: null, w: 22, d: 18, h: 4, wall: 'tole', color: 0x7f6a55, roof: 0x4b3b2a },
   usiflash: { name: 'UsiFlash', sub: 'Concurrent (louche)', kind: 'concurrent', npc: 'kevin', w: 20, d: 14, h: 7, wall: 'tole', color: 0xa29bfe, roof: 0x6c5ce7 },
-  police: { name: 'Gendarmerie', sub: 'Brigade routière', kind: 'police', npc: null, w: 16, d: 12, h: 7, wall: 'beton', color: 0xecf0f1, roof: 0x1f3a93 }
+  police: { name: 'Gendarmerie', sub: 'Brigade routière', kind: 'police', npc: null, w: 16, d: 12, h: 7, wall: 'beton', color: 0xecf0f1, roof: 0x1f3a93 },
+  concession: { name: 'Garage Pasquier', sub: 'Concessionnaire — véhicules neufs et d\'occasion', kind: 'concession', npc: 'vendeur', w: 22, d: 14, h: 7, wall: 'beton', color: 0xf5f6fa, roof: 0xc0392b },
+  part: { name: 'Particulier', sub: 'Client au comptoir', kind: 'particulier', npc: null, virtual: true, w: 1, d: 1, h: 1, wall: 'beton', color: 0xffffff, roof: 0xe84393 }
 };
 ML.CLIENTS = ['aerotech', 'agrimeca', 'novatics', 'ublo'];
 
 /* Véhicules de l'atelier (kind) */
 ML.VEHICLES = {
-  megane: { name: 'la Méga Mégane', color: 0xf4c430, seats: 3 }, kangoo: { name: 'le Kangoo de Lebec', color: 0xecf0f1, seats: 3 },
+  megane: { name: 'la Méga Mégane', color: 0xf4c430, seats: 3 }, kangoo: { name: 'le vieux Kangoo', color: 0xecf0f1, seats: 3 },
   ducato: { name: 'le Ducato', color: 0x95a5a6, seats: 3 }, tp: { name: 'le transpalette', color: 0xe67e22, seats: 0 },
   fenwick: { name: 'le fenwick', color: 0xf39c12, seats: 0, role: 'cariste' }, camion: { name: 'le camion', color: 0x2c6fbb, seats: 1, role: 'livreur' }
 };
-ML.RACE_COLORS = [0xf4c430, 0xe74c3c, 0x3498db, 0x2ecc71, 0x9b59b6];
+ML.RACE_COLORS = [0xf4c430, 0xe74c3c, 0x3498db, 0x2ecc71, 0x9b59b6, 0xe67e22];
 ML.EMOTES = ['👋', '👍', '😂', '😡', '💤', '🙏'];
-/* Campagne : 5 journées, la dernière = inspection (boss) */
-ML.CAMPAIGN = { days: 5, bossDay: 5 };
+/* Campagne : pas de nombre de jours fixe. L'inspecteur vient quand l'atelier est prêt
+   (5 machines et réputation 60), ou au plus tard au jour 14. Réussir l'inspection = jeu terminé. */
+ML.CAMPAIGN = { inspMach: 5, inspRep: 60, inspLate: 14, retry: 2 };
 
 /* Trouvailles (6 par partie) */
 ML.FINDS = {
   pelle_or: { name: "Pelle d'or", desc: 'Lebec calmé pendant 2 min', color: 0xffd700 },
-  pied_coulisse: { name: 'Pied à coulisse de Lebec', desc: '+25 points', color: 0xbdc3c7 },
+  pied_coulisse: { name: 'Pied à coulisse de Lebec', desc: 'Revendu 120 € à un collectionneur', color: 0xbdc3c7 },
   croissant: { name: 'Croissant légendaire', desc: 'Opérateurs ×1,5 pendant 60 s', color: 0xe1a95f },
   plaquettes: { name: 'Boîte de plaquettes oubliée', desc: '+4 plaquettes', color: 0xffd23f },
   barres: { name: "Barres tombées d'un camion", desc: '+2 alu, +2 inox', color: 0xdfe5ea },
@@ -111,7 +117,7 @@ ML.HUMEURS = {
   mal_dormi: { name: 'Lebec a mal dormi', desc: 'Sa colère monte deux fois plus vite.', anger: 2 },
   bonne_humeur: { name: 'Lebec est de bonne humeur', desc: 'Colère divisée par deux, et croissants pour Matis !', anger: 0.5 },
   reforme: { name: 'Lebec a lu la dernière réforme', desc: 'Il fait des tirades aux opérateurs (qui s\'arrêtent pour l\'écouter).' },
-  rendement: { name: 'Lebec veut du rendement', desc: 'Points ×1,25 mais tickets plus courts.', points: 1.25, dur: 0.85 },
+  rendement: { name: 'Lebec veut du rendement', desc: 'Gains ×1,25 mais tickets plus courts.', points: 1.25, dur: 0.85 },
   lunettes: { name: 'Lebec a perdu ses lunettes', desc: 'Il ne voit les bêtises que de près.', sight: 9 },
   dos: { name: 'Lebec a mal au dos', desc: 'Il court beaucoup moins vite avec sa pelle.', run: 4.2 }
 };
@@ -149,6 +155,10 @@ ML.ACH = {
   dry: ['Panne sèche', 'Tomber en panne d\'essence', 20],
   blow: ['Coup de vent', 'Souffler un collègue avec la soufflette', 15],
   served10: ['Stakhanoviste', 'Livrer 10 caisses en une journée (équipe)', 50],
+  rich: ['Patron du CAC 40', 'Avoir 10 000 € en caisse', 80],
+  full: ['Usine à gaz', 'Posséder les 6 machines', 60],
+  part3: ['Service client', 'Servir 3 particuliers en une journée', 40],
+  game_won: ['Fin du poly', 'Terminer la campagne (avis favorable de l\'inspecteur)', 200],
   inspection: ['Avis favorable', 'Réussir une journée d\'inspection', 80],
   traitor_win: ['Taupe parfaite', 'Gagner en traître sans être démasqué', 60]
 };
@@ -180,20 +190,78 @@ ML.SHOP = {
 ML.SKINS = [0xf0c8a0, 0xe2b48c, 0xc68642, 0x8d5524, 0x5b3a29];
 ML.HAIRS = [0x3b2a1a, 0xe0b050, 0x111111, 0x8b5a2b, 0xa0522d, 0xbdc3c7];
 
-/* Améliorations de l'atelier en campagne (budget de l'équipe) */
-ML.UPGRADES = {
-  machine_T3: { name: 'Tour supplémentaire T3 + apprenti', price: 300 },
-  machine_F3: { name: 'Fraiseuse supplémentaire F3 + apprentie', price: 300 },
-  formation: { name: "Formation des apprentis (+1 niveau, max 3)", price: 150, max: 3 },
-  grande_benne: { name: 'Rehausses de benne (6 caisses)', price: 200 },
-  ducato: { name: 'Troisième véhicule (Ducato)', price: 350 },
-  frigo: { name: 'Frigo de l\'atelier (Matis n\'a plus faim)', price: 150 },
-  cafe_pro: { name: 'Machine à café pro (sprint 90 s)', price: 100 },
-  babyfoot: { name: 'Babyfoot (pauses plus courtes)', price: 120 },
-  plantes: { name: 'Plantes vertes (+ satisfaction)', price: 80 },
-  posters: { name: 'Posters de Lebec (sa colère retombe plus vite)', price: 60 }
+/* ======================= ÉCONOMIE (V4) =======================
+   Tout se compte en euros : livrer rapporte, acheter / embaucher / les
+   salaires et les amendes coûtent. Les prix ci-dessous équilibrent une
+   campagne d'environ 1 h 30 jusqu'à l'inspecteur. */
+ML.ECO = {
+  startMoney: 600, freeMoney: 1500, startRep: 40,
+  order: { base: 125, perStep: 65, far: 30, ctl: 15 },        // prix d'une commande (avant taille, réputation, délai)
+  size: { s: 0.8, m: 1, l: 1.8 },
+  part: { mult: 2.6, dur: 150, wait: 55, every: [150, 230] },   // particuliers (pièces urgentes)
+  propLife: 70,                                                 // une demande non acceptée au PC expire
+  supplierDelay: [120, 180], fee: 20,                           // livraison par camion fournisseur (s, frais de port)
+  sub: { fonderie: 60, chaudro: 70, tth: 45 },                  // sous-traitance en direct
+  subPC: { fonderie: 90, chaudro: 100 }, subDelay: [100, 140],  // brut commandé au PC (livré à l'atelier)
+  coco: 70,                                                     // caisse d'outils en direct chez Outi'Pro
+  fines: { radar: 5, police: 60, ped: 30, burn: 80, audit: 40, inspect: 10, slapInsp: 30 },
+  bonus: { audit: 30, mathieu: 10, fred: 10, herve: 20 },
+  rep: { ok: 2, late: 1, fail: 5, expire: 1, part: 3, partFail: 4, audit: 3 },
+  stars: [100, 350, 700]                                        // bénéfice du jour pour 1, 2, 3 étoiles (× nb joueurs, machines…)
 };
+/* Lots achetés au PC (prix du lot, livré par le fournisseur) — en direct c'est le même prix sans frais de port */
+ML.SUPPLY = {
+  acier: { name: 'Barres ACIER ×3', q: 3, price: 36, from: 'aciers' }, alu: { name: 'Barres ALU ×3', q: 3, price: 48, from: 'aciers' },
+  inox: { name: 'Barres INOX ×3', q: 3, price: 60, from: 'aciers' },
+  plaquette: { name: 'Plaquettes carbure ×2', q: 2, price: 30, from: 'outipro' }, fraise: { name: 'Fraises ×2', q: 2, price: 40, from: 'outipro' },
+  foret: { name: 'Forets ×2', q: 2, price: 24, from: 'outipro' }
+};
+/* Catalogue du PC (machines, équipements, améliorations). now: effet immédiat ; sinon installé le lendemain matin. */
+ML.CATALOG = {
+  T2: { cat: 'machine', name: 'Tour CN T2', price: 1100, mach: 'T2', desc: 'Un deuxième tour. Il lui faut un opérateur (RH).' },
+  F2: { cat: 'machine', name: 'Fraiseuse CN F2', price: 1100, mach: 'F2', desc: 'Une deuxième fraiseuse.' },
+  agrandissement: { cat: 'atelier', name: "Agrandissement de l'atelier", price: 1400, desc: 'Deux emplacements de plus : T3 et F3.', now: true },
+  T3: { cat: 'machine', name: 'Tour CN T3', price: 1600, mach: 'T3', need: 'agrandissement', desc: 'Grand tour CN (après agrandissement).' },
+  F3: { cat: 'machine', name: 'Fraiseuse CN F3', price: 1600, mach: 'F3', need: 'agrandissement', desc: 'Centre d\'usinage (après agrandissement).' },
+  tp: { cat: 'equip', name: 'Transpalette', price: 250, veh: 'tp', desc: 'Déplace 4 caisses dans l\'atelier.' },
+  fenwick: { cat: 'equip', name: 'Fenwick', price: 1200, veh: 'fenwick', desc: 'Indispensable pour les GROSSES pièces (rôle cariste).' },
+  erp_auto: { cat: 'atelier', name: 'Logiciel ERP+ (acceptation auto)', price: 450, desc: 'Les demandes des clients sont acceptées toutes seules.', now: true },
+  isolation: { cat: 'atelier', name: 'Isolation du bâtiment', price: 500, desc: 'Moins de flaques par temps de pluie, opérateurs +5 %.', now: true },
+  eclairage: { cat: 'atelier', name: 'Éclairage LED', price: 400, desc: 'Opérateurs +8 % (et on y voit enfin le soir).', now: true },
+  formation: { cat: 'atelier', name: 'Formation des apprentis (+1 niveau)', price: 150, max: 3, desc: 'Les apprentis vont plus vite (max 3).', now: true },
+  grande_benne: { cat: 'atelier', name: 'Rehausses de benne', price: 200, desc: 'Mégane et Ducato : 6 caisses.', now: true },
+  cafe_pro: { cat: 'deco', name: 'Machine à café pro', price: 100, desc: 'Sprint 90 s au lieu de 40.' },
+  frigo: { cat: 'deco', name: "Frigo de l'atelier", price: 150, desc: 'Viennoiseries sur place, Matis n\'a plus faim.' },
+  babyfoot: { cat: 'deco', name: 'Babyfoot', price: 120, desc: 'Pauses plus courtes.' },
+  plantes: { cat: 'deco', name: 'Plantes vertes', price: 80, desc: 'Clients plus satisfaits.' },
+  posters: { cat: 'deco', name: 'Posters de Lebec', price: 60, desc: 'Sa colère retombe plus vite.' }
+};
+/* Personnel : embauche (une fois) + salaire (chaque soir) */
+ML.STAFF = {
+  amaury: { hire: 120, pay: 70, desc: 'Tête en l\'air : oublie ce qu\'il usine.' },
+  marius: { hire: 160, pay: 90, desc: 'Robot infatigable… accepte même le mauvais outil.' },
+  matis: { hire: 120, pay: 70, desc: 'Ralentit quand il a faim (viennoiseries : +40 %).' },
+  brieuc: { hire: 140, pay: 80, desc: 'Très rapide, mais « Flemme. » (une claque le relance).' },
+  app1: { hire: 40, pay: 30, desc: 'Apprenti : lent, progresse avec la formation.' }, app2: { hire: 40, pay: 30, desc: 'Apprentie : lente, progresse avec la formation.' },
+  app3: { hire: 40, pay: 30, desc: 'Apprenti : lent, progresse avec la formation.' }, app4: { hire: 40, pay: 30, desc: 'Apprentie : lente, progresse avec la formation.' },
+  app5: { hire: 40, pay: 30, desc: 'Apprenti : lent, progresse avec la formation.' }
+};
+ML.AI_STAFF = {
+  cariste: { npc: 'tony', name: 'Tony, cariste (IA)', hire: 150, pay: 80, desc: 'Charge tout seul les palettes du quai dans le camion.' },
+  livreur: { npc: 'jojo', name: 'Jojo, livreur (IA)', hire: 150, pay: 100, desc: 'Fait les tournées : livre l\'expédition, ramène ce qui attend sur les quais.' }
+};
+/* Concessionnaire (Garage Pasquier) */
+ML.DEALER = {
+  megane: { name: 'Méga Mégane (tunée)', price: 900, desc: 'Rapide, benne de 4 caisses, 3 places.' },
+  ducato: { name: 'Ducato', price: 1400, desc: 'Grosse benne (6 caisses), stable.' },
+  camion: { name: 'Camion plateau (poids lourd)', price: 2600, desc: 'Palettes ET caisses, rapide et stable (rôle livreur).' }
+};
+/* Pièces urgentes demandées par les particuliers */
+ML.PART_REQ = [['Axe de remorque', 'acier', 'tour', 'plaquette'], ['Bague de tracteur', 'alu', 'tour', 'plaquette'], ['Entretoise de moto', 'alu', 'tour', 'plaquette'],
+  ['Platine de portail', 'acier', 'fraiseuse', 'foret'], ['Patte de fixation', 'inox', 'fraiseuse', 'foret'], ['Came de tondeuse', 'acier', 'fraiseuse', 'fraise']];
+ML.PARTICULIERS = ['part1', 'part2', 'part3', 'part4'];
 ML.APPRENTIS = [['Kylian', 0x2980b9], ['Lilou', 0xe84393], ['Enzo', 0x00b894], ['Inès', 0xfdcb6e], ['Nathan', 0x6c5ce7]];
+ML.APP_IDS = ['app1', 'app2', 'app3', 'app4', 'app5'];
 
 /* Rôles (choisis au salon). Sans joueur pour un rôle, un PNJ le fait… lentement. */
 /* Difficultés : durée des tickets, cadence, chaos, colère de Lebec, dégâts, points, seuils d'étoiles */
@@ -212,6 +280,7 @@ ML.TIPS = [
   'Brieuc ne repart qu\'avec une claque… mais Lebec n\'aime pas la violence dans SON atelier.',
   'Sors de l\'atelier pour mettre une claque : Lebec ne voit que ce qui s\'y passe.',
   'Un bac à copeaux plein bloque la machine : appelle la maintenance (T = ping).',
+  'Les GROSSES commandes n\'arrivent qu\'une fois le fenwick et le camion plateau achetés.',
   'Le chien de la casse adore les viennoiseries. Une lancée, et il dort 60 s.',
   'Le pigeon vole les plaquettes : lance-lui n\'importe quoi pour qu\'il la lâche.',
   'Radars à 60 km/h en ville, 90 sur la rocade. La gendarmerie surveille sa brigade.',
@@ -223,14 +292,23 @@ ML.TIPS = [
   'Il reste des trouvailles cachées en ville : la Pelle d\'or calme Lebec pendant 2 minutes.',
   'Passager de la Mégane ? Tu peux lancer des objets depuis la voiture.',
   'Hervé bloque l\'armoire ? Imprimante → signature de Lebec → retour à Hervé.',
-  '« C\'est écrit dans le poly ! » — François Lebec, tous les jours depuis 1987.'
+  '« C\'est écrit dans le poly ! » — François Lebec, tous les jours depuis 1987.',
+  'Les demandes des clients arrivent au 💻 PC de gestion (bureau) : si personne ne les accepte, elles expirent.',
+  'Au PC, prévois la machine de chaque commande : l\'opérateur sait quoi faire en premier.',
+  'Un seul opérateur pour deux machines ? Il court de l\'une à l\'autre. Embauche dès que tu peux !',
+  'Les particuliers au comptoir paient bien plus cher. Ne les fais pas attendre !',
+  'Le magasinier paie la matière au même prix que le PC, sans frais de port et sans attendre le camion.',
+  'Les salaires tombent le soir : garde toujours un peu d\'argent en caisse.',
+  'Le Garage Pasquier vend la Méga Mégane, le Ducato et le camion plateau. Le vieux Kangoo, lui, tient avec du scotch.',
+  'Campagne : note bien le CODE de sauvegarde. Avec lui, n\'importe qui peut reprendre l\'atelier.',
+  'Jojo le livreur (à embaucher au PC) part en tournée tout seul dès qu\'il y a des caisses à l\'expédition.'
 ];
 
 ML.ROLES = {
   poly: { name: 'Polyvalent', icon: '🛠️', color: 0x7f8c8d, css: '#95a5a6', desc: 'Usine, transporte et livre les petites et moyennes pièces. Plusieurs joueurs peuvent l\'être.' },
   medecin: { name: 'Médecin', icon: '⛑️', color: 0xe74c3c, css: '#e74c3c', desc: 'Seul à pouvoir soigner les blessés (E sur un collègue).', npc: 'docteur' },
-  cariste: { name: 'Cariste', icon: '🚜', color: 0xf39c12, css: '#f39c12', desc: 'Seul habilité au FENWICK : déplace les grosses pièces (R : fourches).', npc: 'momo' },
-  livreur: { name: 'Livreur', icon: '🚚', color: 0x3498db, css: '#3498db', desc: 'Seul habilité au CAMION : livre les grosses pièces (R : décharger chez le client).', npc: 'momo' },
+  cariste: { name: 'Cariste', icon: '🚜', color: 0xf39c12, css: '#f39c12', desc: 'Seul habilité au FENWICK (à acheter au PC) : déplace les grosses pièces (R : fourches).', npc: 'momo' },
+  livreur: { name: 'Livreur', icon: '🚚', color: 0x3498db, css: '#3498db', desc: 'Seul habilité au CAMION plateau (Garage Pasquier) : livre palettes et caisses (R : décharger chez le client).', npc: 'momo' },
   maintenance: { name: 'Maintenance', icon: '🔧', color: 0x27ae60, css: '#27ae60', desc: 'Répare les pannes et vide les bacs à copeaux.', npc: 'gege' },
   magasinier: { name: 'Magasinier', icon: '📦', color: 0x9b59b6, css: '#9b59b6', desc: 'Seul à commander matière et outils chez Eliott et Coco.', npc: 'sylvie' }
 };
@@ -247,8 +325,18 @@ ML.PEOPLE = {
   marius: { name: 'Marius Challine', role: 'Opérateur', op: { speed: 1.2, lazy: 0, traits: ['robot'] }, look: { skin: 0xeac39b, shirt: 0x7f8c8d, pants: 0x2c3e50, hair: 0x222222, height: 1.86 } },
   matis: { name: 'Matis Caillou', role: 'Opérateur', op: { speed: 1.0, lazy: 0.08, traits: ['hungry'] }, look: { skin: 0xf5cfaa, shirt: 0xe67e22, pants: 0x2c3e50, hair: 0xe0b050, height: 1.72, width: 1.2 } },
   brieuc: { name: 'Brieuc', role: 'Opérateur', op: { speed: 1.35, lazy: 0.45, traits: ['deadstop'] }, look: { skin: 0x5b3a29, shirt: 0xc0392b, pants: 0x222831, hair: 0x111111, height: 1.55, width: 1.3 } },
-  app1: { name: 'Apprenti', role: 'Apprenti', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xf0c8a0, shirt: 0x2980b9, pants: 0x34495e, hair: 0x3b2a1a, height: 1.74 } },
-  app2: { name: 'Apprentie', role: 'Apprentie', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xc68642, shirt: 0xe84393, pants: 0x34495e, hair: 0x111111, height: 1.66, longHair: true } },
+  app1: { name: 'Kylian', role: 'Apprenti', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xf0c8a0, shirt: 0x2980b9, pants: 0x34495e, hair: 0x3b2a1a, height: 1.74 } },
+  app2: { name: 'Lilou', role: 'Apprentie', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xc68642, shirt: 0xe84393, pants: 0x34495e, hair: 0x111111, height: 1.66, longHair: true } },
+  app3: { name: 'Enzo', role: 'Apprenti', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xe2b48c, shirt: 0x00b894, pants: 0x34495e, hair: 0x8b5a2b, height: 1.78 } },
+  app4: { name: 'Inès', role: 'Apprentie', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0x8d5524, shirt: 0xfdcb6e, pants: 0x34495e, hair: 0x111111, height: 1.63, longHair: true } },
+  app5: { name: 'Nathan', role: 'Apprenti', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xf3cba5, shirt: 0x6c5ce7, pants: 0x34495e, hair: 0xe0b050, height: 1.81 } },
+  tony: { name: 'Tony', role: 'Cariste (embauché)', visitor: true, look: { skin: 0xd9a37a, shirt: 0xf39c12, pants: 0x2c3e50, hair: 0x222222, height: 1.8, width: 1.15 } },
+  jojo: { name: 'Jojo', role: 'Livreur (embauché)', visitor: true, look: { skin: 0xf0c8a0, shirt: 0x3498db, pants: 0x2c3e50, hair: 0x8b5a2b, height: 1.76 } },
+  vendeur: { name: 'Bernard Pasquier', role: 'Concessionnaire', look: { skin: 0xe8b98f, shirt: 0xc0392b, pants: 0x1c1c1c, hair: 0xbdc3c7, height: 1.79, width: 1.15, glasses: true } },
+  part1: { name: 'Gérard Le Floch', role: 'Agriculteur', visitor: true, look: { skin: 0xe2b48c, shirt: 0x27ae60, pants: 0x34495e, hair: 0xbdc3c7, height: 1.76, width: 1.2 } },
+  part2: { name: 'Mme Rousseau', role: 'Retraitée bricoleuse', visitor: true, look: { skin: 0xf3cba5, shirt: 0x8e44ad, pants: 0x555555, hair: 0xdddddd, height: 1.6, longHair: true, glasses: true } },
+  part3: { name: 'Jean-Mi', role: 'Motard', visitor: true, look: { skin: 0xd9a37a, shirt: 0x111111, pants: 0x1f4e9a, hair: 0x3b2a1a, height: 1.84, beard: true } },
+  part4: { name: 'Patrick', role: 'Voisin (portail cassé)', visitor: true, look: { skin: 0xf0c8a0, shirt: 0xe67e22, pants: 0x34495e, hair: 0x8b5a2b, height: 1.72, width: 1.25 } },
   mimi: { name: 'Mimi', role: 'Boulangère', look: { skin: 0xf3cba5, shirt: 0xffffff, pants: 0x555555, hair: 0x8b5a2b, height: 1.64, longHair: true, apron: 0xf5e6c8 } },
   pompiste: { name: 'Dédé', role: 'Pompiste', look: { skin: 0xe2b48c, shirt: 0xe74c3c, pants: 0x2c3e50, hair: 0x7f8c8d, height: 1.75, cap: 0xe74c3c, mustache: true } },
   eliott: { name: 'Eliott Trit', role: "Commercial — Aciers de l'Ouest", look: { skin: 0xf2c6a0, shirt: 0xd35400, pants: 0x2c3e50, hair: 0xb5651d, height: 2.05, width: 0.9 } },
@@ -274,6 +362,13 @@ ML.LINES = {
   docteur: ['On ne court pas dans un atelier !', 'Respirez… Toussez… Bon, vous vivrez.', 'Encore un coup de pelle ? Je vais finir par avoir un abonnement.'],
   gege: ['Ah ben elle était bien grippée celle-là.', 'Fallait m\'appeler plus tôt !', 'Je repasse jeudi. Peut-être.'],
   momo: ['Une palette ? J\'arrive… doucement.', 'Le fenwick c\'est pas un jouet.'],
+  tony: ['Palette chargée, chef !', 'Le fenwick, c\'est tout un art.', 'Bip bip bip… je recule.'],
+  jojo: ['Je pars en tournée !', 'Livré, signé, tamponné.', 'Y\'a encore des bouchons rue Jean Jaurès…'],
+  vendeur: ['Elle a jamais roulé sous la pluie, celle-là !', 'Pour vous, je fais un prix. Enfin… presque.', 'Contrôle technique ? Il passera. Sûrement.'],
+  part1: ['Mon tracteur est en panne en pleine moisson !', 'Vous me sauvez la vie, là.'],
+  part2: ['C\'est pour ma remorque, mon défunt mari la bichonnait…', 'Merci jeune homme !'],
+  part3: ['Ma bécane démarre plus, faut que ça roule ce week-end !', 'Trop stylé, merci !'],
+  part4: ['Le portail ne ferme plus, les chiens du voisin rentrent !', 'Impeccable, merci les gars.'],
   sylvie: ['Commande passée, livraison dans la journée.', 'Il faut un bon de commande signé, hein.'],
   lebec: ["Encore une réforme de l'Éducation Nationale... on forme des usineurs en trois semaines !", "La cote c'est la cote ! Pas « à peu près » !",
           "De mon temps, le CAP c'était deux ans de lime et d'étau !", "Pas un rond pour les machines, mais des tablettes pour tout le monde !", "Qui a laissé traîner de l'huile soluble ?!"],

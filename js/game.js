@@ -16,12 +16,13 @@
   G.start = cfg => {
     G.cleanup(); ML.ui.modal = null; if (ML.Main.preview) ML.Main.preview(false);
     const game = cfg.game || { mode: 'coop' };
-    Object.assign(G, { on: true, me: cfg.me, host: cfg.host, isHost: cfg.me === cfg.host, solo: !!cfg.solo, players: {}, S: null, ended: false, game, traitor: false,
-      lastSnap: performance.now(), poseT: 0, fastT: 0, slowT: 0, cur: null, camMode: 'cab', sprayT: 0, fxT: 0, dryOnce: false, spillT: 0, auraT: 0, power: true, endShown: false });
+    Object.assign(G, { on: true, me: cfg.me, host: cfg.host, isHost: cfg.me === cfg.host, solo: !!cfg.solo, players: {}, S: null, ended: false, game, traitor: false, late: !!cfg.late,
+      lastSnap: performance.now(), poseT: 0, fastT: 0, slowT: 0, cur: null, camMode: 'cab', sprayT: 0, fxT: 0, dryOnce: false, spillT: 0, auraT: 0, power: true, endShown: false, saveT: 60 });
     cfg.players.forEach(p => { G.players[p.id] = p; });
-    ML.World.build(cfg.seed, game.upgrades || {});
+    if (!game.E) game.E = ML.Company.fresh('', game.mode === 'course' ? 0 : ML.ECO.freeMoney);
+    ML.World.build(game.city || cfg.seed, game.E.up || {}, game.E.mach);
     ML.World.setPower(true); ML.Fx.reset(); ML.Cars.clear(); ML.Cars.parkPolice();
-    const meP = G.players[G.me], sp = ML.LOC.spawn[meP.idx % 5];
+    const meP = G.players[G.me], sp = ML.LOC.spawn[meP.idx % 6];
     G.p = { pos: new THREE.Vector3(sp.x, 0, sp.z), vy: 0, yaw: Math.PI / 2, pitch: -0.05, sel: 0, stamina: C.PLAYER.stamina, stun: 0, punchT: 0, bob: 0, car: null, look: { y: 0, p: 0 }, slip: 0, slipV: null, push: null, rag: null, roll: 0 };
     G.looks[G.me] = ML.Account.look();
     for (const p of cfg.players) if (p.id !== G.me) G.addAvatar(p);
@@ -51,10 +52,10 @@
     ML.Main.menuScene();
   };
   G.addAvatar = p => {
-    const c = ML.COLORS[p.idx % 5], L = G.looks[p.id] || {};
+    const c = ML.COLORS[p.idx % 6], L = G.looks[p.id] || {};
     if (G.avatars[p.id]) ML.People.dispose(G.avatars[p.id]);
-    const role = ML.ROLES[(G.game.roles || {})[p.id]] || ML.ROLES.poly, suit = L.suit !== undefined ? L.suit : 0x1f4e9a;
-    const v = ML.People.build({ skin: L.skin !== undefined ? L.skin : ML.SKINS[p.idx % 5], shirt: L.shirt || suit, pants: suit, hair: L.hair !== undefined ? L.hair : ML.HAIRS[p.idx % 5], height: L.height || 1.78, width: L.width || 1, beard: L.beard, glasses: L.glasses },
+    const role = ML.ROLES[(G.S && G.S.pl[p.id] && G.S.pl[p.id].role) || (G.game.roles || {})[p.id]] || ML.ROLES.poly, suit = L.suit !== undefined ? L.suit : 0x1f4e9a;
+    const v = ML.People.build({ skin: L.skin !== undefined ? L.skin : ML.SKINS[p.idx % 5], shirt: L.shirt || suit, pants: suit, hair: L.hair !== undefined ? L.hair : ML.HAIRS[p.idx % 6], height: L.height || 1.78, width: L.width || 1, beard: L.beard, glasses: L.glasses },
       { name: role.icon + ' ' + p.name, nameColor: c.css, helmet: L.hat ? null : 0xf5f5f5, hat: L.hat, vest: role.color });
     const old = G.avatars[p.id]; if (old) { v.pos.copy(old.pos); v.target.copy(old.target); v.seen = old.seen; v.inCar = old.inCar; }
     v.group.visible = false; G.avatars[p.id] = v; return v;
@@ -77,7 +78,7 @@
     m.sel = G.p.sel;
     const ps = G.myPose(); m.p = [ps.x, ps.y, ps.z, ps.yaw];
     if (G.isHost) { ML.Sim.setPose(G.me, ps); ML.Sim.act(G.me, m); }
-    else ML.Net.relay(Object.assign({ k: 'a' }, m), G.host);
+    else ML.Net.relay(Object.assign({}, m, { k: 'a', kk: m.k }), G.host);        // « k » = type du message : la clé de l'action voyage dans « kk »
   };
 
   /* ======================= Réseau ======================= */
@@ -93,7 +94,7 @@
       return;
     }
     if (d.k === 'look') { G.looks[from] = d.look; if (G.players[from]) G.addAvatar(G.players[from]); return; }
-    if (d.k === 'a') { if (G.isHost) ML.Sim.act(from, d); return; }
+    if (d.k === 'a') { if (G.isHost) ML.Sim.act(from, Object.assign({}, d, { k: d.kk })); return; }
     if (from === G.host) G.apply(d);
   };
 
@@ -116,7 +117,8 @@
     } else if (d.k === 's') {
       G.lastSnap = performance.now();
       G.S = d.S; G.rt = d.S.rt;
-      if (ML.Cars.sync(d.S.cars)) d.S.cars.forEach((sc, i) => { const c = ML.Cars.list[i]; c.pos.set(sc.x, 0, sc.z); c.target.copy(c.pos); c.h = c.th = sc.h; });
+      const sy = ML.Cars.sync(d.S.cars);
+      if (sy) d.S.cars.forEach((sc, i) => { const c = ML.Cars.list[i]; if (sy === 'grow' && !c.isNew) return; c.isNew = false; c.pos.set(sc.x, 0, sc.z); c.target.copy(c.pos); c.h = c.th = sc.h; });
       const seen = {};
       for (const [id, type, dd, x, y, z, ry] of d.S.items) {
         seen[id] = 1;
@@ -173,7 +175,7 @@
       case 'stat': if (e.to === G.me) ML.Account.stat(e.k, e.n); break;
       case 'secret': if (e.to === G.me) { G.traitor = true; ML.HUD.secret(e.s); ML.HUD.big('🕵 TU ES LE TRAÎTRE', '#c39bff'); } break;
       case 'emote': { if (e.pid === G.me) ML.HUD.notify('Tu fais : ' + ML.EMOTES[e.n]); else if (G.avatars[e.pid]) { ML.People.emote(G.avatars[e.pid], ML.EMOTES[e.n]); ML.Sfx.play('emote', 0.6); } break; }
-      case 'ping': { const P = G.players[e.pid]; ML.Fx.ping(e.x, e.z, P ? P.name : '?', P ? ML.COLORS[P.idx % 5].hex : 0xffd257); ML.Sfx.play('bip'); break; }
+      case 'ping': { const P = G.players[e.pid]; ML.Fx.ping(e.x, e.z, P ? P.name : '?', P ? ML.COLORS[P.idx % 6].hex : 0xffd257); ML.Sfx.play('bip'); break; }
       case 'horn': ML.Sfx.horn(e.k, e.pid === G.me ? undefined : e.x, e.z); break;
       case 'flash': {
         const r = ML.World.radars[e.r]; if (r) r.flash = 0.4;
@@ -191,9 +193,11 @@
   G.onEnd = res => {
     if (G.endShown) return; G.endShown = true;
     G.ended = true; if (ML.Dialogue.open) ML.Dialogue.forceClose(); ML.Mini.forceClose();
+    if (ML.ERP.isOpen()) ML.ERP.close();
     const coins = ML.Account.endDay(res);
     let extra = { coins };
-    if (G.isHost && (G.game.mode === 'campagne' || G.game.campaign)) extra = Object.assign(extra, ML.Camp.applyEnd(res));
+    if (G.isHost && G.game.campaign) extra = Object.assign(extra, ML.Camp.applyEnd(res));
+    else if (G.game.campaign && res.co) extra.camp = `<div class="camp"><p>${ML.Company.goal(Object.assign({}, G.game.E, { day: res.co.day, mach: res.snap ? res.snap.mach : G.game.E.mach, rep: res.rep }))}</p></div>`;
     ML.HUD.showEnd(res, extra);
   };
 
@@ -229,6 +233,8 @@
     }
     const ev = ML.Sim.drain();
     if (ev.length) { const m = { k: 'e', l: ev }; G.apply(m); if (!G.solo) ML.Net.relay(m); }
+    // campagne : sauvegarde automatique (serveur + PC) toutes les 60 s
+    if (G.game.campaign && !G.ended) { G.saveT -= dt; if (G.saveT <= 0) { G.saveT = 60; ML.Camp.autosave(ML.Sim.companySnap()); } }
   };
 
   /* ======================= Contrôles du joueur local ======================= */
@@ -251,6 +257,7 @@
     if (ML.ui.modal === 'dialogue') { for (let i = 1; i <= 9; i++) if (I.pressed('Digit' + i) || I.pressed('Numpad' + i)) { ML.Dialogue.pick(i - 1); break; } if (I.pressed('Escape')) ML.Dialogue.close(); }
     else if (ML.ui.modal === 'help' && (I.pressed('Tab') || I.pressed('Escape'))) ML.HUD.toggleHelp();
     else if (ML.ui.modal === 'map' && (I.pressed('KeyM') || I.pressed('Escape'))) ML.HUD.toggleMap();
+    else if (ML.ui.modal === 'erp' && I.pressed('Escape')) ML.ERP.close();
 
     // --- passager (cabine ou benne) ---
     if (p.ride) {
@@ -272,7 +279,9 @@
       const r = ML.Cars.drive(c, dt, can, { frozen: sc && sc.frozen > S.rt, rain: S && S.weather === 'pluie', puddle: onPud });
       ML.Sfx.setEngine(true, c.speed);
       G.spillT -= dt;
-      if (sc && sc.bed.length && sc.kind !== 'tp' && G.spillT <= 0 && ((r.lat > 14 && Math.abs(c.speed) > 9) || r.hard > 12)) { G.spillT = 1.2; G.intent({ a: 'spill', car: p.car, side: r.side }); }
+      // V4 : les caisses tombent beaucoup moins (virage très serré à grande vitesse ou gros choc). Le vieux Kangoo a une suspension fragile.
+      const sk = sc && (sc.kind === 'kangoo' ? [16, 8, 11] : sc.kind === 'camion' ? [30, 14, 16] : [22, 11, 15]);
+      if (sc && sc.bed.length && sc.kind !== 'tp' && G.spillT <= 0 && ((r.lat > sk[0] && Math.abs(c.speed) > sk[1]) || r.hard > sk[2])) { G.spillT = 1.5; G.intent({ a: 'spill', car: p.car, side: r.side }); }
       if (c.kind !== 'tp' && c.fuel <= 0 && !G.dryOnce) { G.dryOnce = true; G.intent({ a: 'dry' }); }
       if (c.fuel > 5) G.dryOnce = false;
       if (can && I.pressed('KeyE')) G.exitCar();
