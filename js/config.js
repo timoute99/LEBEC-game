@@ -196,6 +196,36 @@ ML.UPGRADES = {
 ML.APPRENTIS = [['Kylian', 0x2980b9], ['Lilou', 0xe84393], ['Enzo', 0x00b894], ['Inès', 0xfdcb6e], ['Nathan', 0x6c5ce7]];
 
 /* Rôles (choisis au salon). Sans joueur pour un rôle, un PNJ le fait… lentement. */
+/* Difficultés : durée des tickets, cadence, chaos, colère de Lebec, dégâts, points, seuils d'étoiles */
+ML.DIFFS = {
+  facile: { name: 'Facile', icon: '🙂', desc: 'Tickets longs, peu de chaos, Lebec patient.', dur: 1.4, interval: 1.3, chaos: 0.5, anger: 0.6, base: 0, run: 0.9, dmg: 0.6, points: 1, stars: 0.75, events: [1, 2] },
+  normal: { name: 'Normal', icon: '😐', desc: 'L\'atelier comme d\'habitude.', dur: 1, interval: 1, chaos: 1, anger: 1, base: 0, run: 1, dmg: 1, points: 1, stars: 1, events: [2, 4] },
+  difficile: { name: 'Difficile', icon: '😤', desc: 'Tickets serrés, pannes et feux fréquents, Lebec à cran.', dur: 0.85, interval: 0.85, chaos: 1.5, anger: 1.3, base: 10, run: 1.08, dmg: 1.25, points: 1.2, stars: 1.1, events: [3, 4] },
+  feu: { name: 'LEBEC EN FEU', icon: '🔥', desc: 'Tout brûle. Lebec voit tout, court vite et cogne fort. Points ×1,5.', dur: 0.75, interval: 0.7, chaos: 2.2, anger: 1.8, base: 25, run: 1.18, dmg: 1.5, points: 1.5, stars: 1.2, events: [4, 5], sight: 1.6 }
+};
+ML.TIPS = [
+  'Regarde la couleur du ticket : plus la barre est rouge, plus c\'est urgent.',
+  'Un outil lancé (clic droit) à un usineur qui l\'attend, il l\'attrape au vol !',
+  'Les caisses se lancent aussi dans la benne de la Mégane. Gain de temps garanti.',
+  'Contrôle tes caisses au MARBRE (pied à coulisse) : +5 points et pas de refus client.',
+  'Matis ralentit quand il a faim : une viennoiserie de chez Mimi et il repart à +40 %.',
+  'Brieuc ne repart qu\'avec une claque… mais Lebec n\'aime pas la violence dans SON atelier.',
+  'Sors de l\'atelier pour mettre une claque : Lebec ne voit que ce qui s\'y passe.',
+  'Un bac à copeaux plein bloque la machine : appelle la maintenance (T = ping).',
+  'Le chien de la casse adore les viennoiseries. Une lancée, et il dort 60 s.',
+  'Le pigeon vole les plaquettes : lance-lui n\'importe quoi pour qu\'il la lâche.',
+  'Radars à 60 km/h en ville, 90 sur la rocade. La gendarmerie surveille sa brigade.',
+  'Touche M : la carte complète, avec les objectifs. Clic = repère pour toute l\'équipe.',
+  'Les GROSSES pièces : seul le cariste (fenwick) puis le livreur (camion) peuvent s\'en occuper.',
+  'KO ? Pas de panique : le médecin (ou le Docteur Gwenn, un peu lent) va venir.',
+  'En virage, les caisses tombent de la benne. Ralentis… ou rattrape-les.',
+  'L\'huile soluble fait glisser : la soufflette sèche les flaques.',
+  'Il reste des trouvailles cachées en ville : la Pelle d\'or calme Lebec pendant 2 minutes.',
+  'Passager de la Mégane ? Tu peux lancer des objets depuis la voiture.',
+  'Hervé bloque l\'armoire ? Imprimante → signature de Lebec → retour à Hervé.',
+  '« C\'est écrit dans le poly ! » — François Lebec, tous les jours depuis 1987.'
+];
+
 ML.ROLES = {
   poly: { name: 'Polyvalent', icon: '🛠️', color: 0x7f8c8d, css: '#95a5a6', desc: 'Usine, transporte et livre les petites et moyennes pièces. Plusieurs joueurs peuvent l\'être.' },
   medecin: { name: 'Médecin', icon: '⛑️', color: 0xe74c3c, css: '#e74c3c', desc: 'Seul à pouvoir soigner les blessés (E sur un collègue).', npc: 'docteur' },

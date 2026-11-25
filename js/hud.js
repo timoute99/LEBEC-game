@@ -30,7 +30,8 @@
   H.dayCard = S => {
     const Hm = ML.HUMEURS[S.humeur], W = ML.WEATHER[S.weather];
     const mode = { coop: 'Journée libre', campagne: `Campagne — jour ${S.day}/${ML.CAMPAIGN.days}`, inspection: "INSPECTION de l'Éducation Nationale", course: 'Course de Mégane' }[S.mode] || S.mode;
-    H.el.daycard.innerHTML = `<div class="dc-mode">${U.esc(mode)}</div><div class="dc-h">😤 ${U.esc(Hm.name)}</div><div class="dim">${U.esc(Hm.desc)}</div><div class="dc-w">${S.weather === 'pluie' ? '🌧' : S.weather === 'brouillard' ? '🌫' : '☀️'} ${U.esc(W.name)}</div>` +
+    const Dd = ML.DIFFS[S.diff] || ML.DIFFS.normal;
+    H.el.daycard.innerHTML = `<div class="dc-mode">${U.esc(mode)} · ${Dd.icon} ${U.esc(Dd.name)}</div><div class="dc-h">😤 ${U.esc(Hm.name)}</div><div class="dim">${U.esc(Hm.desc)}</div><div class="dc-w">${S.weather === 'pluie' ? '🌧' : S.weather === 'brouillard' ? '🌫' : '☀️'} ${U.esc(W.name)}</div>` +
       (S.mode === 'inspection' ? '<div class="dc-x">Respecte ses règles absurdes (elles changent !). 5 infractions = échec.</div>' : S.mode === 'course' ? '<div class="dc-x">5 manches : le premier arrivé EN VOITURE devant l\'entreprise indiquée gagne.</div>' : '') +
       (S.traitorMode ? '<div class="dc-x">🕵 Un traître se cache parmi vous…</div>' : '');
     H.el.daycard.classList.remove('hidden'); clearTimeout(H._dc); H._dc = setTimeout(() => H.el.daycard.classList.add('hidden'), 7500);

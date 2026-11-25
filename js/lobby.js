@@ -41,39 +41,62 @@
   };
 
   /* ======================= Init ======================= */
+  const SCREENS = ['scr-home', 'scr-account', 'scr-guide', 'scr-solo', 'scr-multi', 'scr-profile', 'scr-room'];
+  L.screen = id => {
+    if (id !== 'scr-profile') L.cur = id;
+    L.show(); for (const k of SCREENS) $(k).classList.toggle('hidden', k !== id);
+    const pv = id === 'scr-profile'; L.el.classList.toggle('preview', pv); if (ML.Main.preview) ML.Main.preview(pv);
+    if (id === 'scr-solo' || id === 'scr-room') L.tip();
+  };
   L.init = () => {
     L.el = $('lobby');
     A.load();
     $('in-name').value = A.name();
     $('in-server').value = N.defaultUrl();
     if (/^https?:/.test(location.protocol)) $('server-row').classList.add('hidden');
-    L.renderAccount();
-    $('btn-solo').onclick = () => { if (!L.name()) return; ML.Sfx.init(); ML.Game.start({ solo: true, seed: Date.now() >>> 0, me: 'solo', host: 'solo', players: [{ id: 'solo', name: L.name(), idx: 0 }], game: L.gameCfg('h') }); };
-    $('btn-create').onclick = async () => { if (!L.name() || !(await L.ensure())) return; N.send({ t: 'create', priv: $('in-priv').checked }); };
-    $('btn-join').onclick = async () => { const code = $('in-code').value.trim().toUpperCase(); if (!L.name()) return; if (code.length !== 4) return ML.HUD.toast('Le code fait 4 lettres.'); if (!(await L.ensure())) return; N.send({ t: 'join', code }); };
-    $('btn-list').onclick = async () => { if (!L.name() || !(await L.ensure())) return; N.send({ t: 'list' }); };
-    $('btn-start').onclick = () => N.send({ t: 'start', seed: (Math.random() * 1e9) >>> 0, cfg: L.gameCfg('r') });
+    L.roles = {}; L.hostCfg = null; L.myRole = ML.ROLES[localStorage.getItem('ml_role')] ? localStorage.getItem('ml_role') : 'poly';
+    // navigation
+    $('go-solo').onclick = () => { L.screen('scr-solo'); L.renderRoles(); L.renderModes(); };
+    $('go-multi').onclick = async () => { L.screen('scr-multi'); if (await L.ensure()) N.send({ t: 'list' }); };
+    $('go-account').onclick = () => { L.screen('scr-account'); L.renderAccount(); };
+    $('go-guide').onclick = () => { L.screen('scr-guide'); $('guide-tips').innerHTML = ML.TIPS.map(t => `<li>${U.esc(t)}</li>`).join(''); };
+    for (const b of L.el.querySelectorAll('.back')) b.onclick = () => L.showHome();
+    $('btn-profile-h').onclick = () => L.showProfile(); $('btn-profile-r').onclick = () => L.showProfile();
+    $('btn-prof-back').onclick = () => { if (L.cur === 'scr-room' && N.room) { L.showRoom(); } else L.screen(L.cur || 'scr-home'); };
+    // solo
+    $('btn-solo').onclick = () => { const n = L.name('h'); if (!n) return; ML.Sfx.init(); ML.Game.start({ solo: true, seed: Date.now() >>> 0, me: 'solo', host: 'solo', players: [{ id: 'solo', name: n, idx: 0 }], game: L.gameCfg('h') }); };
+    // multi
+    $('btn-create').onclick = async () => { if (!(await L.ensure())) return; N.send({ t: 'create', priv: $('in-priv').checked }); };
+    $('btn-join').onclick = async () => { const code = $('in-code').value.trim().toUpperCase(); if (code.length !== 4) return ML.HUD.toast('Le code fait 4 lettres.'); if (!(await L.ensure())) return; N.send({ t: 'join', code }); };
+    $('btn-list').onclick = async () => { if (!(await L.ensure())) return; N.send({ t: 'list' }); };
+    // salon
+    $('btn-start').onclick = () => { if (!L.name('r')) return; N.send({ t: 'start', seed: (Math.random() * 1e9) >>> 0, cfg: L.gameCfg('r') }); };
     $('btn-leave').onclick = () => { N.send({ t: 'leave' }); L.showHome(); };
     $('btn-copy').onclick = () => { try { navigator.clipboard.writeText(N.room.code); ML.HUD.toast('Code copié !'); } catch (e) { /* rien */ } };
-    $('btn-profile').onclick = () => L.showProfile();
-    $('btn-prof-back').onclick = () => L.showHome();
+    $('r-name').onchange = () => L.name('r');
+    // compte
     $('btn-login').onclick = () => L.auth('login');
     $('btn-register').onclick = () => L.auth('register');
     $('btn-logout').onclick = () => { A.logout(); L.renderAccount(); ML.HUD.toast('Déconnecté : tu joues en invité.'); };
-    for (const p of ['h', 'r']) { $(p + '-mode').onchange = () => L.renderModes(); $(p + '-camp-reset').onclick = () => { if (confirm('Recommencer la campagne au jour 1 (budget et améliorations perdus) ?')) { Camp.reset(); L.renderModes(); } }; }
-    L.renderModes();
+    // modes
+    for (const p of ['h', 'r']) {
+      $(p + '-mode').onchange = $(p + '-diff').onchange = () => { L.renderModes(); if (p === 'r') L.sendCfg(); };
+      $(p + '-camp-reset').onclick = () => { if (confirm('Recommencer la campagne au jour 1 (budget et améliorations perdus) ?')) { Camp.reset(); L.renderModes(); } };
+    }
+    $('r-traitor').onchange = () => L.sendCfg();
+    const lastDiff = localStorage.getItem('ml_diff'); if (ML.DIFFS[lastDiff]) { $('h-diff').value = lastDiff; $('r-diff').value = lastDiff; }
+    setInterval(() => { if (!L.el.classList.contains('hidden')) L.tip(); }, 8000);
 
     N.on('status', s => { $('status').textContent = s; });
     N.on('relay', m => {
       if (m.d && m.d.k === 'role') { L.roles[m.from] = ML.ROLES[m.d.role] ? m.d.role : 'poly'; if (!ML.Game.on) L.renderRoles(); return; }
+      if (m.d && m.d.k === 'cfg') { L.hostCfg = m.d; if (!ML.Game.on) L.renderHostCfg(); return; }
       ML.Game.onRelay(m);
     });
-    L.roles = {}; L.myRole = ML.ROLES[localStorage.getItem('ml_role')] ? localStorage.getItem('ml_role') : 'poly';
-    L.renderRoles();
     N.on('err', m => ML.HUD.toast(m));
     N.on('welcome', () => { if (A.token) A.resume().then(ok => { if (ok) { L.renderAccount(); ML.HUD.toast('Compte ' + A.user + ' reconnecté.'); } }); });
     N.on('rooms', list => {
-      $('room-list').innerHTML = list.length ? list.map(r => `<button class="rl" data-code="${r.code}">${r.code} — ${U.esc(r.host)} (${r.n}/${r.max})</button>`).join('') : '<p class="dim">Aucun salon public. Crée le tien !</p>';
+      $('room-list').innerHTML = list.length ? list.map(r => `<button class="rl" data-code="${r.code}">${r.code} — ${U.esc(r.host)} (${r.n}/${r.max})</button>`).join('') : '<p class="dim small">Aucun salon public pour l\'instant. Crée le tien !</p>';
       for (const b of $('room-list').querySelectorAll('button')) b.onclick = () => N.send({ t: 'join', code: b.dataset.code });
     });
     N.on('room', room => {
@@ -84,7 +107,8 @@
         if (G.isHost) for (const pid in (G.S ? G.S.pl : {})) if (!room.players.find(p => p.id === pid)) ML.Sim.removePlayer(pid);
         return;
       }
-      L.showRoom(); L.sendRole();
+      if ($('scr-profile').classList.contains('hidden')) L.showRoom(); else L.cur = 'scr-room';
+      L.sendRole(); if (room.host === N.id) L.sendCfg();
     });
     N.on('start', m => {
       const r = m.room; ML.Sfx.init();
@@ -96,13 +120,17 @@
     N.on('lost', () => { ML.Game.stop('Connexion perdue.'); L.showHome(); ML.HUD.toast('Connexion au serveur perdue.'); });
     L.showHome();
   };
+  /** Astuce au hasard (salon, solo) */
+  L.tip = () => { const t = U.pick(ML.TIPS); for (const id of ['tip-h', 'tip-r']) if ($(id)) $(id).innerHTML = '💡 ' + U.esc(t); };
 
   /* ======================= Compte ======================= */
   L.renderAccount = () => {
     const logged = A.logged();
     $('acc-state').innerHTML = logged ? `Connecté·e : <b>${U.esc(A.user)}</b> · 🪙 ${A.prof.coins} jetons` : `Invité·e (profil gardé sur ce PC) · 🪙 ${A.prof.coins} jetons`;
+    $('acc-mini').textContent = logged ? A.user + ' · 🪙 ' + A.prof.coins : 'Compte (invité)';
     $('acc-form').classList.toggle('hidden', logged); $('btn-logout').classList.toggle('hidden', !logged);
-    $('in-name').disabled = logged; if (logged) $('in-name').value = A.user;
+    $('solo-name-row').classList.toggle('hidden', logged); $('room-name-row').classList.toggle('hidden', logged);
+    if (logged) { $('in-name').value = A.user; $('r-name').value = A.user; }
   };
   L.auth = async op => {
     const user = $('in-user').value.trim(), pass = $('in-pass').value;
@@ -114,24 +142,25 @@
     if (N.name !== A.user) { N.name = A.user; N.send({ t: 'name', name: A.user }); }
     ML.HUD.toast(op === 'register' ? `Compte créé : bienvenue ${A.user} !` : `Re-bonjour ${A.user} !`);
   };
-  L.name = () => {
-    const n = (A.logged() ? A.user : $('in-name').value.trim()).slice(0, 16);
-    if (!n) { ML.HUD.toast('Choisis un pseudo !'); $('in-name').focus(); return null; }
+  /** Pseudo du joueur (compte, ou champ du solo / du salon) */
+  L.name = where => {
+    const field = where === 'r' ? $('r-name') : $('in-name');
+    const n = (A.logged() ? A.user : field.value.trim()).slice(0, 16);
+    if (!n) { ML.HUD.toast('Choisis un pseudo !'); field.focus(); return null; }
     localStorage.setItem('ml_name', n); if (!A.logged() && A.prof.name !== n) { A.prof.name = n; A.save(); }
+    $('in-name').value = n; $('r-name').value = n;
     if (N.online && n !== N.name) { N.name = n; N.send({ t: 'name', name: n }); }
     return n;
   };
   L.ensure = async nm => {
     if (N.online) return true;
-    $('status').textContent = 'Connexion...';
-    return N.connect($('in-server').value.trim() || N.defaultUrl(), nm || L.name() || 'Joueur');
+    $('status').textContent = 'Connexion au serveur…';
+    const n = nm || (A.logged() ? A.user : localStorage.getItem('ml_name')) || 'Joueur' + Math.floor(Math.random() * 900 + 100);
+    return N.connect($('in-server').value.trim() || N.defaultUrl(), n);
   };
 
   /* ======================= Profil & boutique ======================= */
-  L.showProfile = () => {
-    $('scr-home').classList.add('hidden'); $('scr-room').classList.add('hidden'); $('scr-profile').classList.remove('hidden');
-    L.el.classList.add('preview'); L.renderProfile();
-  };
+  L.showProfile = () => { L.screen('scr-profile'); L.renderProfile(); };
   /* ---------- Rôles ---------- */
   L.sendRole = () => { if (N.room) { L.roles[N.id] = L.myRole; N.relay({ k: 'role', role: L.myRole }); } };
   /** Rôles finaux : premier arrivé, premier servi (sauf polyvalent) */
@@ -191,17 +220,26 @@
       $(p + '-camp').classList.toggle('hidden', mode !== 'campagne');
       $(p + '-camp-info').innerHTML = `Jour <b>${c.day}/${ML.CAMPAIGN.days}</b>${c.day === ML.CAMPAIGN.bossDay ? " (l'INSPECTEUR !)" : ''} · 💶 ${c.budget} € · ⭐ ${c.rep}/100 · ${Object.keys(c.up).length} amélioration(s) <span class="dim">(sauvegarde sur ce PC)</span>`;
       const desc = { coop: 'Une journée normale, événements surprises au hasard.', campagne: '5 journées : réputation, budget, améliorations de l\'atelier, apprentis… et l\'inspecteur au jour 5.', inspection: "Boss : l'inspecteur de l'Éducation Nationale impose des règles absurdes qui changent.", course: 'Course de Mégane dans la ville : 5 manches, premier arrivé devant l\'entreprise indiquée !' }[mode];
-      $(p + '-desc').textContent = desc;
+      const D = ML.DIFFS[$(p + '-diff').value] || ML.DIFFS.normal;
+      $(p + '-desc').textContent = desc + ' — ' + D.icon + ' ' + D.name + ' : ' + D.desc;
     }
   };
   /** Configuration de la partie envoyée à tous */
+  L.sendCfg = () => { if (N.room && N.room.host === N.id) N.relay({ k: 'cfg', mode: $('r-mode').value, diff: $('r-diff').value, traitor: $('r-traitor').checked }); };
+  L.renderHostCfg = () => {
+    const c = L.hostCfg, el = $('room-cfg'); if (!el) return;
+    if (!c || (N.room && N.room.host === N.id)) { el.textContent = ''; return; }
+    const D = ML.DIFFS[c.diff] || ML.DIFFS.normal, M = { coop: 'Journée libre', campagne: 'Campagne', inspection: 'Inspection (boss)', course: 'Course de Mégane' }[c.mode] || c.mode;
+    el.innerHTML = `Choix de l'hôte : <b>${U.esc(M)}</b> · ${D.icon} <b>${D.name}</b>${c.traitor ? ' · 🕵 traître' : ''}`;
+  };
   L.gameCfg = p => {
-    const mode = $(p + '-mode').value, traitor = p === 'r' && $('r-traitor').checked;
+    const mode = $(p + '-mode').value, traitor = p === 'r' && $('r-traitor').checked, diff = $(p + '-diff').value;
+    localStorage.setItem('ml_diff', diff);
     if (mode === 'campagne') {
       const c = Camp.load();
-      return { mode: c.day === ML.CAMPAIGN.bossDay ? 'inspection' : 'campagne', campaign: true, day: c.day, upgrades: c.up, traitor, roles: L.cfgRoles(p) };
+      return { mode: c.day === ML.CAMPAIGN.bossDay ? 'inspection' : 'campagne', campaign: true, day: c.day, upgrades: c.up, traitor, diff, roles: L.cfgRoles(p) };
     }
-    return { mode, day: 1, upgrades: {}, traitor, roles: L.cfgRoles(p) };
+    return { mode, day: 1, upgrades: {}, traitor, diff, roles: L.cfgRoles(p) };
   };
   L.cfgRoles = p => (p === 'h' ? { solo: L.myRole } : L.resolveRoles());
   L.noop = () => {
@@ -210,11 +248,11 @@
   /* ======================= Écrans ======================= */
   L.show = () => { L.el.classList.remove('hidden'); };
   L.hide = () => { L.el.classList.add('hidden'); };
-  L.showHome = () => { L.show(); L.el.classList.remove('preview'); if (ML.Main.preview) ML.Main.preview(false); L.renderRoles(); $('scr-home').classList.remove('hidden'); $('scr-room').classList.add('hidden'); $('scr-profile').classList.add('hidden'); L.renderAccount(); L.renderModes(); };
+  L.showHome = () => { L.screen('scr-home'); L.renderRoles(); L.renderAccount(); L.renderModes(); };
   L.showRoom = () => {
     const r = N.room; if (!r) return L.showHome();
-    L.el.classList.remove('preview'); if (ML.Main.preview) ML.Main.preview(false);
-    L.show(); $('scr-home').classList.add('hidden'); $('scr-profile').classList.add('hidden'); $('scr-room').classList.remove('hidden');
+    L.screen('scr-room'); L.renderAccount();
+    if (!A.logged() && !$('r-name').value) $('r-name').value = N.name || '';
     $('room-code').textContent = r.code;
     const slots = [];
     for (let i = 0; i < r.max; i++) {
@@ -227,7 +265,7 @@
     $('btn-start').classList.toggle('hidden', !host); $('room-opts').classList.toggle('hidden', !host);
     $('room-wait').classList.toggle('hidden', host);
     $('room-wait').textContent = r.state === 'game' ? 'Partie en cours…' : "En attente que l'hôte choisisse le mode et lance la journée…";
-    L.renderModes(); L.renderRoles(true);
+    L.renderModes(); L.renderRoles(true); L.renderHostCfg();
   };
   L.backToRoom = () => { if (N.room) L.showRoom(); else L.showHome(); };
 

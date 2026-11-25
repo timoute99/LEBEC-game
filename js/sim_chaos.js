@@ -14,7 +14,7 @@
     S = K.S; rng = K.rng;
     S.fires = []; S.puddles = [];
     for (const id in S.machines) S.machines[id].chips = Math.floor(rng() * 35);
-    K.pudT = 40 + rng() * 40; K.slipCd = {};
+    K.pudT = (40 + rng() * 40) / K.D.chaos; K.slipCd = {};
     if (rng() < 0.6) addPuddle(-8 + rng() * 16, -2 + rng() * 6);
     if (S.weather === 'pluie') for (let i = 0; i < 3; i++) addPuddle(-8 + rng() * 16, 16 + rng() * 6);
     const perch = rng.pick(ML.LOC.perches) || { x: 30, y: 6, z: 40 };
@@ -89,14 +89,14 @@
       const M = S.machines[id];
       if (M.status === 'run') {
         M.chips = Math.min(100, (M.chips || 0) + dt * 1.5);
-        M.wear = (M.wear || 0) + dt * 0.75;
+        M.wear = (M.wear || 0) + dt * 0.75 * Math.sqrt(K.D.chaos);
         if (M.wear >= 100 && M.job && M.job.tool) {
           M.worn = true; M.job.tool = false; Sim.dirty = true;
           const op = K.npcs[M.op]; K.say(op, `Outil usé ! Il me faut ${M.job.need === 'plaquette' ? 'une plaquette neuve' : M.job.need === 'fraise' ? 'une fraise neuve' : 'un foret neuf'} !`);
           K.all(`⚠ ${id} : outil usé, apporte un(e) ${ML.TOOLS[M.job.need].label.toLowerCase()} neuf(ve).`, 'warn');
         }
-        if (M.chips > 55 && !K.fireAt(id) && rng() < dt * (M.chips - 55) / 45 / 70) K.startFire(id);
-        if (!M.broken && rng() < dt / 280) K.breakMachine(id);
+        if (M.chips > 55 && !K.fireAt(id) && rng() < dt * (M.chips - 55) / 45 / 70 * K.D.chaos) K.startFire(id);
+        if (!M.broken && rng() < dt / 280 * K.D.chaos) K.breakMachine(id);
       }
     }
     for (const f of S.fires.slice()) {
@@ -108,7 +108,7 @@
     }
     K.pudT -= dt;
     if (K.pudT <= 0) {
-      K.pudT = (S.weather === 'pluie' ? 35 : 55) + rng() * 40;
+      K.pudT = ((S.weather === 'pluie' ? 35 : 55) + rng() * 40) / K.D.chaos;
       const ids = Object.keys(S.machines), W = ML.World.machines[rng.pick(ids)];
       if (W) { addPuddle(W.station.x + (rng() - 0.5) * 2, W.station.z + (rng() - 0.5) * 2); K.all('💧 Fuite d\'huile soluble près de ' + W.def.id + ' : attention, ça glisse !', 'info'); }
     }

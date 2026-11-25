@@ -26,7 +26,8 @@
       chips: [], fires: [], puddles: [], evs: {}, rule: null, viol: 0, appNames: {}, up,
       nextOid: 1, nextItem: 1, nextOrder: C.ORDER.firstAt, nOrders: 0, nextId: 1
     };
-    K.H = ML.HUMEURS[S.humeur];
+    K.H = ML.HUMEURS[S.humeur]; K.D = ML.DIFFS[g.diff] || ML.DIFFS.normal; S.diff = ML.DIFFS[g.diff] ? g.diff : 'normal';
+    S.anger = C.LEBEC.base + K.D.base;
     // stock de départ un peu différent à chaque partie
     for (const k in C.START_STOCK) S.stock[k] = Math.max(1, C.START_STOCK[k] + Math.floor(rng() * 3) - 1);
     // opérateurs mélangés sur les postes
@@ -144,7 +145,7 @@
     if (!Object.values(S.machines).length) return;
     const steps = kind === 'plain' ? ['usinage', 'livraison'] : kind === 'tth' ? ['usinage', 'tth', 'livraison'] : [kind, 'usinage', 'livraison'];
     const client = rng.pick(K.clients()), cl = ML.LOC.comp[client], far = Math.hypot(cl.x, cl.z) > 200;
-    const dur = (C.ORDER.base + C.ORDER.perStep * (steps.length - 2) + (far ? C.ORDER.far : 0)) * (K.H.dur || 1) * (S.mode === 'campagne' ? Math.max(0.75, 1 - 0.03 * (S.day - 1)) : 1);
+    const dur = (C.ORDER.base + C.ORDER.perStep * (steps.length - 2) + (far ? C.ORDER.far : 0)) * (K.H.dur || 1) * K.D.dur * (S.mode === 'campagne' ? Math.max(0.75, 1 - 0.03 * (S.day - 1)) : 1);
     const sr = rng(), size = kind === 'plain' ? (sr < 0.3 ? 's' : sr < 0.78 ? 'm' : 'l') : kind === 'chaudro' ? (sr < 0.5 ? 'm' : 'l') : kind === 'tth' ? (sr < 0.5 ? 's' : 'm') : 'm';
     const o = { id: S.nextOid++, client, part, mat, mtype, tool, steps, si: 0, size, src: kind === 'fonderie' || kind === 'chaudro' ? kind : null, t0: S.rt, dl: S.rt + dur * (size === 'l' ? 1.3 : 1), dur: dur * (size === 'l' ? 1.3 : 1), q: false, m: null };
     S.orders.push(o); Sim.dirty = true;
@@ -167,11 +168,11 @@
     if (S.nextOrder <= 0 && S.rt < C.SHIFT_SEC - 50) {
       if (S.orders.length < maxActive) genOrder();
       const camp = S.mode === 'campagne' ? Math.max(0.7, 1 - 0.05 * (S.day - 1)) : 1;
-      S.nextOrder = C.ORDER.interval / (1 + 0.25 * (n - 1)) * (0.8 + rng() * 0.4) * camp;
+      S.nextOrder = C.ORDER.interval / (1 + 0.25 * (n - 1)) * (0.8 + rng() * 0.4) * camp * K.D.interval;
     }
     for (const o of S.orders.slice()) if (S.rt > o.dl) K.failOrder(o);
   }
-  K.points = p => Math.round(p * (K.H.points || 1));
+  K.points = p => Math.round(p * (K.H.points || 1) * K.D.points);
   function deliver(pid, P, sel, held, comp, n) { return K.deliver(pid, P, sel, held, comp, n); }
   K.deliver = (pid, P, sel, held, comp, n) => {
     const o = S.orders.find(x => x.id === held.d.oid);
@@ -387,10 +388,10 @@
     if (by) { note(tid, `${S.pl[by] ? S.pl[by].name : '?'} t'a mis une claque !`, 'warn'); K.witness(by, tp.x, tp.z); if (S.pl[by]) K.damage(tid, C.HP.slap, 'claque'); }
   };
   K.witness = (pid, x, z) => {
-    const L = npcs.lebec, sight = K.H.sight || C.LEBEC.sight;
+    const L = npcs.lebec, sight = (K.H.sight || C.LEBEC.sight) * (K.D.sight || 1);
     if (!U.inWorkshop({ x, z }) || Math.hypot(L.x - x, L.z - z) > sight || S.chase) return;
     let add = C.LEBEC.hit * (K.H.anger || 1); if (S.buffs.calm > S.rt) add *= 0.3;
-    S.anger = Math.min(100, S.anger + add);
+    S.anger = Math.min(100, S.anger + add * K.D.anger);
     say(L, "JE T'AI VU ! ON NE FRAPPE PAS LES COLLÈGUES !");
     note(pid, `😡 Lebec t'a vu (colère ${Math.round(S.anger)}/100). À 50 : coup de pelle !`, 'warn');
     if (S.anger >= C.LEBEC.chaseAt) K.startChase(pid);
@@ -404,7 +405,7 @@
     P.stun = S.rt + 3; K.dropAll(pid, 4);
     const dx = tp.x - L.x, dz = tp.z - L.z, d = Math.hypot(dx, dz) || 1;
     ev.push({ e: 'pelle', to: pid, vx: dx / d * 9, vz: dz / d * 9 }); sfx('bong', tp.x, tp.z);
-    S.anger = C.LEBEC.base + 10; S.chase = null; S.score = Math.max(0, S.score - 5); K.stat(pid, 'pelle'); K.damage(pid, C.HP.pelle, 'coup de pelle');
+    S.anger = C.LEBEC.base + K.D.base + 10; S.chase = null; S.score = Math.max(0, S.score - 5); K.stat(pid, 'pelle'); K.damage(pid, C.HP.pelle, 'coup de pelle');
   }
   function applyFind(k, pid) {
     const F = ML.FINDS[k], who = S.pl[pid] ? S.pl[pid].name : '?';
@@ -486,7 +487,7 @@
     }
     n.run = false;
     const decay = (S.up.posters ? 1 : 0.6) / (K.H.anger || 1);
-    if (S.anger > C.LEBEC.base) S.anger = Math.max(C.LEBEC.base, S.anger - dt * decay);
+    const floor = C.LEBEC.base + K.D.base; if (S.anger > floor) S.anger = Math.max(floor, S.anger - dt * decay);
     if (!n.path.length) { n.wait = (n.wait || 0) - dt; if (n.wait <= 0) { const p = U.pick(ML.LOC.patrol); K.walkTo(n, p.x, p.z); n.wait = 3 + rng() * 6; } }
     n.barkT = (n.barkT || 10) - dt;
     if (n.barkT <= 0) {
@@ -521,7 +522,7 @@
       const t = n.path[0], dx = t.x - n.x, dz = t.z - n.z, d = Math.hypot(dx, dz);
       if (d < 0.3) { n.path.shift(); n.stuck = 0; n.stuckAll = 0; if (!n.path.length) { const cb = n.onArrive; n.onArrive = null; n.run = n.state === 'chase'; if (cb) cb(); } }
       else {
-        const run = n.id === 'lebec' ? (K.H.run || C.LEBEC.run) : n.runSpeed || 5;
+        const run = n.id === 'lebec' ? (K.H.run || C.LEBEC.run) * K.D.run : n.runSpeed || 5;
         const sp = n.run ? run : n.speed, step = Math.min(sp * dt, d), ox = n.x, oz = n.z;
         n.x += dx / d * step; n.z += dz / d * step; U.resolveCircle(n, 0.3);
         const moved = Math.hypot(n.x - ox, n.z - oz);
@@ -619,8 +620,8 @@
   K.end = extra => {
     if (S.over || S.voting) return;
     S.over = true; Sim.dirty = true;
-    const k = 1 + 0.35 * (Math.max(1, S.n) - 1), stars = S.score >= 260 * k ? 3 : S.score >= 160 * k ? 2 : S.score >= 80 * k ? 1 : 0;
-    const res = Object.assign({ mode: S.mode, day: S.day, score: S.score, served: S.served, failed: S.failed, stars, finds: S.finds.got, findsTotal: S.finds.total, sat: Math.round(S.sat), need: [80, 160, 260].map(v => Math.round(v * k)) }, extra || {});
+    const k = (1 + 0.35 * (Math.max(1, S.n) - 1)) * K.D.stars, stars = S.score >= 260 * k ? 3 : S.score >= 160 * k ? 2 : S.score >= 80 * k ? 1 : 0;
+    const res = Object.assign({ mode: S.mode, diff: S.diff, day: S.day, score: S.score, served: S.served, failed: S.failed, stars, finds: S.finds.got, findsTotal: S.finds.total, sat: Math.round(S.sat), need: [80, 160, 260].map(v => Math.round(v * k)) }, extra || {});
     for (const m of Sim.mods) if (m.onEnd) m.onEnd(res);
     if (S.served >= 10) for (const p in S.pl) K.stat(p, 'served10');
     if (res.vote) { S.over = false; S.voting = { until: S.rt + 25, votes: {}, res }; K.ev({ e: 'vote', until: 25, players: Object.keys(S.pl).map(id => [id, S.pl[id].name]) }); return; }

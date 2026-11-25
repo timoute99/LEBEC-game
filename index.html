@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mécanique Lebec — en équipe (V3.1)</title>
+<title>Mécanique Lebec — en équipe (V3.2)</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" href="data:,">
 </head>
@@ -74,61 +74,97 @@
 
 <!-- ================= Menus ================= -->
 <div id="lobby" class="overlay">
-  <div id="scr-home" class="card wide">
+  <!-- Accueil : sobre -->
+  <div id="scr-home" class="card home">
     <h1>MÉCANIQUE LEBEC</h1>
-    <h3>Usinage en équipe — jusqu'à 5 joueurs</h3>
-    <p class="pitch">Des tickets tombent, des opérateurs flemmardent, Eliott parle trop vite et Lebec a une pelle. Fabriquez, transportez, livrez… ensemble.</p>
-    <div class="acc box2">
-      <div id="acc-state"></div>
-      <div id="acc-form" class="actions"><input id="in-user" maxlength="16" placeholder="Pseudo du compte"><input id="in-pass" type="password" maxlength="64" placeholder="Mot de passe"><button id="btn-login" class="sec tiny">Se connecter</button><button id="btn-register" class="sec tiny">Créer un compte</button></div>
-      <div class="actions"><button id="btn-logout" class="sec tiny hidden">Se déconnecter</button></div>
+    <h3>Usinage en équipe · 1 à 5 joueurs</h3>
+    <div class="bigchoice">
+      <button id="go-solo" class="choice"><span class="ic">🧑‍🔧</span>SOLO<small>toi contre l'atelier</small></button>
+      <button id="go-multi" class="choice"><span class="ic">👥</span>MULTIJOUEUR<small>jusqu'à 5 en ligne</small></button>
     </div>
-    <div class="perso box2">
-      <button id="btn-profile" class="bigperso">👕 Personnaliser mon perso<br><span class="dim">apparence, tenue, chapeau, klaxon, tuning, succès</span></button>
+    <div class="homebar"><button id="go-account" class="link">👤 <span id="acc-mini">Compte</span></button><button id="go-guide" class="link">📖 Guide & astuces</button></div>
+  </div>
+
+  <!-- Compte -->
+  <div id="scr-account" class="card hidden">
+    <h2>👤 Compte</h2>
+    <p id="acc-state"></p>
+    <div id="acc-form"><div class="actions"><input id="in-user" maxlength="16" placeholder="Pseudo"><input id="in-pass" type="password" maxlength="64" placeholder="Mot de passe"></div>
+      <div class="actions"><button id="btn-login">Se connecter</button><button id="btn-register" class="sec">Créer un compte</button></div>
+      <p class="dim small">Sans compte, tu joues en invité : ton perso et tes jetons restent sur ce PC.</p></div>
+    <div class="actions"><button id="btn-logout" class="sec hidden">Se déconnecter</button><button class="sec back">Retour</button></div>
+  </div>
+
+  <!-- Guide -->
+  <div id="scr-guide" class="card wide hidden">
+    <h2>📖 Guide</h2>
+    <div class="guide">
+      <p><b>Le but :</b> des tickets tombent en haut de l'écran. Fabrique la pièce et livre-la au client avant la fin du chrono.</p>
+      <ol><li>Prends un <b>brut</b> au rack (bonne matière) et un <b>outil</b> à l'armoire rouge.</li>
+        <li>Donne-les à la <b>bonne machine</b> (tour ou fraiseuse, indiqué sur le ticket) : mini-jeu de prise d'origine.</li>
+        <li>La pièce sort en <b>expédition</b> : petite (se lance), caisse, ou GROSSE (palette : fenwick puis camion).</li>
+        <li>Charge la Mégane et <b>livre</b> le client (E sur l'accueil). Certains tickets passent par la fonderie, la chaudronnerie ou le traitement thermique.</li></ol>
+      <p><b>Rôles :</b> ⛑ Médecin · 🚜 Cariste · 🚚 Livreur · 🔧 Maintenance · 📦 Magasinier · 🛠 Polyvalent. Un rôle sans joueur est tenu par un PNJ… lent.</p>
+      <p><b>Lebec :</b> il ne supporte pas la violence dans SON atelier. 5 coups de pelle = KO, et il faut le médecin.</p>
+      <p><b>Difficultés :</b> 🙂 Facile · 😐 Normal · 😤 Difficile · 🔥 LEBEC EN FEU (tout brûle, points ×1,5).</p>
+      <p class="keys"><kbd>ZQSD</kbd> bouger · <kbd>Maj</kbd> courir · <kbd>E</kbd> interagir · <kbd>G</kbd> poser · <kbd>clic G</kbd> claque/outil · <kbd>clic D</kbd> lancer · <kbd>M</kbd> carte · <kbd>T</kbd> ping · <kbd>Tab</kbd> aide · manette compatible</p>
+      <h3>💡 Astuces</h3><ul id="guide-tips" class="tips"></ul>
+    </div>
+    <div class="actions"><button class="back">Retour</button></div>
+  </div>
+
+  <!-- Solo -->
+  <div id="scr-solo" class="card">
+    <h2>🧑‍🔧 Partie solo</h2>
+    <div id="solo-name-row" class="field"><label>Pseudo <input id="in-name" maxlength="16" placeholder="Ton pseudo"></label></div>
+    <div class="row2">
+      <button id="btn-profile-h" class="bigperso">👕 Mon perso<br><span class="dim">apparence, tenue, boutique</span></button>
       <div class="rolepick"><b>Ton rôle</b><div id="h-roles" class="roles"></div><div id="h-role-desc" class="dim small"></div></div>
     </div>
-    <div class="form">
-      <label>Pseudo <input id="in-name" maxlength="16" placeholder="Ton pseudo"></label>
-      <label id="server-row">Serveur <input id="in-server" placeholder="ws://localhost:8080"></label>
-    </div>
-    <div class="modes box2"><label>Mode (solo) <select id="h-mode"><option value="coop">Journée libre</option><option value="campagne">Campagne (5 jours)</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label>
-      <span id="h-desc" class="dim"></span><div id="h-camp" class="hidden"><span id="h-camp-info"></span> <button id="h-camp-reset" class="sec tiny">recommencer</button></div></div>
-    <div class="actions">
-      <button id="btn-solo" class="sec">Jouer en solo</button>
-      <button id="btn-create">Créer un salon</button>
-      <label class="chk"><input type="checkbox" id="in-priv"> privé</label>
-    </div>
-    <div class="actions">
-      <input id="in-code" maxlength="4" placeholder="CODE" class="code">
-      <button id="btn-join">Rejoindre</button>
-      <button id="btn-list" class="sec">Salons ouverts</button>
-    </div>
-    <div id="room-list"></div>
-    <p id="status" class="dim"></p>
-    <ol class="how small">
-      <li>Prends les tickets en haut de l'écran.</li><li>Brut (racks) + outil (armoire rouge) → la bonne machine.</li>
-      <li>Caisse finie → benne de la Mégane → client.</li><li>Fonderie, chaudronnerie, traitement thermique : certains tickets passent chez les sous-traitants.</li>
-    </ol>
+    <div class="modes box2"><label>Mode <select id="h-mode"><option value="coop">Journée libre</option><option value="campagne">Campagne (5 jours)</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label> <label>Difficulté <select id="h-diff"><option value="facile">🙂 Facile</option><option value="normal" selected>😐 Normal</option><option value="difficile">😤 Difficile</option><option value="feu">🔥 LEBEC EN FEU</option></select></label>
+      <div id="h-desc" class="dim small"></div><div id="h-camp" class="hidden small"><span id="h-camp-info"></span> <button id="h-camp-reset" class="sec tiny">recommencer</button></div></div>
+    <div class="tipbox" id="tip-h"></div>
+    <div class="actions"><button id="btn-solo" class="go">LANCER LA JOURNÉE</button><button class="sec back">Retour</button></div>
   </div>
+
+  <!-- Multijoueur : créer / rejoindre -->
+  <div id="scr-multi" class="card">
+    <h2>👥 Multijoueur</h2>
+    <div id="server-row" class="field"><label>Serveur <input id="in-server" placeholder="ws://localhost:8080"></label></div>
+    <div class="mbox"><b>Créer un salon</b><div class="actions"><button id="btn-create">Créer</button><label class="chk"><input type="checkbox" id="in-priv"> privé (pas dans la liste)</label></div></div>
+    <div class="mbox"><b>Rejoindre avec un code</b><div class="actions"><input id="in-code" maxlength="4" placeholder="CODE" class="code"><button id="btn-join">Rejoindre</button></div></div>
+    <div class="mbox"><b>Salons ouverts</b> <button id="btn-list" class="sec tiny">actualiser</button><div id="room-list"></div></div>
+    <p id="status" class="dim small"></p>
+    <div class="actions"><button class="sec back">Retour</button></div>
+  </div>
+
+  <!-- Perso -->
   <div id="scr-profile" class="card side hidden">
     <h2>👕 Mon perso</h2>
     <div id="prof-body"></div>
-    <div class="actions"><button id="btn-prof-back">Retour</button></div>
+    <div class="actions"><button id="btn-prof-back">Valider</button></div>
   </div>
+
+  <!-- Salon -->
   <div id="scr-room" class="card hidden">
     <h2>Salon <span id="room-code" class="code big"></span> <button id="btn-copy" class="sec tiny">copier</button></h2>
-    <p class="dim">Donne ce code à tes amis : ils cliquent « Rejoindre » avec ce code.</p>
+    <p class="dim small">Donne ce code à tes amis : Multijoueur → Rejoindre.</p>
     <div id="room-players"></div>
-    <div class="box2"><b>Ton rôle</b> <span class="dim">(un seul joueur par rôle, sauf Polyvalent)</span><div id="r-roles" class="roles"></div><div id="r-role-desc" class="dim small"></div></div>
-    <div id="room-opts" class="modes box2"><label>Mode <select id="r-mode"><option value="coop">Journée libre</option><option value="campagne">Campagne (5 jours)</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label>
-      <label class="chk"><input type="checkbox" id="r-traitor"> 🕵 Mode traître (3 joueurs min.)</label>
-      <span id="r-desc" class="dim"></span><div id="r-camp" class="hidden"><span id="r-camp-info"></span> <button id="r-camp-reset" class="sec tiny">recommencer</button></div></div>
-    <div class="actions"><button id="btn-start">LANCER LA JOURNÉE</button><span id="room-wait" class="dim"></span></div>
-    <div class="actions"><button id="btn-leave" class="sec">Quitter le salon</button></div>
+    <div id="room-name-row" class="field"><label>Ton pseudo <input id="r-name" maxlength="16" placeholder="Ton pseudo"></label></div>
+    <div class="row2">
+      <button id="btn-profile-r" class="bigperso">👕 Mon perso<br><span class="dim">apparence, tenue, boutique</span></button>
+      <div class="rolepick"><b>Ton rôle</b> <span class="dim small">(un par joueur, sauf Polyvalent)</span><div id="r-roles" class="roles"></div><div id="r-role-desc" class="dim small"></div></div>
+    </div>
+    <div id="room-opts" class="modes box2"><label>Mode <select id="r-mode"><option value="coop">Journée libre</option><option value="campagne">Campagne (5 jours)</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label> <label>Difficulté <select id="r-diff"><option value="facile">🙂 Facile</option><option value="normal" selected>😐 Normal</option><option value="difficile">😤 Difficile</option><option value="feu">🔥 LEBEC EN FEU</option></select></label>
+      <label class="chk"><input type="checkbox" id="r-traitor"> 🕵 Traître (3 joueurs min.)</label>
+      <div id="r-desc" class="dim small"></div><div id="r-camp" class="hidden small"><span id="r-camp-info"></span> <button id="r-camp-reset" class="sec tiny">recommencer</button></div></div>
+    <div id="room-cfg" class="dim small"></div>
+    <div class="tipbox" id="tip-r"></div>
+    <div class="actions"><button id="btn-start" class="go">LANCER LA JOURNÉE</button><span id="room-wait" class="dim"></span><button id="btn-leave" class="sec">Quitter</button></div>
   </div>
 </div>
 <div id="toasts"></div>
-<div id="version">V3.1</div>
+<div id="version">V3.2</div>
 
 <!-- Three.js r128 + chargeur glTF (copies locales : marche hors ligne et en double-clic) -->
 <script src="lib/three.min.js"></script>

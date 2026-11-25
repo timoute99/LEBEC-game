@@ -40,7 +40,7 @@
   /* ---------- Vie ---------- */
   K.damage = (pid, amt, why) => {
     const P = S.pl[pid]; if (!P || P.ko || amt <= 0) return;
-    P.hp = Math.max(0, P.hp - amt); Sim.dirty = true;
+    amt = Math.round(amt * K.D.dmg); P.hp = Math.max(0, P.hp - amt); Sim.dirty = true;
     K.ev({ e: 'hurt', to: pid, hp: P.hp, why });
     if (P.hp <= 0) {
       P.ko = true; K.koT[pid] = S.rt; K.dropAll(pid, 2);

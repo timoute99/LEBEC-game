@@ -214,3 +214,24 @@ input { background: #1d2230; color: #fff; border: 1px solid #556; border-radius:
 #lobby.preview > * { pointer-events: auto; }
 
 #version { position: fixed; right: 6px; bottom: 3px; font-size: 10px; opacity: .45; color: #fff; pointer-events: none; z-index: 50; }
+
+/* ===================== v3.2 : accueil sobre ===================== */
+#scr-home.home { max-width: 560px; text-align: center; padding: 34px 30px 22px; }
+#scr-home h1 { margin-bottom: 4px; }
+.bigchoice { display: flex; gap: 16px; justify-content: center; margin: 28px 0 22px; }
+.choice { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 22px 10px; font-size: 20px; letter-spacing: 2px; border-radius: 14px; background: #1f2636; border: 2px solid #3b4560; }
+.choice:hover { border-color: #ffd257; transform: translateY(-2px); }
+.choice .ic { font-size: 38px; }
+.choice small { font-size: 12px; letter-spacing: 0; font-weight: 400; opacity: .65; }
+.homebar { display: flex; justify-content: space-between; gap: 10px; }
+.link { background: none; border: none; color: #9fb3c8; font-size: 13px; padding: 4px 6px; font-weight: 500; }
+.link:hover { color: #ffd257; }
+.row2 { display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap; margin: 8px 0; }
+.field { margin: 8px 0; text-align: left; } .field input { margin-left: 6px; }
+.mbox { text-align: left; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 8px 12px; margin: 8px 0; }
+.mbox .actions { justify-content: flex-start; margin: 6px 0 0; }
+.tipbox { margin: 10px 0 4px; padding: 8px 12px; border-left: 3px solid #ffd257; background: rgba(255,210,87,.07); font-size: 13px; text-align: left; min-height: 20px; border-radius: 0; }
+button.go { background: #2e9e57; border-color: #1f7a42; font-size: 16px; padding: 10px 22px; }
+.guide { text-align: left; font-size: 14px; max-height: 60vh; overflow-y: auto; }
+.guide .tips li { margin: 3px 0; }
+#scr-solo, #scr-multi, #scr-room, #scr-account { max-width: 640px; }
