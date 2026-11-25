@@ -186,7 +186,7 @@
     for (const c of S.cars) if (c.dr && Math.abs(c.s) > 3) for (const id in K.npcs) {
       const n = K.npcs[id]; if (!n.active || n.stun > 0 || Math.hypot(n.x - c.x, n.z - c.z) > 2) continue;
       n.stun = 0.6; const dx = n.x - c.x, dz = n.z - c.z, d = Math.hypot(dx, dz) || 1; n.x += dx / d * 1.5; n.z += dz / d * 1.5; U.resolveCircle(n, 0.3);
-      K.say(n, id === 'lebec' ? 'TU M\'AS RENVERSÉ ?! COUP DE PELLE !' : 'Eh oh ! Regarde où tu roules !');
+      K.say(n, ML.line(id, 'renverse', id === 'lebec' ? 'TU M\'AS RENVERSÉ ?! COUP DE PELLE !' : ML.line('tous', 'renverse', 'Eh oh ! Regarde où tu roules !')));
       if (id === 'lebec' && !S.chase) { S.anger = 100; K.startChase(c.dr); }
     }
   };

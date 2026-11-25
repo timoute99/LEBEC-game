@@ -168,19 +168,19 @@
         if (P_(a).op && held && ['brut', 'tool'].includes(IT.def(held).kind) && midOf(a)) return R.use('mach:' + midOf(a));
         if (ML.PARTICULIERS.includes(a)) {
           const p = (S.parts || []).find(x => x.id === a);
-          if (p && p.st === 'wait') return ML.Dialogue.choice(P_(a).name, `${ML.LINES[a][0]} Il me faudrait : « ${p.part} » en ${ML.MATERIALS[p.mat].label} (${ML.MTYPE[p.mtype]}, ${ML.TOOLS[p.tool].label.toLowerCase()}). C'est urgent : ${Math.round(p.dur / 60 * 10) / 10} min maximum. Je paie ${p.price} € !`,
+          if (p && p.st === 'wait') return ML.Dialogue.choice(P_(a).name, `${ML.line(a, 'demande', 'Bonjour !')} Il me faudrait : « ${p.part} » en ${ML.MATERIALS[p.mat].label} (${ML.MTYPE[p.mtype]}, ${ML.TOOLS[p.tool].label.toLowerCase()}). C'est urgent : ${Math.round(p.dur / 60 * 10) / 10} min maximum. Je paie ${p.price} € !`,
             [{ label: `Accepter (${p.price} €)`, fn: () => G.intent({ a: 'part', id: a, ok: 1 }) }, { label: 'Refuser', fn: () => G.intent({ a: 'part', id: a, ok: 0 }) }, { label: 'Je réfléchis…', fn: null }]);
           break;
         }
         if (a === 'vendeur') {
           const opts = Object.keys(ML.DEALER).map(k => { const D = ML.DEALER[k], own = S.owned.includes(k); return { label: own ? `✔ ${D.name} (déjà à vous)` : `${D.name} — ${D.price.toLocaleString('fr-FR')} € : ${D.desc}`, fn: own ? null : () => G.intent({ a: 'buycar', k }) }; });
-          return ML.Dialogue.choice(P_('vendeur').name, `${ML.U.pick(ML.LINES.vendeur)} Dans la caisse de l'atelier, vous avez ${S.money.toLocaleString('fr-FR')} €.`, opts.concat([{ label: 'Juste regarder', fn: null }]));
+          return ML.Dialogue.choice(P_('vendeur').name, `${ML.line('vendeur')} Dans la caisse de l'atelier, vous avez ${S.money.toLocaleString('fr-FR')} €.`, opts.concat([{ label: 'Juste regarder', fn: null }]));
         }
-        if (a === 'mathieu') return ML.Dialogue.listen(P_('mathieu').name, ML.LINES.mathieu.concat(['Et… du coup… voilà… quoi.']), 7, () => G.intent({ a: 'mathieu' }), null, () => G.npcDist('mathieu') < 6);
+        if (a === 'mathieu') return ML.Dialogue.listen(P_('mathieu').name, [0, 1, 2, 3].map(() => ML.line('mathieu')).concat(['Et… du coup… voilà… quoi.']), 7, () => G.intent({ a: 'mathieu' }), null, () => G.npcDist('mathieu') < 6);
         const comp = COMP_OF[a], C = comp && COMP[comp];
         if (C && (C.kind === 'matiere' || C.kind === 'outils') && myRole() !== 'magasinier') break;
         if (C && C.kind === 'matiere') return ML.Dialogue.supplier(a, (mat, succ) => G.intent({ a: 'eliott', mat, succ }));
-        if (C && C.kind === 'outils') return ML.Dialogue.listen(P_('coco').name, ML.LINES.cocoBoxe, 6, () => { G.intent({ a: 'coco' }); ML.Dialogue.info(P_('coco').name, "Merci de m'avoir écouté ! Ta caisse d'outils est sur le quai. Dépose-la en RÉCEPTION à l'atelier."); }, null, () => G.npcDist(a) < 6);
+        if (C && C.kind === 'outils') return ML.Dialogue.listen(P_('coco').name, [0, 1, 2, 3, 4].map(() => ML.line('coco', 'boxe', 'Jab, jab, uppercut !')), 6, () => { G.intent({ a: 'coco' }); ML.Dialogue.info(P_('coco').name, "Merci de m'avoir écouté ! Ta caisse d'outils est sur le quai. Dépose-la en RÉCEPTION à l'atelier."); }, null, () => G.npcDist(a) < 6);
         if (C && (C.kind === 'fonderie' || C.kind === 'chaudro')) {
           const list = S.orders.filter(o => stage(o) === comp && !o.q);
           if (!list.length) return;
@@ -189,7 +189,7 @@
         }
         if (C && C.kind === 'client' && !(isPart(held))) {
           const mine = S.orders.filter(o => o.client === comp);
-          return ML.Dialogue.info(C.name, ML.U.pick(ML.LINES[a] || ['Bonjour !']) + ' ' + (mine.length ? 'On attend : ' + mine.map(o => `#${o.id} ${o.part}`).join(', ') + '.' : 'Rien en attente pour nous.'));
+          return ML.Dialogue.info(C.name, ML.line(a, null, 'Bonjour !') + ' ' + (mine.length ? 'On attend : ' + mine.map(o => `#${o.id} ${o.part}`).join(', ') + '.' : 'Rien en attente pour nous.'));
         }
         break;
       }

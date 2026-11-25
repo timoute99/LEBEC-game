@@ -276,7 +276,7 @@
     const pay = Math.round(((o.price || 100) * (0.75 + 0.35 * frac) + (held.d.ctl ? ML.ECO.order.ctl : 0)) * (held.d.npc || 1));
     K.money(pay, 'ca'); S.served++; S.sat = Math.min(100, S.sat + (S.up.plantes ? 7 : 5));
     K.repAdd(comp === 'part' ? ML.ECO.rep.part : frac > 0.25 ? ML.ECO.rep.ok : ML.ECO.rep.late);
-    if (n) say(n, U.pick(ML.LINES[n.id] || ['Merci !']));
+    if (n) say(n, ML.line(n.id, 'merci', ML.LINES[n.id] || ['Merci !']));
     big(`+${K.eur(pay)} · #${o.id} livrée à ${comp === 'part' ? ML.PEOPLE[o.who].name : COMP[comp].name} !`, '#3ecf6e'); sfx('cash');
     for (const m of Sim.mods) if (m.onDeliver) m.onDeliver(pid, o);
   };
@@ -327,7 +327,7 @@
         const o = S.orders.find(x => x.id === m.oid); if (!o || stage(o) !== comp || o.q) return;
         if (!K.spend(pid, ML.ECO.sub[comp], 'achat', 'le brut')) return say(n, "On ne fait pas crédit, désolé.");
         o.q = true; S.subs[comp].push({ oid: o.id, end: S.rt + C.SUB_SEC });
-        say(n, comp === 'fonderie' ? `Je coule le brut de la #${o.id}. Repasse dans ${C.SUB_SEC} s !` : U.pick(ML.LINES.nono));
+        say(n, comp === 'fonderie' ? `Je coule le brut de la #${o.id}. Repasse dans ${C.SUB_SEC} s !` : ML.line('nono'));
         break;
       }
       case 'open': {                                         // ouvrir un colis (en main ou par terre)
@@ -419,7 +419,7 @@
         M.job.wrong = true;
       }
       P.inv[sel] = null; M.job.tool = true;
-      say(op, M.op === 'marius' ? 'Reçu. Exécution.' : U.pick(["C'est parti !", 'Nickel, je lance.', 'Ça tourne !']));
+      say(op, ML.line(M.op, 'lance', M.op === 'marius' ? 'Reçu. Exécution.' : ["C'est parti !", 'Nickel, je lance.', 'Ça tourne !']));
       return;
     }
     if (held.type === 'viennoiseries' && M.op === 'matis') return feedMatis(pid, P, sel, op);
@@ -428,7 +428,7 @@
   function feedMatis(pid, P, sel, op) {
     P.inv[sel] = null; op.hunger = 0; S.buffs.matis = S.rt + 90;
     if (op.state !== 'work') K.backToWork(op);
-    say(op, 'MIAM ! Je suis une machine maintenant !'); all(`🥐 ${P.name} a nourri Matis : +40 % pendant 90 s.`, 'good');
+    say(op, ML.line('matis', 'miam', 'MIAM ! Je suis une machine maintenant !')); all(`🥐 ${P.name} a nourri Matis : +40 % pendant 90 s.`, 'good');
   }
 
   function npcUse(pid, P, ps, sel, held, id) {
@@ -438,23 +438,23 @@
       if (n.state === 'pause' || n.state === 'forgot') return K.wake(n, pid);
       if (held && held.type === 'viennoiseries' && id === 'matis') return feedMatis(pid, P, sel, n);
       if (held && n.mid) return machineUse(pid, P, sel, held, n.mid, {});
-      return say(n, U.pick(ML.LINES[id] || ['Oui ?']));
+      return say(n, ML.line(id, null, 'Oui ?'));
     }
-    if (id === 'lebec') return say(n, U.pick(ML.LINES.lebec));
+    if (id === 'lebec') return say(n, ML.line('lebec'));
     const comp = n.comp, C2 = comp && COMP[comp]; if (!C2) return;
     switch (C2.kind) {
       case 'boulangerie': if (K.give(pid, { type: 'viennoiseries', d: {} }, sel)) say(n, "Tiens mon grand, c'est la maison qui offre !"); return;
       case 'station': if (K.give(pid, { type: 'jerrican', d: {} }, sel)) say(n, 'Un jerrican, cadeau. Ramène-le pas, je m\'en fiche.'); return;
       case 'tth': {
-        if (!K.isPart(held)) return say(n, U.pick(ML.LINES.maurseau));
+        if (!K.isPart(held)) return say(n, ML.line('maurseau'));
         const o = S.orders.find(x => x.id === held.d.oid);
         if (!o || stage(o) !== 'tth') return say(n, "Celle-là, elle n'a pas besoin de traitement thermique !");
         if (!K.spend(pid, ML.ECO.sub.tth, 'achat', 'le traitement thermique')) return say(n, 'Pas payé, pas chauffé ! WOUHOU quand même.');
         P.inv[sel] = null; o.q = true; S.subs.tth.push({ oid: o.id, end: S.rt + C.SUB_SEC, nc: !!held.d.nc, mes: held.d.mes, type: held.type });
         return say(n, `Au four la #${o.id} ! ${ML.ECO.sub.tth} €. Reviens dans ${C.SUB_SEC} s, WOUHOU !`);
       }
-      case 'client': case 'concurrent': if (K.isPart(held)) return deliver(pid, P, sel, held, comp, n); return say(n, U.pick(ML.LINES[id] || ['Bonjour !']));
-      default: return say(n, U.pick(ML.LINES[id] || ['Oui ?']));
+      case 'client': case 'concurrent': if (K.isPart(held)) return deliver(pid, P, sel, held, comp, n); return say(n, ML.line(id, null, 'Bonjour !'));
+      default: return say(n, ML.line(id, null, 'Oui ?'));
     }
   }
 
@@ -470,9 +470,9 @@
     n.stun = 0.7; sfx('punch', n.x, n.z);
     const ps = pose[by]; if (ps) { const dx = n.x - ps.x, dz = n.z - ps.z, d = Math.hypot(dx, dz) || 1; n.x += dx / d * 0.6; n.z += dz / d * 0.6; U.resolveCircle(n, 0.3); }
     for (const mod of Sim.mods) if (mod.npcHit && mod.npcHit(n, by)) return;
-    if (n.id === 'lebec') { say(n, "TU M'AS FRAPPÉ ?! COUP DE PELLE !!!", true); S.anger = 100; K.stat(by, 'slap_lebec'); K.startChase(by); return; }
-    if (ML.PEOPLE[n.id].op && ['pause', 'toPause', 'forgot', 'rant'].includes(n.state)) { K.backToWork(n); say(n, n.id === 'brieuc' ? "Mmh. D'accord. J'y vais." : "Aïe ! OK OK, j'y retourne !"); }
-    else say(n, n.id === 'marius' ? 'Choc détecté. Je continue.' : U.pick(['Aïe !', 'Hé ! Ça va pas ?!', 'Ouille !']));
+    if (n.id === 'lebec') { say(n, ML.line('lebec', 'frappe', "TU M'AS FRAPPÉ ?! COUP DE PELLE !!!"), true); S.anger = 100; K.stat(by, 'slap_lebec'); K.startChase(by); return; }
+    if (ML.PEOPLE[n.id].op && ['pause', 'toPause', 'forgot', 'rant'].includes(n.state)) { K.backToWork(n); say(n, ML.line(n.id, 'claque', "Aïe ! OK OK, j'y retourne !")); }
+    else say(n, ML.line(n.id, 'claque', ['Aïe !', 'Hé ! Ça va pas ?!', 'Ouille !']));
     K.witness(by, n.x, n.z);
   };
   K.playerHit = (tid, by, dur) => {
@@ -489,7 +489,7 @@
     if (!U.inWorkshop({ x, z }) || Math.hypot(L.x - x, L.z - z) > sight || S.chase) return;
     let add = C.LEBEC.hit * (K.H.anger || 1); if (S.buffs.calm > S.rt) add *= 0.3;
     S.anger = Math.min(100, S.anger + add * K.D.anger);
-    say(L, "JE T'AI VU ! ON NE FRAPPE PAS LES COLLÈGUES !");
+    say(L, ML.line('lebec', 'colere', "JE T'AI VU ! ON NE FRAPPE PAS LES COLLÈGUES !"));
     note(pid, `😡 Lebec t'a vu (colère ${Math.round(S.anger)}/100). À 50 : coup de pelle !`, 'warn');
     if (S.anger >= C.LEBEC.chaseAt) K.startChase(pid);
   };
@@ -538,8 +538,8 @@
   K.backToWork = n => { n.state = 'work'; K.stop(n); };
   K.wake = (n, pid) => {
     const forgot = n.state === 'forgot', chance = n.id === 'brieuc' ? 0.25 : 0.7;
-    if (forgot || rng() < chance) { K.backToWork(n); say(n, forgot ? 'Ah ouiii ! Merci.' : U.pick(["Ouais ouais, j'y vais...", "Bon. D'accord."])); }
-    else { say(n, U.pick(['Encore cinq minutes...', 'Nan.', "J'arrive... (il n'arrive pas)"])); note(pid, 'Il ne bouge pas. Une claque (clic gauche) marcherait mieux...'); }
+    if (forgot || rng() < chance) { K.backToWork(n); say(n, ML.line(n.id, 'reveil', forgot ? 'Ah ouiii ! Merci.' : ["Ouais ouais, j'y vais...", "Bon. D'accord."])); }
+    else { say(n, ML.line(n.id, 'refus', ['Encore cinq minutes...', 'Nan.', "J'arrive... (il n'arrive pas)"])); note(pid, 'Il ne bouge pas. Une claque (clic gauche) marcherait mieux...'); }
   };
   K.workMult = n => {
     if (n.state !== 'work' || !K.atHome(n) || n.stun > 0 || !S.power) return 0;
@@ -570,13 +570,13 @@
         n.faceYaw = n.home.yaw;
         const lazy = op.lazy * 0.7 * (S.up.babyfoot ? 0.7 : 1);
         if (lazy > 0 && rng() < lazy * 0.012 * dt * (M.job ? 1 : 1.5)) {
-          if (op.traits.includes('deadstop')) { n.state = 'pause'; n.pauseT = 35 + rng() * 30; say(n, 'Flemme.'); }
-          else { const sp = U.pick(ML.LOC.coffee); n.state = 'toPause'; K.walkTo(n, sp.x, sp.z, () => { n.state = 'pause'; n.pauseT = (18 + rng() * 20) * (S.up.babyfoot ? 0.6 : 1); }); say(n, 'Petite pause café...'); }
+          if (op.traits.includes('deadstop')) { n.state = 'pause'; n.pauseT = 35 + rng() * 30; say(n, ML.line(n.id, 'pause', 'Flemme.')); }
+          else { const sp = U.pick(ML.LOC.coffee); n.state = 'toPause'; K.walkTo(n, sp.x, sp.z, () => { n.state = 'pause'; n.pauseT = (18 + rng() * 20) * (S.up.babyfoot ? 0.6 : 1); }); say(n, ML.line(n.id, 'pause', 'Petite pause café...')); }
         }
         if (op.traits.includes('forgetful') && M.job && M.job.tool && rng() < 0.006 * dt) { n.state = 'forgot'; say(n, "Euh... j'usinais quoi déjà ?"); }
         break;
       }
-      case 'pause': n.pauseT -= dt; if (n.pauseT <= 0) { K.backToWork(n); say(n, "Bon, j'y retourne."); } break;
+      case 'pause': n.pauseT -= dt; if (n.pauseT <= 0) { K.backToWork(n); say(n, ML.line(n.id, 'retour', "Bon, j'y retourne.")); } break;
       case 'rant': n.pauseT -= dt; if (n.pauseT <= 0) K.backToWork(n); break;
     }
     if (n.id === 'matis' && n.hunger > -100) n.hunger = Math.min(100, n.hunger + dt * 0.45);
@@ -587,10 +587,10 @@
       n.chaseT += dt; n.repath -= dt; n.shoutT -= dt; n.run = true;
       if (!tp || !P) { S.chase = null; n.state = 'patrol'; return; }
       if (n.repath <= 0) { n.repath = 0.3; n.path = [{ x: tp.x, z: tp.z }]; n.onArrive = null; }
-      if (n.shoutT <= 0) { n.shoutT = 3.5; say(n, 'COUP DE PELLE !', true); }
-      if (K.foot(P) && Math.hypot(n.x - tp.x, n.z - tp.z) < C.LEBEC.reach) { coupDePelle(S.chase); n.state = 'patrol'; K.stop(n); return; }
+      if (n.shoutT <= 0) { n.shoutT = 3.5; say(n, ML.line('lebec', 'poursuite', 'COUP DE PELLE !'), true); }
+      if (K.foot(P) && Math.hypot(n.x - tp.x, n.z - tp.z) < C.LEBEC.reach) { coupDePelle(S.chase); n.state = 'patrol'; K.stop(n); say(n, ML.line('lebec', 'pelle', 'La pelle a parlé.')); return; }
       if (!K.foot(P) || n.chaseT > 22 || (!U.inWorkshop(tp) && Math.hypot(n.x - tp.x, n.z - tp.z) > 30)) {
-        S.chase = null; n.state = 'patrol'; K.stop(n); say(n, 'Tu perds rien pour attendre, toi !'); S.anger = Math.max(C.LEBEC.base, S.anger - 25);
+        S.chase = null; n.state = 'patrol'; K.stop(n); say(n, ML.line('lebec', 'abandon', 'Tu perds rien pour attendre, toi !')); S.anger = Math.max(C.LEBEC.base, S.anger - 25);
       }
       return;
     }
@@ -603,9 +603,9 @@
       n.barkT = 16 + rng() * 14;
       if (S.humeur === 'reforme' && rng() < 0.5) {   // tirade : l'opérateur le plus proche s'arrête pour écouter
         let best = null, bd = 9; for (const id in npcs) { const o = npcs[id]; if (o.mid && o.active && o.state === 'work') { const d = Math.hypot(o.x - n.x, o.z - n.z); if (d < bd) { bd = d; best = o; } } }
-        if (best) { best.state = 'rant'; best.pauseT = 10; say(n, U.pick(ML.LINES.tirade), true); return; }
+        if (best) { best.state = 'rant'; best.pauseT = 10; say(n, ML.line('lebec', 'tirades'), true); return; }
       }
-      say(n, U.pick(ML.LINES.lebec));
+      say(n, ML.line('lebec'));
     }
   }
   function brainShop(n, dt) {

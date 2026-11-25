@@ -1,4 +1,4 @@
-MÉCANIQUE LEBEC — usinage en équipe (V4.3, 1 à 6 joueurs)
+MÉCANIQUE LEBEC — usinage en équipe (V4.4, 1 à 6 joueurs)
 ==========================================================
 En ligne : https://lebec-game.onrender.com
 
@@ -38,6 +38,13 @@ MODES
   avec le code peut la reprendre ; l'Inspecteur vient quand l'atelier est prêt, le réussir
   termine le jeu) · Inspection (boss : règles absurdes qui changent) · Course de Mégane
   (5 manches) · Mode traître (3 joueurs minimum : un joueur payé par UsiFlash, vote à la fin).
+
+NOUVEAU EN V4.4 (personnages)
+  - Tous les personnages, leur personnalité et leurs répliques sont dans UN fichier : js/persos.js.
+    Modifie-le sur GitHub (crayon ✏️) : le jeu est à jour 2-3 minutes après, sans rien d'autre à faire.
+  - Environ 400 répliques, rangées par situation (pause, claque, coup de pelle, livraison…).
+  - Plus de répliques en boucle : chacun dit toutes ses phrases avant de se répéter.
+  - Champ « idées: » par personnage : écris ce que tu veux, Claude le lira et le codera.
 
 NOUVEAU EN V4.3 (graphismes)
   - Atelier refait : sol peint, charpente, pont roulant, établi, rayonnage, affiches, enseigne géante sur le toit.

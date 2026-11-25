@@ -65,7 +65,7 @@
   function opArrive(id) {
     const n = npcs[id]; Object.assign(n, { active: true, x: OUT.x + (rng() - 0.5) * 2, z: OUT.z, state: 'work', path: [], stun: 0 });
     K.assignOps(); if (n.home) K.walkTo(n, n.home.x, n.home.z);
-    K.say(n, ML.PEOPLE[id].op.traits.includes('apprenti') ? 'Bonjour ! C\'est mon premier jour…' : U.pick(ML.LINES[id] || ['Bonjour !']));
+    K.say(n, ML.line(id, 'embauche', ML.PEOPLE[id].op.traits.includes('apprenti') ? 'Bonjour ! C\'est mon premier jour…' : ML.line(id, null, 'Bonjour !')));
   }
   function aiArrive(k, instant) {
     const A = ML.AI_STAFF[k], n = npcs[A.npc], sp = ML.LOC.aiSpots[A.npc];
@@ -159,7 +159,7 @@
     }
     for (const p of S.parts.slice()) {
       const n = npcs[p.id];
-      if (p.st === 'wait' && S.rt > p.exp) { p.st = 'leave'; K.repAdd(-ECO.rep.expire); K.all(`🚗 ${ML.PEOPLE[p.id].name} en a eu marre d'attendre au comptoir et repart (réputation −${ECO.rep.expire}).`, 'warn'); partLeave(p, "Tant pis, j'irai chez UsiFlash !"); }
+      if (p.st === 'wait' && S.rt > p.exp) { p.st = 'leave'; K.repAdd(-ECO.rep.expire); K.all(`🚗 ${ML.PEOPLE[p.id].name} en a eu marre d'attendre au comptoir et repart (réputation −${ECO.rep.expire}).`, 'warn'); partLeave(p, ML.line(p.id, 'marre', "Tant pis, j'irai chez UsiFlash !")); }
       if (n && n.active && (p.st === 'wait' || p.st === 'order') && !n.path.length) n.faceYaw = Math.PI;
     }
   }
@@ -169,7 +169,7 @@
     const p = { id, slot, st: 'arrive', part, mat, mtype, tool, price, dur: ECO.part.dur * K.D.dur, exp: 0, oid: null };
     S.parts.push(p); Sim.dirty = true;
     const k = S.parts.indexOf(p), cx = ML.LOC.counter.x - 0.9 + 1.8 * (k % 2), cz = ML.LOC.counter.z;
-    Object.assign(n, { active: true, x: sp.x + 1.6, z: sp.z, state: 'part', path: [{ x: sp.x + 2, z: 18.5 }, { x: -1.5, z: 17.5 }, { x: -1.5, z: 13 }, { x: cx, z: cz }], onArrive: () => { p.st = 'wait'; p.exp = S.rt + ECO.part.wait; n.faceYaw = Math.PI; K.say(n, U.pick(ML.LINES[id])); Sim.dirty = true; }, run: false, stun: 0, speed: 2.2, comp: 'part' });
+    Object.assign(n, { active: true, x: sp.x + 1.6, z: sp.z, state: 'part', path: [{ x: sp.x + 2, z: 18.5 }, { x: -1.5, z: 17.5 }, { x: -1.5, z: 13 }, { x: cx, z: cz }], onArrive: () => { p.st = 'wait'; p.exp = S.rt + ECO.part.wait; n.faceYaw = Math.PI; K.say(n, ML.line(id, 'demande', ML.LINES[id] || ['Bonjour !'])); Sim.dirty = true; }, run: false, stun: 0, speed: 2.2, comp: 'part' });
     K.all(`🚗 Un client particulier (${ML.PEOPLE[id].name}) se gare et vient au COMPTOIR : il veut une pièce urgente (${price} €) !`, 'info'); K.sfx('order');
   }
   function partLeave(p, line) {
@@ -201,7 +201,7 @@
       if (n.path.length) return;
       n.jobT -= dt; if (n.jobT > 0) return;
       const o = S.items.find(x => x.id === n.job);
-      if (o && cam && !cam.dr && K.bedFree(cam) >= 4) { cam.bed.push(K.strip(o)); K.removeItem(o); K.say(n, U.pick(ML.LINES.tony)); K.sfx('drop', cam.x, cam.z); Sim.dirty = true; }
+      if (o && cam && !cam.dr && K.bedFree(cam) >= 4) { cam.bed.push(K.strip(o)); K.removeItem(o); K.say(n, ML.line('tony')); K.sfx('drop', cam.x, cam.z); Sim.dirty = true; }
       n.job = null; K.walkTo(n, n.home.x, n.home.z); return;
     }
     K.tonyT -= dt; if (K.tonyT > 0) return; K.tonyT = 2;
@@ -227,7 +227,7 @@
     K.tour = { items: take.map(o => K.strip(o)), end: S.rt + 35 + 6 * take.length };
     for (const o of take) K.removeItem(o);
     S.tour = { end: K.tour.end, n: take.length };
-    K.say(n, U.pick(ML.LINES.jojo)); n.state = 'tour';
+    K.say(n, ML.line('jojo')); n.state = 'tour';
     K.walkTo(n, OUT.x, OUT.z + 6, () => { n.active = false; Sim.dirty = true; });
     K.all(`🚚 Jojo part en tournée avec ${take.length} colis (retour dans ~${Math.round(K.tour.end - S.rt)} s).`, 'info'); Sim.dirty = true;
   }
@@ -314,13 +314,13 @@
       if (p.st === 'order') { K.say(n, 'Alors, ma pièce ? Ça avance ?'); return true; }
       return true;                                   // demande : dialogue côté joueur (intention « part »)
     }
-    if (n.id === 'tony' || n.id === 'jojo') { K.say(n, U.pick(ML.LINES[n.id])); return true; }
+    if (n.id === 'tony' || n.id === 'jojo') { K.say(n, ML.line(n.id)); return true; }
     return false;
   };
   mod.onDeliver = (pid, o) => {
     if (o.client !== 'part') return;
     const p = S.parts.find(x => x.oid === o.id); if (!p) return;
-    S.nParts++; partLeave(p, U.pick(ML.LINES[p.id].slice(-1)));
+    S.nParts++; partLeave(p, ML.line(p.id, 'merci', 'Merci !'));
   };
   mod.onFail = o => {
     if (o.client !== 'part') return;

@@ -1,7 +1,8 @@
 /* =====================================================================
    config.js — Données & réglages de MÉCANIQUE LEBEC (V4)
    C'est LE fichier à modifier pour l'équilibrage et le contenu :
-   persos, entreprises, pièces, événements, humeurs, succès, boutique.
+   entreprises, pièces, événements, humeurs, succès, boutique.
+   (Les personnages et leurs répliques sont dans js/persos.js.)
    ===================================================================== */
 window.ML = window.ML || {};
 ML.debug = /[?&]debug/.test(location.search);
@@ -409,6 +410,24 @@ ML.LINES = {
   saboteur: ['Rien à voir, je passe.', 'Hé hé hé...'],
   inspecteur: ['Je note. Je note tout.', 'Votre référentiel de compétences, je vous prie.', 'Infraction !']
 };
+
+/* Tirage des répliques « paquet de cartes » : jamais deux fois la même tant que
+   la liste n'a pas été dite en entier. ML.line(id) = répliques, ML.line(id,'pause') = liste « pause: ». */
+(function () {
+  const bags = {};
+  ML.line = (id, key, fb) => {
+    const k = key && key !== 'repliques' ? id + '_' + key : id, a = ML.LINES[k];
+    if (!a || !a.length) return Array.isArray(fb) ? fb[Math.floor(Math.random() * fb.length)] : fb;
+    let b = bags[k];
+    if (!b || b.src !== a || !b.q.length) {
+      const q = a.slice();
+      for (let j = q.length - 1; j > 0; j--) { const r = Math.floor(Math.random() * (j + 1)); [q[j], q[r]] = [q[r], q[j]]; }
+      if (b && b.last && q.length > 1 && q[q.length - 1] === b.last) [q[0], q[q.length - 1]] = [q[q.length - 1], q[0]];
+      b = bags[k] = { src: a, q, last: b && b.last };
+    }
+    return (b.last = b.q.pop());
+  };
+})();
 
 ML.QUIZ_JACKY = [
   ["Pour la mise en position, où placez-vous l'appui plan ?", 'Sur la surface Réf A', 'Sur la face la plus large', 'Sur la Réf C', 'On serre fort, ça ira'],

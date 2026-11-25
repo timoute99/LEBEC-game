@@ -169,7 +169,7 @@
         const P = S.pl[n.patient], tp = K.pose[n.patient];
         if (!P || !P.ko || !tp) { leave(n, 'Bon, plus personne à soigner ?'); return true; }
         n.t += dt; n.re = (n.re || 0) - dt;
-        if (Math.hypot(tp.x - n.x, tp.z - n.z) < 1.8) { K.heal(n.patient, 'le Docteur Gwenn'); leave(n, U.pick(ML.LINES.docteur)); return true; }
+        if (Math.hypot(tp.x - n.x, tp.z - n.z) < 1.8) { K.heal(n.patient, 'le Docteur Gwenn'); leave(n, ML.line('docteur')); return true; }
         if (n.re <= 0) { n.re = 1.5; K.walkTo(n, tp.x, tp.z); }
         if (n.t > 45 && Math.hypot(tp.x - n.x, tp.z - n.z) > 25) { n.x = tp.x + 4; n.z = tp.z + 4; U.resolveCircle(n, 0.3); n.t = 0; }
         return true;
@@ -177,7 +177,7 @@
       case 'gege': {
         if (n.state === 'fix') {
           n.t -= dt;
-          if (n.t <= 0) { const M = S.machines[n.job]; if (M) { M.broken = false; M.chips = 0; M.bin = true; } delete K.issueT[n.job]; K.all(`🔧 Gégé a remis ${n.job} en état.`, 'good'); Sim.dirty = true; leave(n, U.pick(ML.LINES.gege)); }
+          if (n.t <= 0) { const M = S.machines[n.job]; if (M) { M.broken = false; M.chips = 0; M.bin = true; } delete K.issueT[n.job]; K.all(`🔧 Gégé a remis ${n.job} en état.`, 'good'); Sim.dirty = true; leave(n, ML.line('gege')); }
         }
         return true;
       }
@@ -267,7 +267,7 @@
   mod.npcUse = (pid, P, ps, sel, held, n) => {
     const comp = K.compOf(n.id), C2 = comp && COMP[comp];
     if (C2 && (C2.kind === 'matiere' || C2.kind === 'outils') && P.role !== 'magasinier') { K.say(n, 'Je ne traite qu\'avec le MAGASINIER de chez Lebec !'); needRole(pid, 'magasinier', 'Commander'); return true; }
-    if (['docteur', 'gege', 'momo', 'sylvie'].includes(n.id)) { K.say(n, U.pick(ML.LINES[n.id])); return true; }
+    if (['docteur', 'gege', 'momo', 'sylvie'].includes(n.id)) { K.say(n, ML.line(n.id)); return true; }
     return false;
   };
   mod.onHit = (pid, kind) => {

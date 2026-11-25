@@ -53,7 +53,7 @@
     if (S.mode !== 'inspection' || S.rule !== rule || !S.pl[pid]) return;
     const key = pid + rule; if ((K.vcd[key] || 0) > S.rt) return; K.vcd[key] = S.rt + 5;
     S.viol++; K.fine(ML.ECO.fines.inspect);
-    K.say(npcs.inspecteur, 'Infraction ! ' + ML.RULES[rule], true);
+    K.say(npcs.inspecteur, ML.line('inspecteur', 'infraction', 'Infraction !') + ' ' + ML.RULES[rule], true);
     K.all(`📏 Infraction de ${S.pl[pid].name} : ${ML.RULES[rule]} (${S.viol}/5, −${ML.ECO.fines.inspect} €)`, 'warn'); K.sfx('error'); Sim.dirty = true;
   };
 
@@ -138,7 +138,7 @@
       }
       case 'inspecteur':
         if (!n.path.length) { n.wait = (n.wait || 0) - dt; if (n.wait <= 0) { const p = rng.pick(IN_SPOTS); K.walkTo(n, p.x, p.z); n.wait = 4 + rng() * 6; } }
-        n.barkT = (n.barkT || 8) - dt; if (n.barkT <= 0) { n.barkT = 14 + rng() * 10; K.say(n, U.pick(ML.LINES.inspecteur)); }
+        n.barkT = (n.barkT || 8) - dt; if (n.barkT <= 0) { n.barkT = 14 + rng() * 10; K.say(n, ML.line('inspecteur')); }
         return true;
     }
     return true;
@@ -161,7 +161,7 @@
     while (K.sched.length && S.rt >= K.sched[0].t) start(K.sched.shift().k);
     for (const k in S.evs) {
       const e = S.evs[k]; if (S.rt < e.until) continue;
-      if (k === 'audit') { K.fine(ML.ECO.fines.audit); K.repAdd(-ML.ECO.rep.audit); K.all(`🔍 Audit raté : personne n'a présenté de caisse à Jacky (−${ML.ECO.fines.audit} €, réputation −${ML.ECO.rep.audit}).`, 'warn'); leave('jacky', 'Je mets un écart. Majeur.'); }
+      if (k === 'audit') { K.fine(ML.ECO.fines.audit); K.repAdd(-ML.ECO.rep.audit); K.all(`🔍 Audit raté : personne n'a présenté de caisse à Jacky (−${ML.ECO.fines.audit} €, réputation −${ML.ECO.rep.audit}).`, 'warn'); leave('jacky', ML.line('jacky', 'absent', 'Je mets un écart. Majeur.')); }
       else if (k === 'herve') leave('herve', 'Bon. Je repasserai. Avec un formulaire.');
       else if (k === 'fred') leave('fred', 'Penses-y, à Naval Group !');
       else if (k === 'mathieu') { endMathieu(); leave('mathieu', 'Bon… du coup… je… vais… y aller.'); }
@@ -190,8 +190,8 @@
     switch (m.a) {
       case 'audit': {
         const n = npcs.jacky; if (!S.evs.audit || n.state !== 'audit' || !K.near(ps, n.x, n.z, 6) || !K.isPart(held)) return true;
-        if (m.ok) { K.bonus(ML.ECO.bonus.audit); K.repAdd(ML.ECO.rep.audit); S.sat = Math.min(100, S.sat + 10); K.big(`🔍 AUDIT RÉUSSI (+${ML.ECO.bonus.audit} €, réputation +${ML.ECO.rep.audit})`, '#3ecf6e'); leave('jacky', 'MIP/MAP irréprochable. Je note : conforme.'); }
-        else { K.fine(ML.ECO.fines.audit); K.repAdd(-ML.ECO.rep.audit); K.all(`🔍 Audit raté par ${P.name} (−${ML.ECO.fines.audit} €, réputation −${ML.ECO.rep.audit})`, 'warn'); leave('jacky', 'Appui plan sur la Réf A ! RÉF A ! Écart majeur.'); }
+        if (m.ok) { K.bonus(ML.ECO.bonus.audit); K.repAdd(ML.ECO.rep.audit); S.sat = Math.min(100, S.sat + 10); K.big(`🔍 AUDIT RÉUSSI (+${ML.ECO.bonus.audit} €, réputation +${ML.ECO.rep.audit})`, '#3ecf6e'); leave('jacky', ML.line('jacky', 'reussi', 'MIP/MAP irréprochable. Je note : conforme.')); }
+        else { K.fine(ML.ECO.fines.audit); K.repAdd(-ML.ECO.rep.audit); K.all(`🔍 Audit raté par ${P.name} (−${ML.ECO.fines.audit} €, réputation −${ML.ECO.rep.audit})`, 'warn'); leave('jacky', ML.line('jacky', 'rate', 'Appui plan sur la Réf A ! RÉF A ! Écart majeur.')); }
         return true;
       }
       case 'mathieu': {
@@ -249,12 +249,12 @@
     }
     if (n.id === 'herve') {
       if (held && held.type === 'convention' && held.d.signee) { P.inv[sel] = null; K.bonus(ML.ECO.bonus.herve); K.all(`📝 Convention signée remise à Hervé par ${P.name} : l'armoire est libre (+${ML.ECO.bonus.herve} €) !`, 'good'); leave('herve', 'Parfait ! Bon stage !'); return true; }
-      K.say(n, held && held.type === 'convention' ? "Elle n'est pas signée ! Par M. Lebec, s'il vous plaît." : U.pick(ML.LINES.herve)); return true;
+      K.say(n, held && held.type === 'convention' ? "Elle n'est pas signée ! Par M. Lebec, s'il vous plaît." : ML.line('herve')); return true;
     }
-    if (n.id === 'jacky') { K.say(n, S.evs.audit ? 'Une CAISSE. Au MARBRE. Maintenant.' : U.pick(ML.LINES.jacky)); return true; }
-    if (n.id === 'fred') { K.say(n, U.pick(ML.LINES.fred)); return true; }
-    if (n.id === 'inspecteur') { K.say(n, U.pick(ML.LINES.inspecteur)); return true; }
-    if (n.id === 'saboteur') { K.say(n, U.pick(ML.LINES.saboteur)); return true; }
+    if (n.id === 'jacky') { K.say(n, S.evs.audit ? ML.line('jacky', 'audit', 'Une CAISSE. Au MARBRE. Maintenant.') : ML.line('jacky')); return true; }
+    if (n.id === 'fred') { K.say(n, ML.line('fred')); return true; }
+    if (n.id === 'inspecteur') { K.say(n, ML.line('inspecteur')); return true; }
+    if (n.id === 'saboteur') { K.say(n, ML.line('saboteur')); return true; }
     if (n.id === 'kevin' && K.priv.traitor === pid && !held) { K.say(n, 'Chut. Apporte-moi leurs caisses, je te paie en croissants.'); return true; }
     return false;
   };
