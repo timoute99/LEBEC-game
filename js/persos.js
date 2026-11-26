@@ -30,19 +30,33 @@ ML.PERSOS_TXT = `
 #    Lebec       : tirades (humeur « réforme »), colère (il voit une claque),
 #                  frappé (on le frappe), poursuite (il court avec la pelle),
 #                  pelle (il vient de mettre un coup), abandon (il lâche l'affaire)
-#    opérateurs  : lance (il démarre une pièce), pause (il part en pause),
+#                  soufflette (on lui souffle dessus)
+#    opérateurs  : lance (il démarre une pièce), manivelle (il démarre une
+#                  machine manuelle), pause (il part en pause),
 #                  retour (il revient de pause tout seul), réveil (on le remet
 #                  au travail), refus (il ne veut pas), claque (on lui met une
-#                  claque), embauche (premier jour), miam (Matis mange)
-#    clients     : merci (quand on lui livre sa caisse)
+#                  claque), embauche (premier jour), miam (Matis mange),
+#                  oubli (il oublie ce qu'il usine), outil neuf (on lui change
+#                  l'outil usé), inoccupé (il n'a pas de machine), désaffecté
+#                  (on lui retire sa machine). Au travail, il dit aussi une
+#                  de ses répliques toutes les une à deux minutes.
+#    ouvriers embauchés (carrière, PC du BE) : ils n'ont pas de fiche à eux.
+#                  Le jeu prend la liste de leur trait ([tete_en_lair],
+#                  [robot], [gourmand], [flemmard], [apprenti]), sinon celle
+#                  de [ouvrier]. Les légendes (Amaury, Marius, Matis, Brieuc)
+#                  gardent leurs propres répliques.
+#    clients     : merci (quand on lui livre sa caisse) — aussi Roudaut
+#                  (Carrière du Bec) et Yvonne (barrage de Kerlebec)
+#    Kerbrigand  : répliques = ce qu'il dit quand tu es en cellule
 #    particuliers: demande (ce qu'il raconte au comptoir), merci,
 #                  marre (il en a marre d'attendre et repart)
 #    Coco        : boxe (ses histoires de boxe pendant qu'on attend)
 #    Jacky       : audit (il attend sa caisse), réussi, raté, absent (personne
 #                  ne lui a présenté de caisse)
 #    inspecteur  : infraction
-#    tout le monde : renverse (quand on le renverse en voiture) — sinon
-#                  le jeu prend la liste « renverse » de [tous]
+#    tout le monde : renverse (quand on le renverse en voiture), souffle
+#                  (coup de soufflette), attrape (il attrape ce qu'on lui
+#                  lance) — sinon le jeu prend la liste de [tous]
 #  Une liste que le jeu ne connaît pas encore (ex. « blague: ») est gardée :
 #  dis à Claude à quel moment l'utiliser.
 #
@@ -64,6 +78,17 @@ renverse:
 - Je vais le dire à Lebec !
 - Mon dos ! Mon pauvre dos !
 - C'est un Kangoo ou un bulldozer ?!
+souffle:
+- Pfffouah !
+- Hé ! Mes cheveux !
+- Ça décoiffe !
+- J'ai des copeaux jusque dans les oreilles !
+- Arrête, j'ai pas mis mes lunettes !
+attrape:
+- Bien reçu !
+- Belle passe !
+- Attrapé !
+- Joli lancer !
 
 
 # ======================= L'ATELIER =======================
@@ -135,6 +160,11 @@ abandon:
 - Pff… Je te retrouverai à la pause café.
 - Mes genoux… Je te laisse filer. Pour cette fois.
 - Cours, cours… J'ai le temps, moi. Toute la journée.
+soufflette:
+- ARRÊTE AVEC TA SOUFFLETTE !
+- La soufflette, c'est pour les copeaux ! PAS POUR LE CHEF !
+- Tu me décoiffes encore une fois et c'est la pelle !
+- Ma moustache ! MA MOUSTACHE !
 
 [amaury]
 nom: Amaury Carter
@@ -153,6 +183,11 @@ répliques:
 - Lebec m'a dit « c'est écrit dans le poly ». C'est quel poly déjà ?
 - J'ai oublié mon casse-croûte. Encore.
 - Tu crois qu'on peut mettre un néon sous un tour ?
+oubli:
+- Euh... j'usinais quoi déjà ?
+- Attends… c'était un arbre ou une bague ?
+- J'ai arrêté la machine. Je sais plus pourquoi.
+- Quelqu'un a vu ma pièce ? Elle était là, dans le mandrin.
 pause:
 - Petite pause café… enfin je crois que c'était café.
 - Je reviens ! Je sais plus d'où, mais je reviens.
@@ -392,6 +427,158 @@ répliques:
 - Mon oncle connaît Lebec. Enfin, il connaît quelqu'un qui le connaît.
 embauche:
 - Salut ! Mon oncle m'a dit que c'était le meilleur atelier du coin !
+
+
+# ======================= LES OUVRIERS EMBAUCHÉS (carrière) =======================
+#  Les ouvriers qu'on embauche au PC du BE ont un nom tiré au hasard : ils
+#  parlent avec la liste de leur trait, puis avec celle de [ouvrier].
+
+[ouvrier]
+nom: (ouvriers embauchés)
+rôle: Répliques de tous les ouvriers embauchés au PC du BE
+personnalité: Des gars et des filles du coin, embauchés pour pas cher, qui ont vu le Hangar Pourri devenir (peut-être) une vraie usine.
+dans le jeu: Utilisées quand l'ouvrier n'a pas de réplique dans la liste de son trait.
+idées:
+répliques:
+- Encore une pièce et je fais une pause. Ou l'inverse.
+- Ça sent le copeau chaud. J'adore.
+- Le patron dit qu'on va s'agrandir. Le patron dit beaucoup de choses.
+- Qui a pris mon pied à coulisse ? Il avait mon nom au feutre !
+- La paie tombe vendredi ? On est quel jour ?
+- J'ai connu le Hangar Pourri, moi. Il pleuvait sur le tour.
+- Si Lebec passe, je suis très concentré.
+- Il me faudrait une machine plus récente. Genre de ce siècle.
+- On m'a dit « tu verras, c'est une petite boîte familiale ». J'ai vu.
+- Mon tour date de 1974. Il a plus d'ancienneté que moi.
+- Les vestiaires, c'est pour quand ? Je me change dans la Mégane.
+- J'ai mis une étoile de plus à ma pièce. Dans ma tête.
+- Un jour, j'aurai une CN. Un jour.
+pause:
+- Petite pause café...
+- Je vais me dégourdir les jambes.
+- Deux minutes, je reviens. Promis.
+retour:
+- Bon, j'y retourne.
+- Allez, au boulot.
+- Pause terminée. Snif.
+réveil:
+- Ouais ouais, j'y vais...
+- Bon. D'accord.
+- C'est bon, c'est bon, je retourne à ma machine.
+refus:
+- Encore cinq minutes...
+- Nan.
+- J'arrive... (il n'arrive pas)
+claque:
+- Aïe !
+- Hé ! Ça va pas ?!
+- Ouille !
+- Aïe ! OK OK, j'y retourne !
+lance:
+- C'est parti !
+- Nickel, je lance.
+- Ça tourne !
+manivelle:
+- Je mouline… (aide-moi si t'es pressé : E)
+- À la manivelle, ça va prendre un moment…
+- Tour à manivelle, bras d'acier.
+outil neuf:
+- Outil neuf, ça repart !
+- Ah, ça coupe mieux comme ça.
+- Plaquette neuve, copeaux bleus. Le bonheur.
+inoccupé:
+- On m'affecte où, chef ?
+- Je m'ennuie...
+- Y a pas une machine pour moi ?
+- Je peux balayer, sinon.
+- Je suis payé à regarder les autres ? Ça me va.
+désaffecté:
+- Bon, je vais prendre un café en attendant.
+- Ma machine ! Ils m'ont pris ma machine !
+embauche:
+- Bonjour ! On commence où ?
+- Salut ! C'est ici, la Mécanique Lebec ?
+
+[tete_en_lair]
+nom: (trait « Tête en l'air »)
+rôle: Ouvriers embauchés qui oublient de relancer la machine
+répliques:
+- J'ai garé ma voiture… quelque part.
+- C'était quoi le code du vestiaire déjà ?
+- J'ai mis mes lunettes de protection. Sur ma tête. Ah non.
+- Attends, je note la cote. Où est mon carnet ?
+oubli:
+- Euh... j'usinais quoi déjà ?
+- Je reviens d'où, là ?
+- Il était à moi ce brut ?
+
+[robot]
+nom: (trait « Robot »)
+rôle: Ouvriers embauchés qui exécutent tout, même les erreurs
+répliques:
+- Consigne reçue.
+- Je ne discute pas. J'exécute.
+- Niveau d'huile : correct. Niveau d'humeur : sans objet.
+- Copeau numéro 3 211. Conforme.
+lance:
+- Reçu. Exécution.
+- Cycle démarré.
+claque:
+- Choc détecté. Je continue.
+- Impact enregistré.
+réveil:
+- Reprise du cycle.
+
+[gourmand]
+nom: (trait « Gourmand »)
+rôle: Ouvriers embauchés qui s'arrêtent pour manger
+répliques:
+- Il reste des chouquettes en salle de pause ?
+- Ça creuse, l'usinage.
+- Je mangerais bien un far breton. Entier.
+- Si on livre à l'heure, on fête ça avec des crêpes ?
+pause:
+- Je vais voir s'il reste quelque chose au frigo…
+- Pause goûter !
+miam:
+- MIAM ! Je suis une machine maintenant !
+- Ah, ça va mieux. Je pourrais usiner un pont.
+- Merci ! Là je suis à 140 %.
+
+[flemmard]
+nom: (trait « Rapide mais… »)
+rôle: Ouvriers embauchés très rapides… quand ils veulent bien
+répliques:
+- Je suis rapide. Juste pas maintenant.
+- Mmh.
+- Je visualise la pièce. Ça compte.
+- Plus tard. C'est plus efficace plus tard.
+pause:
+- Flemme.
+- Pause. Longue pause.
+refus:
+- Nan.
+- Encore cinq minutes...
+- Tu vois pas que je suis occupé à rien faire ?
+réveil:
+- Mmh. D'accord. J'y vais.
+claque:
+- Aïe. OK. Mode turbo.
+
+[apprenti]
+nom: (trait « Apprenti »)
+rôle: Apprentis embauchés : lents mais pas chers
+répliques:
+- Chef, c'est normal que ça fume ?
+- On m'a dit de demander un pot de peinture à rayures.
+- Je dois aller chercher la clé à pipe gauche, quelqu'un sait où elle est ?
+- C'est quoi une MIP ? Et la MAP ?
+- J'ai mis le brut à l'envers. Ça compte quand même ?
+- Mon prof m'a dit que l'usinage c'était l'avenir. Il avait pas dit que c'était bruyant.
+- J'ai mesuré trois fois. J'ai trouvé trois cotes différentes.
+- Lebec, c'est le boss final ? Il a combien de PV ?
+embauche:
+- Bonjour ! C'est mon premier jour… je dois faire quoi ?
 
 
 # ======================= RÔLES DE SECOURS & PERSONNEL =======================
@@ -671,6 +858,49 @@ répliques:
 - Lebec et moi, c'est une longue histoire. Une histoire de pelle.
 
 
+# ======================= LES CLIENTS DU PLATEAU (carrière) =======================
+
+[roudaut]
+nom: Roudaut
+rôle: Chef de carrière
+personnalité: Chef de la Carrière du Bec, sur le plateau. Casque jaune vissé sur la tête, barbe pleine de poussière de granit, voix qui couvre les tirs de mine.
+dans le jeu: Client du plateau : on lui livre ses pièces là-haut, par la route du col.
+idées:
+répliques:
+- Attention, tir de mine dans cinq minutes ! Ou dix. On verra.
+- Le granit, ça s'use pas. Mes concasseurs, si.
+- T'as monté le col avec ça ? Respect.
+- Ici on casse des cailloux depuis 1912. Les pièces aussi, du coup.
+- Un godet de chargeuse, ça pèse le poids d'une Mégane. Pleine.
+- Casque obligatoire ! Même pour dire bonjour.
+- La poussière ? C'est du granit en poudre. C'est noble.
+- Mon concasseur a mangé une dent de godet. Il a pas aimé.
+merci:
+- Ah ! Ça, c'est du costaud. Merci les gars.
+- Parfait. Le concasseur va pouvoir remâcher.
+- Bien joué d'être monté jusqu'ici. Redescends doucement, ça glisse.
+- Ça tiendra. Enfin, plus longtemps que la précédente.
+
+[yvonne]
+nom: Yvonne
+rôle: Ingénieure du barrage
+personnalité: Ingénieure du barrage de Kerlebec, calme et précise, trente ans de turbines. Parle en mégawatts et en mètres cubes.
+dans le jeu: Client du plateau : pièces de précision pour les turbines du barrage.
+idées:
+répliques:
+- Bonjour. Vous venez pour la turbine numéro deux ?
+- Ici, une fuite d'un millimètre, c'est une piscine par jour.
+- Douze mégawatts. Et pas un de plus, la vanne grince.
+- La cote est au centième ? Au barrage, on travaille au centième.
+- Le lac est à son niveau. Moi aussi.
+- Ne vous penchez pas trop sur la rambarde, s'il vous plaît.
+- Une turbine, c'est comme un tour. Mais qui tourne depuis 1962.
+merci:
+- Conforme. La turbine vous remercie.
+- Très bien. Je l'installe à la prochaine vidange.
+- Joli travail. Vous pourriez travailler pour EDF. Ne le faites pas.
+
+
 # ======================= LES PARTICULIERS (au comptoir) =======================
 
 [part1]
@@ -841,12 +1071,35 @@ infraction:
 - Je note : non-respect du règlement.
 - Inacceptable. Je l'écris en rouge.
 - Ça, c'est un point en moins. Au moins.
+
+[kerbrigand]
+nom: Adjudant Kerbrigand
+rôle: Gendarmerie
+personnalité: Adjudant de la gendarmerie du bourg, flegme breton, humour sec comme un biscuit. Garde les détenus de l'atelier avec un plaisir mal caché.
+dans le jeu: Ses répliques défilent à l'écran pendant qu'on est en cellule.
+idées:
+répliques:
+- Alors, on joue au bowling avec les piétons ?
+- Ici, le Wi-Fi c'est NON. Le café aussi.
+- Le dernier qui a tenté de scier les barreaux, il avait une lime de 8. Pas assez.
+- Tu veux un coup de fil ? Y a un Minitel au fond, il marche pas.
+- Un passant c'est un accident. Deux, c'est une passion.
+- Lebec a appelé. Il a dit : « gardez-le ».
+- Les toilettes sont en inox. Enfin, en blanc. On a eu un souci de budget.
+- Ton permis, je le garde pour caler mon bureau.
+- Calme-toi, c'est pas Alcatraz. C'est pire : c'est la Bretagne en novembre.
+- La caution, c'est pas une suggestion.
+- Le radar t'a pris de profil. C'est ton meilleur côté.
+- Tu peux appeler Lebec. Il viendra. Avec sa pelle.
 `;
 
-/* ======================= NE PAS MODIFIER EN DESSOUS (lecture du texte) ======================= */
+/* ======================= NE PAS MODIFIER EN DESSOUS (lecture du texte) =======================
+   Remplit ML.LINES[id] (répliques) et ML.LINES[id + '_' + situation] (accents et espaces retirés :
+   « réussi » → jacky_reussi, « outil neuf » → ouvrier_outil_neuf), et ML.LINE_META[clé] = { o: id, sit }.
+   Le tirage (ML.line, ML.redraw) est dans config.js : si ce fichier plante, le jeu garde ses répliques. */
 (function () {
-  const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-  const TEXT = ['personnalite', 'dans le jeu', 'idees', 'idee', 'notes'], P = {}, L = {};
+  const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const TEXT = ['personnalite', 'dans le jeu', 'idees', 'idee', 'notes'], P = {}, L = {}, META = {};
   let id = null, list = null, field = null;
   for (const raw of ML.PERSOS_TXT.split('\n')) {
     const line = raw.trim();
@@ -855,7 +1108,7 @@ infraction:
     let m;
     if ((m = line.match(/^\[([a-z0-9_]+)\]$/i))) { id = m[1].toLowerCase(); P[id] = P[id] || { lists: {} }; list = null; field = null; continue; }
     if (!id) continue;
-    const add = t => { if (t) (L[list || id] = L[list || id] || []).push(t); };   // hors liste → répliques
+    const add = t => { if (!t) return; const k = list || id; if (!META[k]) META[k] = { o: id, sit: k === id ? null : k.slice(id.length + 1) }; (L[k] = L[k] || []).push(t); };   // hors liste → répliques
     if (line.startsWith('-')) { add(line.replace(/^-\s*/, '')); continue; }
     if ((m = line.match(/^([^:]{1,40}):\s*$/))) {                       // « pause: » → une liste commence
       const k = norm(m[1]).replace(/\s+/g, '_'); list = k === 'repliques' ? id : id + '_' + k; field = null; P[id].lists[k] = 1; continue;
@@ -867,9 +1120,16 @@ infraction:
     else add(line);                                                      // phrase sans « - » : comptée quand même
   }
   for (const k in P) if (ML.PEOPLE[k]) { if (P[k].nom) ML.PEOPLE[k].name = P[k].nom; if (P[k].role) ML.PEOPLE[k].role = P[k].role; }
-  for (const k in L) ML.LINES[k] = L[k];
+  ML.LINE_META = ML.LINE_META || {};
+  for (const k in L) { ML.LINES[k] = L[k]; ML.LINE_META[k] = META[k]; }
   // compatibilité avec les anciens noms de listes
   if (L.lebec_tirades) ML.LINES.tirade = L.lebec_tirades;
   if (L.coco_boxe) ML.LINES.cocoBoxe = L.coco_boxe;
   ML.PERSOS = P;
+  // Adjudant Kerbrigand : ses phrases de cellule (sim_law.js) sont remplacées par celles d'ici
+  document.addEventListener('DOMContentLoaded', () => {
+    const A = ML.Law && ML.Law.LINES, l = L.kerbrigand; if (!A || !l || !l.length) return;
+    const who = (P.kerbrigand && P.kerbrigand.nom) || 'Adjudant Kerbrigand';
+    A.splice(0, A.length, ...l.map(t => `${who} : « ${t} »`));
+  });
 })();

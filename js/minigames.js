@@ -25,12 +25,12 @@
     if (ML.ui.modal === 'mini') ML.ui.modal = null;
     if (cb) cb(res);
   }
-  M.forceClose = () => { if (M.open) { st = null; M.open = false; M.el.classList.add('hidden'); if (ML.ui.modal === 'mini') ML.ui.modal = null; } };
+  M.forceClose = () => { if (ML.Mini3D) ML.Mini3D.forceClose(); if (M.open) { st = null; M.open = false; M.el.classList.add('hidden'); if (ML.ui.modal === 'mini') ML.ui.modal = null; } };
   const body = () => M.el.querySelector('.mg-body');
   const go = () => I.pressed('Space') || I.pressed('KeyE') || I.left;
 
   M.run = (type, data, cb) => {
-    if (M.open) return;
+    if (M.open || (ML.Mini3D && ML.Mini3D.isOpen)) return;
     data = data || {};
     switch (type) {
       case 'origine':
@@ -82,6 +82,7 @@
   }
 
   M.update = dt => {
+    if (ML.Mini3D && ML.Mini3D.isOpen) ML.Mini3D.update(dt);   // mini-jeux 3D (minigames3d.js)
     if (!st) return;
     const now = performance.now();
     if (!st.started) { st.started = true; st.last = now; return; }   // la touche qui a ouvert le mini-jeu ne compte pas

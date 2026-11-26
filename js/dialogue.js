@@ -25,7 +25,8 @@
     D.opts = options; D.optEl.innerHTML = '';
     options.forEach((o, i) => { const b = document.createElement('button'); b.innerHTML = `<kbd>${i + 1}</kbd>`; b.appendChild(document.createTextNode(o.label)); b.onclick = () => D.pick(i); D.optEl.appendChild(b); });
   };
-  D.choice = (speaker, text, options) => { reset(); show(speaker, text); D.setOptions(options); };
+  // ML.redraw (config.js) : une réplique de persos.js en début de texte est retirée sans répétition
+  D.choice = (speaker, text, options) => { reset(); show(speaker, ML.redraw ? ML.redraw(text) : text); D.setOptions(options); };
   D.info = (speaker, text, cb) => D.choice(speaker, text, [{ label: 'OK', fn: cb || null }]);
 
   D.pick = i => {
@@ -39,6 +40,9 @@
   D.forceClose = () => { if (!D.open) return; hide(); if (ML.ui.modal === 'dialogue') ML.ui.modal = null; };
 
   D.listen = (speaker, lines, seconds, onDone, onCancel, cond) => {
+    // liste de persos.js trop longue (Coco et la boxe…) : on en tire quelques-unes, ~1,3 s chacune, sans répétition
+    const n = Math.max(2, Math.round(seconds / 1.3)), meta = ML.lineMeta && lines.length > n && ML.lineMeta(lines[0]);
+    if (meta) { const tail = ML.lineMeta(lines[lines.length - 1]) ? [] : [lines[lines.length - 1]]; lines = Array.from({ length: n - tail.length }, () => ML.line(meta.o, meta.sit, lines[0])).concat(tail); }
     reset(); show(speaker, lines[0]);
     Object.assign(D, { mode: 'listen', t: 0, dur: seconds, lines, li: 0, onDone, onCancel, cond });
     D.timerEl.style.display = 'block';

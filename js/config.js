@@ -1,8 +1,7 @@
 /* =====================================================================
-   config.js — Données & réglages de MÉCANIQUE LEBEC (V4)
+   config.js — Données & réglages de MÉCANIQUE LEBEC v2
    C'est LE fichier à modifier pour l'équilibrage et le contenu :
-   entreprises, pièces, événements, humeurs, succès, boutique.
-   (Les personnages et leurs répliques sont dans js/persos.js.)
+   persos, entreprises, pièces, événements, humeurs, succès, boutique.
    ===================================================================== */
 window.ML = window.ML || {};
 ML.debug = /[?&]debug/.test(location.search);
@@ -11,7 +10,21 @@ ML.CFG = {
   SHIFT_SEC: 480,                      // une journée (7h → 19h) = 8 minutes réelles
   DAY_START: 7 * 60, DAY_END: 19 * 60,
   PLAYER: { eye: 1.65, r: 0.35, walk: 5.6, sprint: 8.8, stamina: 4 },
-  CAR: { accel: 13, brake: 24, max: 27, rev: 7, steer: 0.55, wb: 2.6, cap: 4, fuelUse: 0.04 },
+  CAR: { accel: 13, brake: 24, max: 27, rev: 7, steer: 0.55, wb: 2.6, cap: 4, fuelUse: 0.04,
+    /* Caractère de chaque véhicule (cars.js, Cars.drive) :
+       mass = masse à vide (kg) ; grip = adhérence latérale max (m/s²) ; slip = vitesse de « recollage » latéral (1/s) ;
+       under = sous-virage (0 = neutre) ; roll = roulis visuel ; pitch = plongée/cabrage ; strap = tenue du chargement
+       (1 = caisses posées dans la benne, plus = ridelles hautes / sangles) ; hb = efficacité du frein à main (dérive). */
+    kinds: {
+      megane:  { mass: 1150, grip: 11.5, slip: 9,  under: 0.05, roll: 0.075, pitch: 0.035, strap: 1.0, hb: 1.0 },
+      kangoo:  { mass: 1350, grip: 10,   slip: 8,  under: 0.15, roll: 0.1,   pitch: 0.04,  strap: 1.05, hb: 0.9 },
+      ducato:  { mass: 2000, grip: 8.5,  slip: 7,  under: 0.3,  roll: 0.13,  pitch: 0.05,  strap: 1.5, hb: 0.75 },
+      camion:  { mass: 4500, grip: 6.5,  slip: 6,  under: 0.55, roll: 0.1,   pitch: 0.03,  strap: 2.0, hb: 0.5 },
+      fenwick: { mass: 3000, grip: 7,    slip: 10, under: 0.1,  roll: 0.16,  pitch: 0.07,  strap: 1.0, hb: 0.4, rear: true },
+      tp:      { mass: 120,  grip: 6,    slip: 12, under: 0,    roll: 0.05,  pitch: 0.02,  strap: 1.2, hb: 0 }
+    },
+    /* masses du chargement (kg) par type d'objet ; défaut = 15 */
+    itemMass: { machine: 900, palette: 320, matiere: 70, caisse: 45, bac_plein: 90, bac_vide: 12, piece: 12, jerrican: 20 } },
   TP: { accel: 10, brake: 20, max: 4.8, rev: 3, steer: 0.9, wb: 1.2, cap: 4 },      // transpalette
   REACH: 5,
   NET: { poseHz: 15, fastHz: 10, slowEvery: 1 },
@@ -19,22 +32,21 @@ ML.CFG = {
   HP: { max: 100, pelle: 20, slap: 5, slip: 10, fire: 7, dog: 15, koSpeed: 1.7 },
   SIZE: { s: { name: 'petite', pts: 0.8, prod: 0.8 }, m: { name: 'moyenne', pts: 1, prod: 1 }, l: { name: 'GROSSE', pts: 1.7, prod: 1.5 } },
   FENWICK: { accel: 7, brake: 18, max: 7, rev: 4, steer: 0.8, wb: 1.5, cap: 1 },
-  CAMION: { accel: 9, brake: 20, max: 24, rev: 5, steer: 0.45, wb: 4.2, cap: 8, fuelUse: 0.05 },   // plateau : 8 places (palette = 4)
-  KANGOO: { accel: 9, brake: 20, max: 19, rev: 5, steer: 0.55, wb: 2.5, fuelUse: 0.045 },             // le vieux Kangoo : poussif
-  DUCATO: { accel: 11, brake: 22, max: 24, rev: 6, steer: 0.5, wb: 3, fuelUse: 0.05 },
-  ORDER: { base: 250, perStep: 90, far: 35, interval: 44, firstAt: 2 },   // V4.1 : beaucoup plus de temps pour faire les pièces
-  PROD_SEC: 14, SUB_SEC: 16,
-  COFFEE: { mult: 1.45, sec: 60, secPro: 120 },                           // café : on va beaucoup plus vite
+  CAMION: { accel: 8, brake: 18, max: 21, rev: 5, steer: 0.45, wb: 4.2, cap: 2, fuelUse: 0.05 },
+  ORDER: { base: 215, perStep: 80, far: 30, interval: 44, firstAt: 2 },   // V4.1 (portage) : plus de temps pour faire les pièces (+30 % environ)
+  PROD_SEC: 17, SUB_SEC: 18,
+  COFFEE: { mult: 1.45, sec: 60, secPro: 120 },                           // V4.1 (portage) : café = BEAUCOUP plus vite pendant 1 min (2 min café pro / salle de pause)
   START_STOCK: { acier: 4, alu: 4, inox: 3, plaquette: 3, fraise: 3, foret: 3 },
   SPEED_LIMIT: 16.7,                   // 60 km/h : au-delà, les radars flashent
   POLICE_TRIGGER: 19.5,                // 70 km/h près de la police : poursuite
-  MAP: { minX: -170, maxX: 170, minZ: -40, maxZ: 330 }
+  MAP: { minX: -600, maxX: 600, minZ: -450, maxZ: 750 },          // monde entier (relief, montagnes, autoroute)
+  CORE: { minX: -215, maxX: 235, minZ: -40, maxZ: 395 }            // le bourg (rues, entreprises) : tout le bassin plat
 };
 
 ML.COLORS = [
   { name: 'Rouge', hex: 0xe74c3c, css: '#e74c3c' }, { name: 'Bleu', hex: 0x3498db, css: '#3498db' },
   { name: 'Vert', hex: 0x2ecc71, css: '#2ecc71' }, { name: 'Jaune', hex: 0xf1c40f, css: '#f1c40f' },
-  { name: 'Violet', hex: 0x9b59b6, css: '#9b59b6' }, { name: 'Orange', hex: 0xe67e22, css: '#e67e22' }
+  { name: 'Violet', hex: 0x9b59b6, css: '#9b59b6' }, { name: 'Orange', hex: 0xe67e22, css: '#e67e22' }   // 6e joueur (V4.0)
 ];
 ML.MATERIALS = {
   acier: { label: 'ACIER', color: 0x8c9199, css: '#9aa0a8' }, alu: { label: 'ALU', color: 0xdfe5ea, css: '#e8edf1' },
@@ -45,17 +57,57 @@ ML.TOOLS = { plaquette: { label: 'Plaquette', color: 0xffd23f, css: '#ffd23f' },
 ML.MTYPE = { tour: 'Tour', fraiseuse: 'Fraiseuse' };
 ML.STEP = { fonderie: 'Fonderie', chaudro: 'Chaudronnerie', usinage: 'Usinage', tth: 'Traitement th.', livraison: 'Livraison' };
 
+/* Usinabilité des matières : v = vitesse d'usinage, wear = usure d'outil en plus (/s), q = bonus de qualité.
+   L'inox colle et chauffe (lent, use les plaquettes), l'alu file comme du beurre. */
+ML.MAT_USIN = { acier: { v: 1, wear: 0, q: 0 }, alu: { v: 1.3, wear: -0.3, q: 3 }, inox: { v: 0.7, wear: 0.6, q: -4 }, fonte: { v: 0.9, wear: 0.2, q: -2 }, soude: { v: 0.85, wear: 0.15, q: -2 } };
+
+/* GAMMES D'USINAGE : catalogue des opérations. mt = type de machine, tool = outil, k = durée (× PROD_SEC),
+   mg = mini-jeu quand un joueur prend les commandes d'une machine MANUELLE. */
+ML.OPS = {
+  tournage: { n: 'Tournage', ic: '🌀', mt: 'tour', tool: 'plaquette', k: 1, mg: 'chariot' },
+  gorge: { n: 'Gorge', ic: '〰️', mt: 'tour', tool: 'plaquette', k: 0.45, mg: 'chariot' },
+  percage_tour: { n: 'Perçage axial', ic: '🎯', mt: 'tour', tool: 'foret', k: 0.5, mg: 'drill' },
+  fraisage: { n: 'Fraisage', ic: '🌪️', mt: 'fraiseuse', tool: 'fraise', k: 0.9, mg: 'contour' },
+  surfacage: { n: 'Surfaçage', ic: '▭', mt: 'fraiseuse', tool: 'fraise', k: 0.6, mg: 'contour' },
+  meplat: { n: 'Méplat', ic: '◧', mt: 'fraiseuse', tool: 'fraise', k: 0.5, mg: 'contour' },
+  percage: { n: 'Perçage', ic: '📍', mt: 'fraiseuse', tool: 'foret', k: 0.5, mg: 'drill' },
+  taraudage: { n: 'Taraudage', ic: '🔩', mt: 'fraiseuse', tool: 'foret', k: 0.45, mg: 'tap' }
+};
+/* Pièces : [désignation, matière, type de la 1re machine, outil de la 1re op, gamme (ids de ML.OPS)] */
 ML.PARTS = {
-  plain: [['Arbre Ø40', 'acier', 'tour', 'plaquette'], ['Bague', 'alu', 'tour', 'plaquette'], ['Axe épaulé', 'inox', 'tour', 'plaquette'],
-          ['Bride de serrage', 'acier', 'fraiseuse', 'fraise'], ['Platine percée', 'alu', 'fraiseuse', 'foret'], ['Équerre', 'inox', 'fraiseuse', 'foret']],
-  fonderie: [['Corps de vanne', 'fonte', 'fraiseuse', 'fraise'], ['Moyeu fonte', 'fonte', 'tour', 'plaquette']],
-  chaudro: [['Bâti mécano-soudé', 'soude', 'fraiseuse', 'foret'], ['Embase soudée', 'soude', 'fraiseuse', 'fraise']],
-  tth: [['Arbre traité', 'acier', 'tour', 'plaquette'], ['Pignon traité', 'acier', 'fraiseuse', 'fraise']]
+  plain: [['Arbre Ø40', 'acier', 'tour', 'plaquette', ['tournage']], ['Bague', 'alu', 'tour', 'plaquette', ['tournage', 'percage_tour']], ['Axe épaulé', 'inox', 'tour', 'plaquette', ['tournage', 'meplat', 'percage']],
+          ['Bride de serrage', 'acier', 'fraiseuse', 'fraise', ['surfacage', 'percage']], ['Platine percée', 'alu', 'fraiseuse', 'foret', ['percage', 'taraudage']], ['Équerre', 'inox', 'fraiseuse', 'fraise', ['fraisage', 'percage']],
+          ['Entretoise', 'acier', 'tour', 'plaquette', ['tournage', 'gorge']], ['Cale usinée', 'alu', 'fraiseuse', 'fraise', ['surfacage']]],
+  fonderie: [['Corps de vanne', 'fonte', 'fraiseuse', 'fraise', ['surfacage', 'percage', 'taraudage']], ['Moyeu fonte', 'fonte', 'tour', 'plaquette', ['tournage', 'percage_tour']]],
+  chaudro: [['Bâti mécano-soudé', 'soude', 'fraiseuse', 'fraise', ['surfacage', 'percage']], ['Embase soudée', 'soude', 'fraiseuse', 'fraise', ['fraisage']]],
+  tth: [['Arbre traité', 'acier', 'tour', 'plaquette', ['tournage', 'gorge']], ['Pignon traité', 'acier', 'tour', 'plaquette', ['tournage', 'fraisage']]]
+};
+/* Outils de gamme partagés (hôte, HUD, BE, mini-jeux) */
+ML.Routing = {
+  /** Gamme d'une pièce : depuis le n-uplet, sinon par son nom, sinon une op par défaut (type + outil) */
+  of(part, mtype, tool) {
+    if (Array.isArray(part)) { if (Array.isArray(part[4])) return part[4].slice(); mtype = part[2]; tool = part[3]; part = part[0]; }
+    for (const k in ML.PARTS) for (const p of ML.PARTS[k]) if (p[0] === part && Array.isArray(p[4])) return p[4].slice();
+    for (const id in ML.OPS) if (ML.OPS[id].mt === mtype && ML.OPS[id].tool === tool) return [id];
+    return [mtype === 'fraiseuse' ? 'fraisage' : 'tournage'];
+  },
+  /** Grosses pièces : on ne balade pas 300 kg dans l'atelier → seulement les ops du 1er type de machine.
+      types (facultatif) : types de machines disponibles → les ops impossibles sautent (dépannage). */
+  fit(ops, size, types) {
+    let out = (ops || []).filter(id => ML.OPS[id]);
+    if (!out.length) out = ['tournage'];
+    if (size === 'l') out = out.filter(id => ML.OPS[id].mt === ML.OPS[out[0]].mt);
+    if (types) { const t = out.filter(id => types[ML.OPS[id].mt]); if (t.length) out = t; }
+    return out;
+  },
+  label: ops => (ops || []).map(id => (ML.OPS[id] ? ML.OPS[id].n : id)).join(' → '),
+  /** Qualité 0–100 → étoiles et mot */
+  grade: q => (q === null || q === undefined ? { s: '☆☆☆', w: 'pas encore usinée', k: 'na' } : q >= 82 ? { s: '★★★', w: 'excellente', k: 'top' } : q >= 55 ? { s: '★★☆', w: 'bonne', k: 'ok' } : q >= 40 ? { s: '★☆☆', w: 'limite', k: 'lim' } : { s: '✖', w: 'REBUT', k: 'nc' })
 };
 /* Cotes pour le contrôle au pied à coulisse : [désignation, nominal, tolérance] */
 ML.COTES = [['Ø extérieur', 40, 0.05], ['Longueur', 120, 0.1], ['Alésage', 25, 0.02], ['Épaisseur', 12, 0.05], ['Entraxe', 64, 0.03]];
 
-/* Postes de l'atelier. Au départ : T1 + F1. Les autres s'achètent au PC (T3/F3 : après l'agrandissement). */
+/* Postes de l'atelier. Les deux derniers s'achètent en campagne. */
 ML.MACHINES = [
   { id: 'T1', type: 'tour', name: 'Tour CN', x: -12, z: -6, len: 4 },
   { id: 'T2', type: 'tour', name: 'Tour CN', x: -4, z: -6, len: 4 },
@@ -65,7 +117,6 @@ ML.MACHINES = [
   { id: 'F3', type: 'fraiseuse', name: 'Fraiseuse CN', x: 4, z: 4, upgrade: 'machine_F3' }
 ];
 ML.OPERATORS = ['amaury', 'marius', 'matis', 'brieuc'];
-ML.MACHINE_ORDER = ['T1', 'F1', 'T2', 'F2', 'T3', 'F3'];
 
 /* Entreprises : taille du bâtiment, métier. La POSITION est tirée au hasard à chaque partie (citygen.js). */
 ML.COMPANIES = {
@@ -78,32 +129,43 @@ ML.COMPANIES = {
   tth: { name: 'TTH Ouest', sub: 'Sous-traitant — traitement thermique', kind: 'tth', npc: 'maurseau', w: 20, d: 16, h: 8, wall: 'beton', color: 0xc0392b, roof: 0x641e16 },
   aerotech: { name: 'AéroTech', sub: 'Client', kind: 'client', npc: 'vasseur', w: 24, d: 16, h: 10, wall: 'beton', color: 0xdfe6e9, roof: 0x0984e3 },
   agrimeca: { name: 'AgriMéca', sub: 'Client', kind: 'client', npc: 'moreau', w: 24, d: 18, h: 9, wall: 'tole', color: 0x6ab04c, roof: 0x1e5631 },
-  novatics: { name: 'Novatics', sub: 'Client', kind: 'client', npc: 'novatics', w: 22, d: 16, h: 11, wall: 'beton', color: 0x2d3e50, roof: 0x00a8e8, unlockRep: 55 },
-  ublo: { name: 'Ublo', sub: 'Client', kind: 'client', npc: 'ublo', w: 20, d: 16, h: 9, wall: 'beton', color: 0xfdf2e9, roof: 0xff6f61, unlockRep: 70 },
+  novatics: { name: 'Novatics', sub: 'Client', kind: 'client', npc: 'novatics', w: 22, d: 16, h: 11, wall: 'beton', color: 0x2d3e50, roof: 0x00a8e8, unlock: 2 },
+  ublo: { name: 'Ublo', sub: 'Client', kind: 'client', npc: 'ublo', w: 20, d: 16, h: 9, wall: 'beton', color: 0xfdf2e9, roof: 0xff6f61, unlock: 3 },
   casse: { name: 'Casse Auto Jacquot', sub: 'Attention au chien !', kind: 'casse', npc: null, w: 22, d: 18, h: 4, wall: 'tole', color: 0x7f6a55, roof: 0x4b3b2a },
   usiflash: { name: 'UsiFlash', sub: 'Concurrent (louche)', kind: 'concurrent', npc: 'kevin', w: 20, d: 14, h: 7, wall: 'tole', color: 0xa29bfe, roof: 0x6c5ce7 },
-  police: { name: 'Gendarmerie', sub: 'Brigade routière', kind: 'police', npc: null, w: 16, d: 12, h: 7, wall: 'beton', color: 0xecf0f1, roof: 0x1f3a93 },
-  concession: { name: 'Garage Pasquier', sub: 'Concessionnaire — véhicules neufs et d\'occasion', kind: 'concession', npc: 'vendeur', w: 22, d: 14, h: 7, wall: 'beton', color: 0xf5f6fa, roof: 0xc0392b },
-  part: { name: 'Particulier', sub: 'Client au comptoir', kind: 'particulier', npc: null, virtual: true, w: 1, d: 1, h: 1, wall: 'beton', color: 0xffffff, roof: 0xe84393 }
+  concession: { name: 'Garage Pasquier', sub: 'Concessionnaire — véhicules neufs et d\'occasion', kind: 'concession', npc: 'vendeur', w: 22, d: 14, h: 7, wall: 'beton', color: 0xf5f6fa, roof: 0xc0392b },   // V4.0 (portage)
+  carriere: { name: 'Carrière du Bec', sub: 'Client — granit (sur le plateau)', kind: 'client', npc: 'roudaut', w: 26, d: 18, h: 9, wall: 'tole', color: 0xb9b4ab, roof: 0x8a5a3c, plateau: true },
+  barrage: { name: 'Barrage de Kerlebec', sub: 'Client — hydroélectricité (sur le plateau)', kind: 'client', npc: 'yvonne', w: 22, d: 16, h: 10, wall: 'beton', color: 0xdfe6e9, roof: 0x2a7fa8, plateau: true },
+  police: { name: 'Gendarmerie', sub: 'Brigade routière', kind: 'police', npc: null, w: 16, d: 12, h: 7, wall: 'beton', color: 0xecf0f1, roof: 0x1f3a93 }
 };
-ML.CLIENTS = ['aerotech', 'agrimeca', 'novatics', 'ublo'];
+ML.CLIENTS = ['aerotech', 'agrimeca', 'novatics', 'ublo', 'carriere', 'barrage'];
+/* PARTICULIERS (V4.0, portage) : clients de passage qui viennent à pied au COMPTOIR de l'atelier (près de la porte)
+   commander une petite pièce urgente, bien payée. Pseudo-entreprise « part » NON énumérable : COMP.part.name marche
+   partout, mais le générateur de ville (Object.keys) ne lui construit pas de bâtiment. Logique : sim_roles.js (fin). */
+Object.defineProperty(ML.COMPANIES, 'part', { enumerable: false, value: { name: 'Particulier', sub: 'Client au comptoir', kind: 'particulier', npc: null, virtual: true, w: 1, d: 1, h: 1, wall: 'beton', color: 0xffffff, roof: 0xe84393 } });
+ML.PARTICULIERS = ['part1', 'part2', 'part3', 'part4'];
+/* Pièces demandées : [désignation, matière, type de machine, outil, gamme] */
+ML.PART_REQ = [['Axe de remorque', 'acier', 'tour', 'plaquette', ['tournage']], ['Bague de tracteur', 'alu', 'tour', 'plaquette', ['tournage', 'percage_tour']],
+  ['Entretoise de moto', 'alu', 'tour', 'plaquette', ['tournage']], ['Platine de portail', 'acier', 'fraiseuse', 'foret', ['percage']],
+  ['Patte de fixation', 'inox', 'fraiseuse', 'foret', ['percage', 'taraudage']], ['Came de tondeuse', 'acier', 'fraiseuse', 'fraise', ['fraisage']]];
+/* every : délai entre deux particuliers (s) · wait : patience au comptoir · dur : délai de la pièce · mult : prix × (pièce urgente) */
+ML.PARTI = { every: [150, 230], firstAt: [60, 110], wait: 90, dur: 260, mult: 2.2, price: 140, max: 2 };
 
 /* Véhicules de l'atelier (kind) */
 ML.VEHICLES = {
-  megane: { name: 'la Méga Mégane', color: 0xf4c430, seats: 3 }, kangoo: { name: 'le vieux Kangoo', color: 0xecf0f1, seats: 3 },
+  megane: { name: 'la Méga Mégane', color: 0xf4c430, seats: 3 }, kangoo: { name: 'le Kangoo de Lebec', color: 0xecf0f1, seats: 3 },
   ducato: { name: 'le Ducato', color: 0x95a5a6, seats: 3 }, tp: { name: 'le transpalette', color: 0xe67e22, seats: 0 },
   fenwick: { name: 'le fenwick', color: 0xf39c12, seats: 0, role: 'cariste' }, camion: { name: 'le camion', color: 0x2c6fbb, seats: 1, role: 'livreur' }
 };
 ML.RACE_COLORS = [0xf4c430, 0xe74c3c, 0x3498db, 0x2ecc71, 0x9b59b6, 0xe67e22];
 ML.EMOTES = ['👋', '👍', '😂', '😡', '💤', '🙏'];
-/* Campagne : pas de nombre de jours fixe. L'inspecteur vient quand l'atelier est prêt
-   (5 machines et réputation 60), ou au plus tard au jour 14. Réussir l'inspection = jeu terminé. */
-ML.CAMPAIGN = { inspMach: 5, inspRep: 60, inspLate: 14, retry: 2 };
+/* Campagne : 5 journées, la dernière = inspection (boss) */
+ML.CAMPAIGN = { days: 5, bossDay: 5 };
 
 /* Trouvailles (6 par partie) */
 ML.FINDS = {
   pelle_or: { name: "Pelle d'or", desc: 'Lebec calmé pendant 2 min', color: 0xffd700 },
-  pied_coulisse: { name: 'Pied à coulisse de Lebec', desc: 'Revendu 120 € à un collectionneur', color: 0xbdc3c7 },
+  pied_coulisse: { name: 'Pied à coulisse de Lebec', desc: '+25 points', color: 0xbdc3c7 },
   croissant: { name: 'Croissant légendaire', desc: 'Opérateurs ×1,5 pendant 60 s', color: 0xe1a95f },
   plaquettes: { name: 'Boîte de plaquettes oubliée', desc: '+4 plaquettes', color: 0xffd23f },
   barres: { name: "Barres tombées d'un camion", desc: '+2 alu, +2 inox', color: 0xdfe5ea },
@@ -119,7 +181,7 @@ ML.HUMEURS = {
   mal_dormi: { name: 'Lebec a mal dormi', desc: 'Sa colère monte deux fois plus vite.', anger: 2 },
   bonne_humeur: { name: 'Lebec est de bonne humeur', desc: 'Colère divisée par deux, et croissants pour Matis !', anger: 0.5 },
   reforme: { name: 'Lebec a lu la dernière réforme', desc: 'Il fait des tirades aux opérateurs (qui s\'arrêtent pour l\'écouter).' },
-  rendement: { name: 'Lebec veut du rendement', desc: 'Gains ×1,25 mais tickets plus courts.', points: 1.25, dur: 0.85 },
+  rendement: { name: 'Lebec veut du rendement', desc: 'Points ×1,25 mais tickets plus courts.', points: 1.25, dur: 0.85 },
   lunettes: { name: 'Lebec a perdu ses lunettes', desc: 'Il ne voit les bêtises que de près.', sight: 9 },
   dos: { name: 'Lebec a mal au dos', desc: 'Il court beaucoup moins vite avec sa pelle.', run: 4.2 }
 };
@@ -157,10 +219,6 @@ ML.ACH = {
   dry: ['Panne sèche', 'Tomber en panne d\'essence', 20],
   blow: ['Coup de vent', 'Souffler un collègue avec la soufflette', 15],
   served10: ['Stakhanoviste', 'Livrer 10 caisses en une journée (équipe)', 50],
-  rich: ['Patron du CAC 40', 'Avoir 10 000 € en caisse', 80],
-  full: ['Usine à gaz', 'Posséder les 6 machines', 60],
-  part3: ['Service client', 'Servir 3 particuliers en une journée', 40],
-  game_won: ['Fin du poly', 'Terminer la campagne (avis favorable de l\'inspecteur)', 200],
   inspection: ['Avis favorable', 'Réussir une journée d\'inspection', 80],
   traitor_win: ['Taupe parfaite', 'Gagner en traître sans être démasqué', 60]
 };
@@ -192,134 +250,67 @@ ML.SHOP = {
 ML.SKINS = [0xf0c8a0, 0xe2b48c, 0xc68642, 0x8d5524, 0x5b3a29];
 ML.HAIRS = [0x3b2a1a, 0xe0b050, 0x111111, 0x8b5a2b, 0xa0522d, 0xbdc3c7];
 
-/* ======================= ÉCONOMIE (V4) =======================
-   Tout se compte en euros : livrer rapporte, acheter / embaucher / les
-   salaires et les amendes coûtent. Les prix ci-dessous équilibrent une
-   campagne d'environ 1 h 30 jusqu'à l'inspecteur. */
-ML.ECO = {
-  startMoney: 900, freeMoney: 1500, startRep: 40, bankrupt: -2000,     // sous −2 000 € le soir : faillite
-  // moins on est de joueurs, plus les pièces rapportent et plus on a de temps (index = nb de joueurs − 1)
-  playerPay: [1.6, 1.25, 1.1, 1], playerTime: [1.35, 1.15, 1.05, 1], playerChaos: [0.55, 0.75, 0.9, 1],
-  order: { base: 125, perStep: 65, far: 30, ctl: 15 },        // prix d'une commande (avant taille, réputation, délai)
-  size: { s: 0.8, m: 1, l: 1.8 },
-  part: { mult: 2.6, dur: 240, wait: 90, every: [150, 230] },   // particuliers (pièces urgentes)
-  propLife: 120,                                                // une demande non acceptée au PC expire
-  supplierDelay: [120, 180], fee: 20,                           // livraison par camion fournisseur (s, frais de port)
-  sub: { fonderie: 60, chaudro: 70, tth: 45 },                  // sous-traitance en direct
-  subPC: { fonderie: 90, chaudro: 100 }, subDelay: [100, 140],  // brut commandé au PC (livré à l'atelier)
-  coco: 70,                                                     // caisse d'outils en direct chez Outi'Pro
-  fines: { radar: 5, police: 60, ped: 30, burn: 80, audit: 40, inspect: 10, slapInsp: 30 },
-  bonus: { audit: 30, mathieu: 10, fred: 10, herve: 20 },
-  rep: { ok: 2, late: 1, fail: 3, expire: 1, part: 3, partFail: 3, audit: 3 },
-  stars: [100, 350, 700]                                        // bénéfice du jour pour 1, 2, 3 étoiles (× nb joueurs, machines…)
+/* Améliorations de l'atelier en campagne (budget de l'équipe) */
+ML.UPGRADES = {
+  machine_T3: { name: 'Tour supplémentaire T3 + apprenti', price: 300 },
+  machine_F3: { name: 'Fraiseuse supplémentaire F3 + apprentie', price: 300 },
+  formation: { name: "Formation des apprentis (+1 niveau, max 3)", price: 150, max: 3 },
+  grande_benne: { name: 'Rehausses de benne (6 caisses)', price: 200 },
+  ducato: { name: 'Troisième véhicule (Ducato)', price: 350 },
+  frigo: { name: 'Frigo de l\'atelier (Matis n\'a plus faim)', price: 150 },
+  cafe_pro: { name: 'Machine à café pro (sprint 90 s)', price: 100 },
+  babyfoot: { name: 'Babyfoot (pauses plus courtes)', price: 120 },
+  plantes: { name: 'Plantes vertes (+ satisfaction)', price: 80 },
+  posters: { name: 'Posters de Lebec (sa colère retombe plus vite)', price: 60 }
 };
-/* Produits commandés au PC (prix à l'unité). Tout arrive dans UN colis en réception : on l'ouvre (R) et on range.
-   lot = quantité d'une commande « automatique » (Sylvie). En direct chez Eliott : une caisse = 3 barres. */
-ML.SUPPLY = {
-  acier: { name: 'Barre ACIER', price: 12, lot: 3, from: 'aciers' }, alu: { name: 'Barre ALU', price: 16, lot: 3, from: 'aciers' },
-  inox: { name: 'Barre INOX', price: 20, lot: 3, from: 'aciers' },
-  plaquette: { name: 'Plaquette carbure', price: 15, lot: 2, from: 'outipro' }, fraise: { name: 'Fraise', price: 20, lot: 2, from: 'outipro' },
-  foret: { name: 'Foret', price: 12, lot: 2, from: 'outipro' }
-};
-ML.CART_MAX = 40;                                               // articles max dans un colis
-/* Catalogue du PC (machines, équipements, améliorations). now: effet immédiat ; sinon installé le lendemain matin. */
-ML.CATALOG = {
-  T2: { cat: 'machine', name: 'Tour CN T2', price: 1100, mach: 'T2', desc: 'Un deuxième tour. Il lui faut un opérateur (RH).' },
-  F2: { cat: 'machine', name: 'Fraiseuse CN F2', price: 1100, mach: 'F2', desc: 'Une deuxième fraiseuse.' },
-  agrandissement: { cat: 'atelier', name: "Agrandissement de l'atelier", price: 1400, desc: 'Deux emplacements de plus : T3 et F3.', now: true },
-  T3: { cat: 'machine', name: 'Tour CN T3', price: 1600, mach: 'T3', need: 'agrandissement', desc: 'Grand tour CN (après agrandissement).' },
-  F3: { cat: 'machine', name: 'Fraiseuse CN F3', price: 1600, mach: 'F3', need: 'agrandissement', desc: 'Centre d\'usinage (après agrandissement).' },
-  tp: { cat: 'equip', name: 'Transpalette', price: 250, veh: 'tp', desc: 'Déplace 4 caisses dans l\'atelier.' },
-  fenwick: { cat: 'equip', name: 'Fenwick', price: 1200, veh: 'fenwick', desc: 'Indispensable pour les GROSSES pièces (rôle cariste).' },
-  erp_auto: { cat: 'atelier', name: 'Logiciel ERP+ (acceptation auto)', price: 450, desc: 'Les demandes des clients sont acceptées toutes seules.', now: true },
-  isolation: { cat: 'atelier', name: 'Isolation du bâtiment', price: 500, desc: 'Moins de flaques par temps de pluie, opérateurs +5 %.', now: true },
-  eclairage: { cat: 'atelier', name: 'Éclairage LED', price: 400, desc: 'Opérateurs +8 % (et on y voit enfin le soir).', now: true },
-  formation: { cat: 'atelier', name: 'Formation des apprentis (+1 niveau)', price: 150, max: 3, desc: 'Les apprentis vont plus vite (max 3).', now: true },
-  grande_benne: { cat: 'atelier', name: 'Rehausses de benne', price: 200, desc: 'Mégane et Ducato : 6 caisses.', now: true },
-  cafe_pro: { cat: 'deco', name: 'Machine à café pro', price: 100, desc: 'Sprint 90 s au lieu de 40.' },
-  frigo: { cat: 'deco', name: "Frigo de l'atelier", price: 150, desc: 'Viennoiseries sur place, Matis n\'a plus faim.' },
-  babyfoot: { cat: 'deco', name: 'Babyfoot', price: 120, desc: 'Pauses plus courtes.' },
-  plantes: { cat: 'deco', name: 'Plantes vertes', price: 80, desc: 'Clients plus satisfaits.' },
-  posters: { cat: 'deco', name: 'Posters de Lebec', price: 60, desc: 'Sa colère retombe plus vite.' },
-  antipigeon: { cat: 'abo', name: 'Abonnement Pigeon-Stop', price: 60, daily: 25, desc: 'Filets + effaroucheur : plus aucun pigeon ne vole de plaquettes. 25 €/jour, résiliable.', now: true }
-};
-/* Personnel : embauche (une fois) + salaire (chaque soir) */
-ML.STAFF = {
-  amaury: { hire: 120, pay: 70, desc: 'Tête en l\'air : oublie ce qu\'il usine.' },
-  marius: { hire: 160, pay: 90, desc: 'Robot infatigable… accepte même le mauvais outil.' },
-  matis: { hire: 120, pay: 70, desc: 'Ralentit quand il a faim (viennoiseries : +40 %).' },
-  brieuc: { hire: 140, pay: 80, desc: 'Très rapide, mais « Flemme. » (une claque le relance).' },
-  app1: { hire: 40, pay: 30, desc: 'Apprenti : lent, progresse avec la formation.' }, app2: { hire: 40, pay: 30, desc: 'Apprentie : lente, progresse avec la formation.' },
-  app3: { hire: 40, pay: 30, desc: 'Apprenti : lent, progresse avec la formation.' }, app4: { hire: 40, pay: 30, desc: 'Apprentie : lente, progresse avec la formation.' },
-  app5: { hire: 40, pay: 30, desc: 'Apprenti : lent, progresse avec la formation.' }
-};
-ML.AI_STAFF = {
-  cariste: { npc: 'tony', name: 'Tony, cariste (IA)', hire: 150, pay: 80, desc: 'Charge tout seul les palettes du quai dans le camion.' },
-  livreur: { npc: 'jojo', name: 'Jojo, livreur (IA)', hire: 150, pay: 100, desc: 'Fait les tournées : livre l\'expédition, ramène ce qui attend sur les quais.' }
-};
-/* Concessionnaire (Garage Pasquier) */
-ML.DEALER = {
-  megane: { name: 'Méga Mégane (tunée)', price: 900, desc: 'Rapide, benne de 4 caisses, 3 places.' },
-  ducato: { name: 'Ducato', price: 1400, desc: 'Grosse benne (6 caisses), stable.' },
-  camion: { name: 'Camion plateau (poids lourd)', price: 2600, desc: 'Palettes ET caisses, rapide et stable (rôle livreur).' }
-};
-/* Pièces urgentes demandées par les particuliers */
-ML.PART_REQ = [['Axe de remorque', 'acier', 'tour', 'plaquette'], ['Bague de tracteur', 'alu', 'tour', 'plaquette'], ['Entretoise de moto', 'alu', 'tour', 'plaquette'],
-  ['Platine de portail', 'acier', 'fraiseuse', 'foret'], ['Patte de fixation', 'inox', 'fraiseuse', 'foret'], ['Came de tondeuse', 'acier', 'fraiseuse', 'fraise']];
-ML.PARTICULIERS = ['part1', 'part2', 'part3', 'part4'];
 ML.APPRENTIS = [['Kylian', 0x2980b9], ['Lilou', 0xe84393], ['Enzo', 0x00b894], ['Inès', 0xfdcb6e], ['Nathan', 0x6c5ce7]];
-ML.APP_IDS = ['app1', 'app2', 'app3', 'app4', 'app5'];
 
-/* Rôles (choisis au salon). Sans joueur pour un rôle, un PNJ le fait… lentement. */
-/* Difficultés : durée des tickets, cadence, chaos, colère de Lebec, dégâts, points, seuils d'étoiles */
+/* ===================== DIFFICULTÉS (portées de la V3.2, choisies au menu, cfg.game.diff) =====================
+   dur : durée des tickets · interval : temps entre deux tickets · chaos : feux / pannes / flaques / usure
+   anger : colère de Lebec quand il voit une claque · base : colère minimale · run : vitesse de Lebec
+   sight : portée de son regard · points : score (hors carrière) · stars : seuils d\'étoiles
+   events : nombre de visiteurs surprise [min, max] · pay : prix de vente (carrière) · pen : pénalités (carrière) */
 ML.DIFFS = {
-  facile: { name: 'Facile', icon: '🙂', desc: 'Tickets longs, peu de chaos, Lebec patient.', dur: 1.4, interval: 1.3, chaos: 0.5, anger: 0.6, base: 0, run: 0.9, dmg: 0.6, points: 1, stars: 0.75, events: [1, 2] },
-  normal: { name: 'Normal', icon: '😐', desc: 'L\'atelier comme d\'habitude.', dur: 1, interval: 1, chaos: 1, anger: 1, base: 0, run: 1, dmg: 1, points: 1, stars: 1, events: [2, 4] },
-  difficile: { name: 'Difficile', icon: '😤', desc: 'Tickets serrés, pannes et feux fréquents, Lebec à cran.', dur: 0.85, interval: 0.85, chaos: 1.5, anger: 1.3, base: 10, run: 1.08, dmg: 1.25, points: 1.2, stars: 1.1, events: [3, 4] },
-  feu: { name: 'LEBEC EN FEU', icon: '🔥', desc: 'Tout brûle. Lebec voit tout, court vite et cogne fort. Points ×1,5.', dur: 0.75, interval: 0.7, chaos: 2.2, anger: 1.8, base: 25, run: 1.18, dmg: 1.5, points: 1.5, stars: 1.2, events: [4, 5], sight: 1.6 }
+  facile: { name: 'Facile', icon: '🙂', desc: 'Tickets longs, peu de chaos, Lebec patient, pénalités divisées par deux.', dur: 1.4, interval: 1.3, chaos: 0.5, anger: 0.6, base: 0, run: 0.9, points: 1, stars: 0.75, events: [1, 2], pay: 1, pen: 0.5, dmg: 0.6 },
+  normal: { name: 'Normal', icon: '😐', desc: 'L\'atelier comme d\'habitude.', dur: 1, interval: 1, chaos: 1, anger: 1, base: 0, run: 1, points: 1, stars: 1, events: [2, 4], pay: 1, pen: 1 },
+  difficile: { name: 'Difficile', icon: '😤', desc: 'Tickets serrés, pannes et feux fréquents, Lebec à cran. Pièces payées +10 %.', dur: 0.85, interval: 0.85, chaos: 1.5, anger: 1.3, base: 10, run: 1.08, points: 1.2, stars: 1.1, events: [3, 4], pay: 1.1, pen: 1.3, dmg: 1.25 },
+  feu: { name: 'LEBEC EN FEU', icon: '🔥', desc: 'Tout brûle. Lebec voit tout, court vite et cogne fort. Points ×1,5, pièces payées +25 %, pénalités salées.', dur: 0.75, interval: 0.7, chaos: 2.2, anger: 1.8, base: 25, run: 1.18, points: 1.5, stars: 1.2, events: [4, 5], sight: 1.6, pay: 1.25, pen: 1.6, dmg: 1.6 }
 };
+/* Astuces affichées au menu (guide, partie solo, salon) */
 ML.TIPS = [
   'Regarde la couleur du ticket : plus la barre est rouge, plus c\'est urgent.',
   'Un outil lancé (clic droit) à un usineur qui l\'attend, il l\'attrape au vol !',
   'Les caisses se lancent aussi dans la benne de la Mégane. Gain de temps garanti.',
-  'Contrôle tes caisses au MARBRE (pied à coulisse) : +5 points et pas de refus client.',
-  'Matis ralentit quand il a faim : une viennoiserie de chez Mimi et il repart à +40 %.',
-  'Brieuc ne repart qu\'avec une claque… mais Lebec n\'aime pas la violence dans SON atelier.',
+  'Contrôle tes pièces au MARBRE : une pièce non conforme repérée à temps, c\'est un client content.',
+  'Carrière : tout se gère au PC du BE (LebecOS 95) — devis, machines, matière, embauches, travaux.',
+  'Une machine achetée arrive EN CAISSE : fenwick ou transpalette (R), puis E pour l\'installer.',
+  'Machine manuelle (vieux tour) : prends les commandes toi-même, c\'est un mini-jeu et c\'est plus rapide.',
+  'La route en corniche est plus courte… et plus dangereuse. Les clients du plateau paient mieux.',
+  'Matis ralentit quand il a faim : une viennoiserie et il repart.',
   'Sors de l\'atelier pour mettre une claque : Lebec ne voit que ce qui s\'y passe.',
   'Un bac à copeaux plein bloque la machine : appelle la maintenance (T = ping).',
-  'Les GROSSES commandes n\'arrivent qu\'une fois le fenwick et le camion plateau achetés.',
-  'Le chien de la casse adore les viennoiseries. Une lancée, et il dort 60 s.',
   'Le pigeon vole les plaquettes : lance-lui n\'importe quoi pour qu\'il la lâche.',
-  'Radars à 60 km/h en ville, 90 sur la rocade. La gendarmerie surveille sa brigade.',
-  'Touche M : la carte complète, avec les objectifs. Clic = repère pour toute l\'équipe.',
-  'Les GROSSES pièces : seul le cariste (fenwick) puis le livreur (camion) peuvent s\'en occuper.',
+  'Radars en ville, gendarmerie, prison : les amendes sont à TON nom dans la compta.',
+  'Touche M : la carte complète. Clic = repère pour toute l\'équipe.',
   'KO ? Pas de panique : le médecin (ou le Docteur Gwenn, un peu lent) va venir.',
+  'En virage, les caisses tombent de la benne. Ralentis… ou rattrape-les.',
   'L\'huile soluble fait glisser : la soufflette sèche les flaques.',
-  'Les caisses ne tombent de la benne qu\'en cas de choc contre le décor au-delà de 70 km/h.',
-  'Il reste des trouvailles cachées en ville : la Pelle d\'or calme Lebec pendant 2 minutes.',
-  'Passager de la Mégane ? Tu peux lancer des objets depuis la voiture.',
-  'Hervé bloque l\'armoire ? Imprimante → signature de Lebec → retour à Hervé.',
+  'Multijoueur : un pote peut rejoindre le salon même quand la journée a commencé (jusqu\'à 6).',
+  'F1 : l\'aide de Lebec. Tab : les commandes. K : couper le son.',
   '« C\'est écrit dans le poly ! » — François Lebec, tous les jours depuis 1987.',
-  'Les demandes des clients arrivent au 💻 PC de gestion (bureau) : si personne ne les accepte, elles expirent.',
-  'Au PC, prévois la machine de chaque commande : l\'opérateur sait quoi faire en premier.',
-  'Un seul opérateur pour deux machines ? Il court de l\'une à l\'autre. Embauche dès que tu peux !',
-  'Les particuliers au comptoir paient bien plus cher. Ne les fais pas attendre !',
-  'Le magasinier paie la matière au même prix que le PC, sans frais de port et sans attendre le camion.',
-  'Un colis arrivé en réception : R pour l\'ouvrir (tout tombe par terre), puis E sur le rack ou l\'armoire avec les produits en main pour les ranger.',
-  'Touche M : clique sur la carte pour poser un repère, le trajet s\'affiche comme un GPS.',
-  'Un café et tu cours BEAUCOUP plus vite pendant une minute.',
-  'Seul, chaque pièce rapporte plus et les délais sont plus longs : prends ton temps !',
-  'Les salaires tombent le soir : garde toujours un peu d\'argent en caisse.',
-  'Le Garage Pasquier vend la Méga Mégane, le Ducato et le camion plateau. Le vieux Kangoo, lui, tient avec du scotch.',
-  'Campagne : note bien le CODE de sauvegarde. Avec lui, n\'importe qui peut reprendre l\'atelier.',
-  'Jojo le livreur (à embaucher au PC) part en tournée tout seul dès qu\'il y a des caisses à l\'expédition.'
+  'Un particulier au COMPTOIR (près de la porte) ? E pour prendre sa commande : petite pièce urgente, bien payée. Ne le fais pas attendre !',
+  'Un colis livré : R pour l\'ouvrir (tout tombe par terre), puis E sur le rack ou l\'armoire avec les produits en main pour les ranger.',
+  'Touche M : clique sur la carte pour poser un repère, le trajet s\'affiche comme un GPS. Une caisse à livrer en main ? Le GPS te guide tout seul.',
+  'Un café et tu vas BEAUCOUP plus vite pendant une minute.',
+  'Les caisses se lancent aussi sur le plateau du camion (clic droit).'
 ];
 
+/* Rôles (choisis au salon). Sans joueur pour un rôle, un PNJ le fait… lentement. */
 ML.ROLES = {
   poly: { name: 'Polyvalent', icon: '🛠️', color: 0x7f8c8d, css: '#95a5a6', desc: 'Usine, transporte et livre les petites et moyennes pièces. Plusieurs joueurs peuvent l\'être.' },
   medecin: { name: 'Médecin', icon: '⛑️', color: 0xe74c3c, css: '#e74c3c', desc: 'Seul à pouvoir soigner les blessés (E sur un collègue).', npc: 'docteur' },
-  cariste: { name: 'Cariste', icon: '🚜', color: 0xf39c12, css: '#f39c12', desc: 'Seul habilité au FENWICK (à acheter au PC) : déplace les grosses pièces (R : fourches).', npc: 'momo' },
-  livreur: { name: 'Livreur', icon: '🚚', color: 0x3498db, css: '#3498db', desc: 'Seul habilité au CAMION plateau (Garage Pasquier) : livre palettes et caisses (R : décharger chez le client).', npc: 'momo' },
+  cariste: { name: 'Cariste', icon: '🚜', color: 0xf39c12, css: '#f39c12', desc: 'Seul habilité au FENWICK : déplace les grosses pièces (R : fourches).', npc: 'momo' },
+  livreur: { name: 'Livreur', icon: '🚚', color: 0x3498db, css: '#3498db', desc: 'Seul habilité au CAMION : livre les grosses pièces (R : décharger chez le client).', npc: 'momo' },
   maintenance: { name: 'Maintenance', icon: '🔧', color: 0x27ae60, css: '#27ae60', desc: 'Répare les pannes et vide les bacs à copeaux.', npc: 'gege' },
   magasinier: { name: 'Magasinier', icon: '📦', color: 0x9b59b6, css: '#9b59b6', desc: 'Seul à commander matière et outils chez Eliott et Coco.', npc: 'sylvie' }
 };
@@ -335,19 +326,11 @@ ML.PEOPLE = {
   amaury: { name: 'Amaury Carter', role: 'Opérateur', op: { speed: 1.0, lazy: 0.04, traits: ['forgetful'] }, look: { skin: 0xf0c8a0, shirt: 0x4e8a3e, pants: 0x34495e, hair: 0x6b4a2b, height: 1.83 } },
   marius: { name: 'Marius Challine', role: 'Opérateur', op: { speed: 1.2, lazy: 0, traits: ['robot'] }, look: { skin: 0xeac39b, shirt: 0x7f8c8d, pants: 0x2c3e50, hair: 0x222222, height: 1.86 } },
   matis: { name: 'Matis Caillou', role: 'Opérateur', op: { speed: 1.0, lazy: 0.08, traits: ['hungry'] }, look: { skin: 0xf5cfaa, shirt: 0xe67e22, pants: 0x2c3e50, hair: 0xe0b050, height: 1.72, width: 1.2 } },
-  brieuc: { name: 'Brieuc', role: 'Opérateur', op: { speed: 1.35, lazy: 0.3, traits: ['deadstop'] }, look: { skin: 0x5b3a29, shirt: 0xc0392b, pants: 0x222831, hair: 0x111111, height: 1.55, width: 1.3 } },
-  app1: { name: 'Kylian', role: 'Apprenti', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xf0c8a0, shirt: 0x2980b9, pants: 0x34495e, hair: 0x3b2a1a, height: 1.74 } },
-  app2: { name: 'Lilou', role: 'Apprentie', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xc68642, shirt: 0xe84393, pants: 0x34495e, hair: 0x111111, height: 1.66, longHair: true } },
-  app3: { name: 'Enzo', role: 'Apprenti', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xe2b48c, shirt: 0x00b894, pants: 0x34495e, hair: 0x8b5a2b, height: 1.78 } },
-  app4: { name: 'Inès', role: 'Apprentie', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0x8d5524, shirt: 0xfdcb6e, pants: 0x34495e, hair: 0x111111, height: 1.63, longHair: true } },
-  app5: { name: 'Nathan', role: 'Apprenti', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xf3cba5, shirt: 0x6c5ce7, pants: 0x34495e, hair: 0xe0b050, height: 1.81 } },
-  tony: { name: 'Tony', role: 'Cariste (embauché)', visitor: true, look: { skin: 0xd9a37a, shirt: 0xf39c12, pants: 0x2c3e50, hair: 0x222222, height: 1.8, width: 1.15 } },
-  jojo: { name: 'Jojo', role: 'Livreur (embauché)', visitor: true, look: { skin: 0xf0c8a0, shirt: 0x3498db, pants: 0x2c3e50, hair: 0x8b5a2b, height: 1.76 } },
-  vendeur: { name: 'Bernard Pasquier', role: 'Concessionnaire', look: { skin: 0xe8b98f, shirt: 0xc0392b, pants: 0x1c1c1c, hair: 0xbdc3c7, height: 1.79, width: 1.15, glasses: true } },
-  part1: { name: 'Gérard Le Floch', role: 'Agriculteur', visitor: true, look: { skin: 0xe2b48c, shirt: 0x27ae60, pants: 0x34495e, hair: 0xbdc3c7, height: 1.76, width: 1.2 } },
-  part2: { name: 'Mme Rousseau', role: 'Retraitée bricoleuse', visitor: true, look: { skin: 0xf3cba5, shirt: 0x8e44ad, pants: 0x555555, hair: 0xdddddd, height: 1.6, longHair: true, glasses: true } },
-  part3: { name: 'Jean-Mi', role: 'Motard', visitor: true, look: { skin: 0xd9a37a, shirt: 0x111111, pants: 0x1f4e9a, hair: 0x3b2a1a, height: 1.84, beard: true } },
-  part4: { name: 'Patrick', role: 'Voisin (portail cassé)', visitor: true, look: { skin: 0xf0c8a0, shirt: 0xe67e22, pants: 0x34495e, hair: 0x8b5a2b, height: 1.72, width: 1.25 } },
+  brieuc: { name: 'Brieuc', role: 'Opérateur', op: { speed: 1.35, lazy: 0.45, traits: ['deadstop'] }, look: { skin: 0x5b3a29, shirt: 0xc0392b, pants: 0x222831, hair: 0x111111, height: 1.55, width: 1.3 } },
+  app1: { name: 'Apprenti', role: 'Apprenti', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xf0c8a0, shirt: 0x2980b9, pants: 0x34495e, hair: 0x3b2a1a, height: 1.74 } },
+  app2: { name: 'Apprentie', role: 'Apprentie', op: { speed: 0.7, lazy: 0.1, traits: ['apprenti'] }, look: { skin: 0xc68642, shirt: 0xe84393, pants: 0x34495e, hair: 0x111111, height: 1.66, longHair: true } },
+  roudaut: { name: 'Roudaut', role: 'Chef de carrière', look: { skin: 0xe2b48c, shirt: 0xf28c28, pants: 0x4b5a6b, hair: 0x5a3d22, height: 1.9, width: 1.3, beard: true, helmet: 0xffc93c } },
+  yvonne: { name: 'Yvonne', role: 'Ingénieure du barrage', look: { skin: 0xf3cba5, shirt: 0x2a7fa8, pants: 0x34495e, hair: 0xb0b0b0, height: 1.68, longHair: true, glasses: true } },
   mimi: { name: 'Mimi', role: 'Boulangère', look: { skin: 0xf3cba5, shirt: 0xffffff, pants: 0x555555, hair: 0x8b5a2b, height: 1.64, longHair: true, apron: 0xf5e6c8 } },
   pompiste: { name: 'Dédé', role: 'Pompiste', look: { skin: 0xe2b48c, shirt: 0xe74c3c, pants: 0x2c3e50, hair: 0x7f8c8d, height: 1.75, cap: 0xe74c3c, mustache: true } },
   eliott: { name: 'Eliott Trit', role: "Commercial — Aciers de l'Ouest", look: { skin: 0xf2c6a0, shirt: 0xd35400, pants: 0x2c3e50, hair: 0xb5651d, height: 2.05, width: 0.9 } },
@@ -360,6 +343,12 @@ ML.PEOPLE = {
   novatics: { name: 'Accueil Novatics', role: 'Client — Novatics', look: { skin: 0xe6b48d, shirt: 0x00a8e8, pants: 0x2d3e50, hair: 0x2a2a2a, height: 1.76 } },
   ublo: { name: 'Accueil Ublo', role: 'Client — Ublo', look: { skin: 0xf0c8a0, shirt: 0xff6f61, pants: 0x34495e, hair: 0x4a3426, height: 1.7, longHair: true } },
   kevin: { name: 'Kévin', role: "Chef d'atelier — UsiFlash", look: { skin: 0xd9a37a, shirt: 0x6c5ce7, pants: 0x222222, hair: 0x111111, height: 1.77, cap: 0x111111 } },
+  vendeur: { name: 'Bernard Pasquier', role: 'Concessionnaire — Garage Pasquier', look: { skin: 0xe8b98f, shirt: 0xc0392b, pants: 0x1c1c1c, hair: 0xbdc3c7, height: 1.79, width: 1.15, glasses: true } },
+  // particuliers (V4.0, portage) : viennent au comptoir de l'atelier
+  part1: { name: 'Gérard Le Floch', role: 'Agriculteur', visitor: true, look: { skin: 0xe2b48c, shirt: 0x27ae60, pants: 0x34495e, hair: 0xbdc3c7, height: 1.76, width: 1.2 } },
+  part2: { name: 'Mme Rousseau', role: 'Retraitée bricoleuse', visitor: true, look: { skin: 0xf3cba5, shirt: 0x8e44ad, pants: 0x555555, hair: 0xdddddd, height: 1.6, longHair: true, glasses: true } },
+  part3: { name: 'Jean-Mi', role: 'Motard', visitor: true, look: { skin: 0xd9a37a, shirt: 0x111111, pants: 0x1f4e9a, hair: 0x3b2a1a, height: 1.84, beard: true } },
+  part4: { name: 'Patrick', role: 'Voisin (portail cassé)', visitor: true, look: { skin: 0xf0c8a0, shirt: 0xe67e22, pants: 0x34495e, hair: 0x8b5a2b, height: 1.72, width: 1.25 } },
   // visiteurs et événements
   jacky: { name: 'Jacky Foucher', role: 'Inspecteur Qualité', visitor: true, look: { skin: 0xe8b98f, shirt: 0xf4f4f4, pants: 0x2c3e50, hair: 0x555555, height: 1.86, tie: 0x2c3e50, glasses: true } },
   herve: { name: 'Hervé Lehec', role: 'Référent stages', visitor: true, look: { skin: 0xeec4a0, shirt: 0xbfa77a, pants: 0x4d4d4d, hair: 0x777777, height: 1.74, glasses: true } },
@@ -373,13 +362,6 @@ ML.LINES = {
   docteur: ['On ne court pas dans un atelier !', 'Respirez… Toussez… Bon, vous vivrez.', 'Encore un coup de pelle ? Je vais finir par avoir un abonnement.'],
   gege: ['Ah ben elle était bien grippée celle-là.', 'Fallait m\'appeler plus tôt !', 'Je repasse jeudi. Peut-être.'],
   momo: ['Une palette ? J\'arrive… doucement.', 'Le fenwick c\'est pas un jouet.'],
-  tony: ['Palette chargée, chef !', 'Le fenwick, c\'est tout un art.', 'Bip bip bip… je recule.'],
-  jojo: ['Je pars en tournée !', 'Livré, signé, tamponné.', 'Y\'a encore des bouchons rue Jean Jaurès…'],
-  vendeur: ['Elle a jamais roulé sous la pluie, celle-là !', 'Pour vous, je fais un prix. Enfin… presque.', 'Contrôle technique ? Il passera. Sûrement.'],
-  part1: ['Mon tracteur est en panne en pleine moisson !', 'Vous me sauvez la vie, là.'],
-  part2: ['C\'est pour ma remorque, mon défunt mari la bichonnait…', 'Merci jeune homme !'],
-  part3: ['Ma bécane démarre plus, faut que ça roule ce week-end !', 'Trop stylé, merci !'],
-  part4: ['Le portail ne ferme plus, les chiens du voisin rentrent !', 'Impeccable, merci les gars.'],
   sylvie: ['Commande passée, livraison dans la journée.', 'Il faut un bon de commande signé, hein.'],
   lebec: ["Encore une réforme de l'Éducation Nationale... on forme des usineurs en trois semaines !", "La cote c'est la cote ! Pas « à peu près » !",
           "De mon temps, le CAP c'était deux ans de lime et d'étau !", "Pas un rond pour les machines, mais des tablettes pour tout le monde !", "Qui a laissé traîner de l'huile soluble ?!"],
@@ -403,6 +385,11 @@ ML.LINES = {
   novatics: ['Bonjour ! Vous avez notre commande ?'],
   ublo: ["Salut ! C'est pour nous ?"],
   kevin: ['Chut. On ne s\'est jamais vus.', 'Une caisse de chez Lebec ? Je prends, je prends.'],
+  vendeur: ['Elle a jamais roulé sous la pluie, celle-là !', 'Pour vous, je fais un prix. Enfin… presque.', 'Contrôle technique ? Il passera. Sûrement.', 'Le Kangoo de Lebec ? Je le reprends pas, même gratuit.'],
+  part1: ['Mon tracteur est en panne en pleine moisson !', 'Vous me sauvez la vie, là.'],
+  part2: ['C\'est pour ma remorque, mon défunt mari la bichonnait…', 'Merci jeune homme !'],
+  part3: ['Ma bécane démarre plus, faut que ça roule ce week-end !', 'Trop stylé, merci !'],
+  part4: ['Le portail ne ferme plus, les chiens du voisin rentrent !', 'Impeccable, merci les gars.'],
   jacky: ['MIP/MAP irréprochable, appui plan sur la Réf A.', 'Apportez-moi une caisse au marbre. Tout de suite.'],
   herve: ['Alors, ce stage, trouvé ? Et la convention ?', "Pas de convention, pas d'outils ! C'est le règlement."],
   fred: ["Tu as pensé à l'alternance ? Penses-y... Naval Group recrute !", 'Tu as rempli Arexis ? ARÉXIS !'],
@@ -410,14 +397,22 @@ ML.LINES = {
   saboteur: ['Rien à voir, je passe.', 'Hé hé hé...'],
   inspecteur: ['Je note. Je note tout.', 'Votre référentiel de compétences, je vous prie.', 'Infraction !']
 };
-
-/* Tirage des répliques « paquet de cartes » : jamais deux fois la même tant que
-   la liste n'a pas été dite en entier. ML.line(id) = répliques, ML.line(id,'pause') = liste « pause: ». */
+/* Les listes ci-dessus sont des SECOURS : js/persos.js (chargé juste après) les remplace et en ajoute
+   des centaines (une par situation : ML.LINES[id + '_' + situation], ML.LINE_META[clé] = { o: id, sit }).
+   - ML.line(id, situation, secours) : tirage « paquet de cartes » (jamais deux fois la même tant que
+     la liste n'a pas été dite en entier). Cherche la liste du perso, puis celle de son trait (ouvriers
+     embauchés : [robot], [gourmand]…), puis [ouvrier], puis [tous], sinon `secours` (texte ou tableau).
+   - ML.redraw(texte, id) : si `texte` est une réplique connue (ou commence par une), la remplace par un
+     tirage de la même situation pour ce perso. Branché dans K.say (sim.js) et les dialogues : les
+     phrases écrites en dur ailleurs profitent ainsi des listes de persos.js. */
 (function () {
   const bags = {};
-  ML.line = (id, key, fb) => {
-    const k = key && key !== 'repliques' ? id + '_' + key : id, a = ML.LINES[k];
-    if (!a || !a.length) return Array.isArray(fb) ? fb[Math.floor(Math.random() * fb.length)] : fb;
+  ML.LINE_META = ML.LINE_META || {};
+  ML.PERSO_TRAITS = { forgetful: 'tete_en_lair', robot: 'robot', hungry: 'gourmand', deadstop: 'flemmard', apprenti: 'apprenti' };
+  const has = k => Array.isArray(ML.LINES[k]) && ML.LINES[k].length > 0;
+  const keyOf = (o, sit) => sit && sit !== 'repliques' ? o + '_' + sit : o;
+  ML.drawLine = k => {
+    const a = ML.LINES[k]; if (!a || !a.length) return undefined;
     let b = bags[k];
     if (!b || b.src !== a || !b.q.length) {
       const q = a.slice();
@@ -425,7 +420,41 @@ ML.LINES = {
       if (b && b.last && q.length > 1 && q[q.length - 1] === b.last) [q[0], q[q.length - 1]] = [q[q.length - 1], q[0]];
       b = bags[k] = { src: a, q, last: b && b.last };
     }
-    return (b.last = b.q.pop());
+    return (ML.drawLine.last = b.last = b.q.pop());
+  };
+  ML.lineChain = id => {
+    const P = id && ML.PEOPLE[id], out = [id];
+    if (P && P.op) { for (const t of P.op.traits || []) if (ML.PERSO_TRAITS[t]) out.push(ML.PERSO_TRAITS[t]); out.push('ouvrier'); }
+    out.push('tous'); return out;
+  };
+  ML.line = (id, sit, fb) => {
+    const own = keyOf(id, sit); if (has(own)) return ML.drawLine(own);
+    const rest = ML.lineChain(id).slice(1).map(o => keyOf(o, sit)).filter(has);
+    if (rest.length) return ML.drawLine(sit && sit !== 'repliques' ? rest[0] : rest[Math.floor(Math.random() * rest.length)]);
+    return Array.isArray(fb) ? fb[Math.floor(Math.random() * fb.length)] : fb;
+  };
+  let idx = null;
+  const ALIAS = { tirade: { o: 'lebec', sit: 'tirades' }, cocoBoxe: { o: 'coco', sit: 'boxe' } };
+  function build() {
+    idx = new Map();
+    for (const k in ML.LINES) {
+      const a = ML.LINES[k], meta = ML.LINE_META[k] || ALIAS[k] || { o: k, sit: null }; if (!Array.isArray(a)) continue;
+      for (const s of a) if (typeof s === 'string') { const l = idx.get(s) || []; if (!l.some(e => e.o === meta.o && e.sit === meta.sit)) l.push(meta); idx.set(s, l); }
+    }
+  }
+  function find(s, id) {
+    const c = idx.get(s); if (!c) return null;
+    const ch = id && ML.PEOPLE[id] ? ML.lineChain(id) : null, ok = ch ? c.filter(e => ch.includes(e.o)) : c;
+    return ok.find(e => e.sit) || ok[0] || null;
+  }
+  ML.lineMeta = s => { if (!idx) build(); return find(s); };      // { o, sit } d'une réplique connue, sinon null
+  ML.redraw = (s, id) => {
+    if (typeof s !== 'string' || !s || s === ML.drawLine.last) return s;
+    if (!idx) build();
+    let e = find(s, id); if (e) return ML.line(id && ML.PEOPLE[id] ? id : e.o, e.sit, s);
+    const m = s.match(/^(.+?[.!?…»])\s+(\S[\s\S]*)$/);
+    if (m && (e = find(m[1], id))) return ML.line(id && ML.PEOPLE[id] ? id : e.o, e.sit, m[1]) + ' ' + m[2];
+    return s;
   };
 })();
 

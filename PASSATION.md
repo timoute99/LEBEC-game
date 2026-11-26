@@ -1,23 +1,63 @@
-# Mécanique Lebec V4 (multijoueur) : document de passation
-
-**V4.5 (nov. 2026).** Premières répliques écrites par Timothée intégrées (fautes de frappe corrigées). Lecteur de `persos.js` plus tolérant : une ligne vide termine la liste ; ce qui suit (avec ou sans « - ») va dans les répliques du perso. Les opérateurs au travail disent une réplique toutes les 50-110 s (`n.chatT`). `K.say` et le sous-titre durent plus longtemps pour les longues phrases (la bulle au-dessus de la tête reste coupée à 46 caractères, le sous-titre montre tout).
-
-**V4.4 (nov. 2026) — personnages.** `js/persos.js` (chargé juste après `config.js`) contient `ML.PERSOS_TXT`, un texte simple que Timothée modifie sur GitHub : `[id]`, `nom:`, `rôle:` (appliqués à `ML.PEOPLE`), notes `personnalité:` / `dans le jeu:` / `idées:` (non utilisées par le jeu — **à lire quand Timothée dit « j'ai modifié persos »** et à coder), et des listes `- réplique`. Le petit lecteur en bas du fichier remplit `ML.LINES[id]` (répliques) et `ML.LINES[id + '_' + situation]` (accents retirés : `réussi` → `jacky_reussi`). Tirage : `ML.line(id, situation, secours)` dans `config.js` = paquet mélangé (pas de répétition avant d'avoir tout dit) ; si la liste manque ou si `persos.js` plante (accent grave tapé dans le texte), on retombe sur `secours` puis sur `ML.LINES` de `config.js`. Situations branchées : Lebec `tirades colere frappe poursuite pelle renverse abandon` ; opérateurs `lance pause retour reveil refus claque embauche`, Matis `miam` ; clients `merci` ; particuliers `demande merci marre` ; Coco `boxe` ; Jacky `audit reussi rate absent` ; inspecteur `infraction` ; `[tous] renverse` (secours commun). Pour une nouvelle situation : ajouter la liste dans le fichier, l'en-tête, puis l'appel `ML.line` dans le code.
-
-**V4.3 (nov. 2026) — graphismes.** `js/decor.js` : un « lot » (`Batch`) fusionne des milliers de blocs colorés (couleurs par sommet) en quelques maillages par zone de 64 m (solides + vitres ; les vitres s'allument le soir via `Decor.setNight`). Formes : box, cyl, cone, pyr, prism (toit), ball. Atelier refait (sol peint, emplacements machines rayés, charpente, pont roulant, tuyaux, fenêtres hautes, établi, rayonnage, fûts, palettes, distributeur, horloge, affiches ; dehors : bandeau vert, corniche, jardinières, clims, lanterneaux, enseigne géante + engrenage). Machines détaillées (1 maillage par machine). Entreprises : corniche, clims, auvent, porte de quai rayée. Villes : `Decor.building(f)` remplace ~68 % des immeubles KayKit par des maisons (toit, volets, jardin, nain/trampoline), boutiques (store rayé, enseigne au nom rigolo) et immeubles à balcons (linge, paraboles, plantes) ; passages piétons, bancs, abribus, bornes, sapins, fleurs, herbes, rochers. Nouvelles collisions de décor : établi, rayonnage, fûts, palettes, distributeur, jardinières, abribus. Coût mesuré : ~+5 % d'appels de dessin.
-
-**V4.1 (nov. 2026) — confort et équilibrage.** Délais ×~1,5 (`CFG.ORDER`), facteurs par nombre de joueurs `ECO.playerPay/playerTime/playerChaos` (seul : pièces ×1,6, délais ×1,35, chaos ×0,55). Café = vitesse ×1,45 (`CFG.COFFEE`). Caisses qui tombent : seulement choc contre le DÉCOR au-delà de 70 km/h (`Cars.drive` renvoie `crash`). Pigeon 2-3× moins fréquent + abonnement `antipigeon` (catalogue `cat:'abo'`, `daily` payé le soir, résiliable : op `unsub`). Les caisses se lancent (dans les bennes et sur le plateau du camion). Fournisseurs : panier côté joueur (`ERP.cart`) → op `order` → un **colis** (`type:'colis'`, `d.c` = contenu, taille s/m/l) en réception ; **R** l'ouvre (`a:'open'`, tout tombe par terre), E sur rack/armoire avec les produits en main = **ranger** (`K.store`). GPS personnel `js/gps.js` (Dijkstra sur le graphe des rues, ruban au sol, mini-carte et carte). Échap dans le PC : sort du PC sans écran Pause (`HUD.showPause(b, soft)`). Journée libre : les jours s'enchaînent avec le même atelier ; faillite sous −2 000 € (`res.bankrupt`, `E.bankrupt`). **PWA** : `manifest.webmanifest`, `sw.js` (réseau d'abord, copie hors ligne), `icons/`, bouton « Installer le jeu » (`L.initInstall`).
-
-**V4.0 (nov. 2026) — économie et gestion.** Tout se compte en euros (`S.money`, `K.money/spend/fine/bonus`, `S.today` = CA, achats, invest, amendes, primes, salaires). L'**entreprise** (`js/company.js`, `ML.Company`) = ce qui dure d'un jour à l'autre : argent, réputation, machines possédées `mach`, personnel `staff` (opérateurs + apprentis app1..app5), personnel IA `ai` (cariste Tony, livreur Jojo), véhicules `veh`, améliorations `up`, stock, jour, inspection. Elle arrive dans `cfg.game.E` (avec `city` = graine de ville fixe pour la campagne) ; hors campagne, `L.freeCfg` crée un petit atelier de départ avec 1 500 €. Départ : T1 + F1, UN opérateur qui jongle entre les machines (`K.assignOps`, `n.mids`), le vieux Kangoo (2 caisses, poussif). Les demandes des clients arrivent au **PC de gestion** (`S.props`, à accepter → `K.accept`, ou automatique avec l'ERP+) ; `js/erp.js` = fenêtre à onglets (commandes + machine prévue `o.plan`, catalogue `ML.CATALOG`, fournisseurs `ML.SUPPLY` livrés par camion `S.deliv`, personnel `ML.STAFF`/`ML.AI_STAFF`, bilan). `js/sim_eco.js` : intentions `erp` (accept/refuse/plan/buy/supply/subpc/hire/fire), particuliers (parking clients + comptoir, `S.parts`, intention `part`), concessionnaire Garage Pasquier (`ML.DEALER`, intention `buycar`), Tony et Jojo (tournées `K.tour`). Difficulté progressive : `K.lvl` (machines, réputation, jour) règle cadence, types de commandes, chaos et nombre d'événements. Camion plateau : 8 places (palette = 4, caisse = 1 : `K.bedFree`). Campagne sans fin de jours : l'inspecteur vient quand 5 machines + réputation 60 (ou au jour 14) ; avis favorable = `res.won`, jeu terminé (on peut continuer). **Sauvegarde serveur** : `{t:'camp', op:'create'|'load'|'put'}` → `{t:'campr'}`, code de 6 caractères, fichier `lebec-saves.json` (même dépôt GitHub privé que les comptes, ou `server/data/saves.json`) ; l'hôte sauvegarde toutes les 60 s et le soir (`ML.Camp`). **Drop-in** : on peut rejoindre un salon en cours (`start` avec `late:true`, `Sim.addPlayer`) ; **migration** : si l'hôte part en campagne, le nouvel hôte recharge la dernière sauvegarde et relance la journée. 6 joueurs max. Relais des intentions : la clé d'action voyage dans `kk` (le champ `k` est le type du message ; avant V4, `k` écrasé cassait le klaxon des invités).
-
+# Mécanique Lebec V3 (multijoueur) : document de passation
 
 V3 (nov. 2026) : rôles + vie/KO + PNJ de secours (`js/sim_roles.js`, enregistré AVANT chaos/city/events pour pouvoir refuser une action), pièces 3 tailles + fenwick/camion, bacs à copeaux, passagers (`car.pass`, `P.ride`), carte plein écran (`HUD.toggleMap`), personnalisation avec aperçu 3D (`ML.Main.preview`), ville refaite (`citygen.js` : rocade en U, avenues, rues greffées en T, impasses `node.cul`, lotissements, noms de rues `city.labels`), passants (`f.ps`) et chien de la casse (`f.dog`). Rôles transmis par relais `{k:'role'}` dans le salon, figés par l'hôte dans `cfg.roles`. Profil : `look` accepte aussi suit, height, width, beard, glasses (whitelist serveur).
 
 
 Pour reprendre le projet sans contexte. Utilisateur francophone, étudiant BUT GMP : texte du jeu et commentaires en français, rendu soigné, vérifier avant de livrer. Style voulu : chaos 4/5, simple à comprendre.
 
+
+
+## V5 — CARRIÈRE « SIMULATOR » (nov. 2026) : à lire en premier
+Conception et contrats d'API : **docs/V5-CONCEPTION.md**. Résumé :
+- **Carrière sans fin** (`career.js`, `sim_career.js`) : on part du Hangar Pourri (un tour de 1974, un apprenti) → 5 niveaux d'atelier + 6 pièces (BE, stock, pause, vestiaires, métrologie, quai). Argent, réputation, devis, contrats, salaires, loyer, électricité, faillite, objectifs (`ML.CAREER.GOALS`), durée des journées réglable (8–20 min).
+- **PC du BE** (`be.js`, LebecOS 95) : devis, catalogue machines, matière, personnel (embaucher / affecter / licencier), travaux, compta + **historique des dépenses** (amendes par joueur), objectifs, réglages.
+- **Machines déplaçables** (`sim_build.js`, API dans `world_atelier.js`) : livrées en caisse, fenwick/transpalette (R), installation E (fantôme vert/rouge), désinstallation à la clé.
+- **Production** (`sim.js`, `ML.OPS`/`ML.Routing` dans config.js) : gammes 1–3 opérations, pièces « en cours », machines manuelles à piloter (mini-jeux 3D), CN avec réglage par référence, qualité ★–★★★, rebuts au marbre.
+- **Mini-jeux 3D** (`minigames3d.js`, `ML.Mini3D`) : chariotage, tangentage, contour, perçage, taraudage, plaquette, mesure, touret, mandrin.
+- **Navigation des PNJ** (`nav.js`), **conduite & circulation** (`cars.js`, `sim_city.js` ; réglages `CFG.CAR.kinds`), **nouveau bourg** (`citygen.js`), **falaise + corniche + plateau** (`terrain.js`, `citygen_outer.js`), chutes et crash (dépanneuse).
+- **Patch note** : soufflette au tuyau (`sim_law.js`), gendarmerie → prison → caution, entreprises visitables.
+- **Multijoueur** (`server.js`, `net.js`, `lobby.js`) : entreprises partagées (`saves/careers/<id>.json` sur GitHub), sauvegarde auto à mi-journée, reprise d'hôte.
+- **Tutoriel** (`tuto.js`) : Lebec guide le jour 1 + astuces contextuelles (F1 / F2).
+- **Reports de la branche V4.0→V4.5 (Timothée)** : `persos.js` (≈560 répliques, `ML.line` / `ML.redraw` dans config.js, tirage sans répétition), accueil SOLO / MULTIJOUEUR + guide (`ML.TIPS`), **difficultés** `ML.DIFFS` (facile, normal, difficile, LEBEC EN FEU → `cfg.game.diff`, `K.D`), **6 joueurs** et **rejoindre en cours de partie**, **PWA** (`manifest.webmanifest`, `sw.js` réseau d'abord : changer `CACHE` après une grosse mise à jour), touches M/Tab/AZERTY réparées, ping visible, événements en bas à gauche, **particuliers** au comptoir (`ML.PARTICULIERS`, offres au BE en carrière), **Garage Pasquier** (`concession`), **GPS** (`gps.js`), **colis** à ouvrir à la réception et ranger, caisses lancées dans le camion, café rapide (`CFG.COFFEE`), +30 % de temps sur les tickets. Non reportés (remplacés par la carrière V5) : sim_eco.js, erp.js, codes de sauvegarde, achat de véhicules au garage.
+- Dev : `index.html#cam=x,y,z,cx,cy,cz&lvl=N&rooms=be,stock&demo` (vue fixe du menu), serveur local sans cache `.claude/devserver.py`.
+
+## V4 — REFONTE VISUELLE (nov. 2026) : à lire en premier
+
+### Direction artistique
+Style « jouet low-poly » : aplats, ombrage toon à 3 tons, proportions un peu exagérées, détails absurdes. **Une seule source de vérité : `js/style.js`.**
+- `ML.PAL` : la palette. Ne pas inventer de couleurs ailleurs (variantes : `ML.Style.vary`).
+- `ML.Style.toon(couleur, émissif, opts)` : seul type de matériau. `U.mat` est redirigé dessus, `ML.Tex.mat` aussi.
+- `ML.Style.box` (boîte chanfreinée), `ML.Style.signTex` (enseignes), `ML.Style.merge(groupe)` (fusion par matériau : à utiliser pour TOUT décor statique, sinon le jeu rame), `ML.Style.sky` / `setSky` (ciel dégradé).
+- Outil de dev : `index.html#cam=x,y,z,cx,cy,cz` place la caméra du menu et cache le menu (captures d'écran) ; ou `ML.debugCam = {p:[…], t:[…]}` dans la console.
+
+### Le monde (1200 × 1200 m au lieu de 340 × 370)
+- `js/terrain.js` : relief déterministe (graine). Bassin de la ville presque plat, montagne au nord avec un col, plateau et lac, collines à l'est, bocage à l'ouest/sud, rivière qui passe derrière l'atelier. L'atelier et sa cour sont **toujours à l'altitude 0**.
+- `js/citygen.js` : centre-ville (inchangé dans son principe, limité à `CFG.CORE`) + types de bâtiments (`fillers[].type`).
+- `js/citygen_outer.js` : autoroute A84 (2×2 voies), rond-point de la Pelle (statue de Lebec) + bretelle + péage, route du col en lacets (A* sur le relief), chemin du lac, descente est, D12 vers le hameau de Kerlebec, fermes, forêts, rochers, ponts/viaducs détectés automatiquement.
+- Drapeaux des arêtes : `core` (centre), `hw` (autoroute, aussi `ring` → vitesse rapide), `mtn`, `dep`, `giratoire`, `bridge`, `rw` (demi-largeur). La circulation, les passants et la carte utilisent le même graphe qu'avant : rien à changer dans `sim_city.js`.
+- `CFG.MAP` = monde entier, `CFG.CORE` = centre-ville. `ML.LOC.sites` = { col, lac, hameau, rondpoint, auberge }.
+- `world.js` : routes fusionnées (très peu d'appels de dessin), `W.cull(cam)` masque les bâtiments lointains.
+- `U.resolveCircle` / `U.inCollider` passent par une grille spatiale (des milliers d'arbres ont des colliders).
+
+### ⚠ CONVENTION DE HAUTEUR (important pour brancher la suite)
+`ML.Terrain.h(x, z)` = altitude du sol (ponts compris). **Tous les y de la simulation et du réseau restent RELATIFS au sol** (debout = 0, un objet posé = 0). On ajoute `h` uniquement au RENDU :
+- déjà fait : caméra et `G.eye()` (absolus), objets au sol (`game.js`), persos, voitures (inclinées selon la pente), circulation, gendarmerie, passants, chien, pigeon, flaques, feux (fichiers `people.js`, `cars.js`, `fx.js`), bâtiments et entreprises.
+- Toute NOUVELLE chose posée par terre en ville doit faire pareil. Les cibles `W.targets` des entreprises ont déjà `y` absolu.
+- `ML.Terrain.water(x,z)` (altitude de l'eau ou null) : à utiliser si on veut que les voitures « plongent » dans la rivière.
+
+### Patch note : ce qui est prêt côté visuel et ce qu'il reste à brancher
+| Demande | Visuel livré | À brancher (logique) |
+|---|---|---|
+| Relief, rivière, routes de montagne, autoroute | ✅ complet | rien (option : ralentir les voitures en montée, `ML.Terrain.slope`) |
+| Passants | ✅ variés | — |
+| Détails forêts / bruts / armoire / étagère d'outils | ✅ (world_atelier.js) | — |
+| Soufflette reliée à l'air comprimé | ✅ enrouleurs + tuyau dynamique : `W.HOSE_LEN`, `W.hoseReels`, `W.updateHoses(positions)` | appeler `ML.World.updateHoses(positions)` à chaque image chez tous les clients (positions monde de TOUTES les soufflettes, tenues ou posées) ; elle renvoie l'indice d'enrouleur de chacune (-1 = aucun). Bloquer le porteur si `distance(position, hoseReels[i]) > HOSE_LEN` (14 m). Détails en tête de world_atelier.js |
+| Entreprises ouvertes avec réception et persos | ✅ porte, accueil, bureaux/atelier, personnel ; colliders de murs ; `P.door` (position de la porte) | — |
+| Gendarmerie + prison | ✅ cellule : `ML.LOC.jail {x,z,yaw}`, `ML.LOC.jailDoor`, `ML.World.jailDoor(ouvert)` | compteur de passants renversés (`ped` dans `sim_city.js`) → poursuite → téléporter le joueur à `ML.LOC.jail`, fermer la porte, le libérer après X s |
+| Historique des dépenses (amendes par joueur) | ❌ non fait (c'est surtout de la logique + un écran HUD) | à faire |
+
 ## 1. Le projet
-Jeu coopératif 3D façon *Overcooked* en atelier d'usinage, 1 à 5 joueurs dans le navigateur, clavier/souris ou manette.
+Jeu coopératif 3D façon *Overcooked* en atelier d'usinage, 1 à 6 joueurs dans le navigateur, clavier/souris ou manette.
 V2 = V1 (multi validé) + les 4 vagues demandées : chaos, ville vivante, mini-jeux/événements/visiteurs/humeur, campagne/comptes/boutique/succès/traître/inspecteur.
 
 ## 2. Contraintes (à respecter)
@@ -64,5 +104,5 @@ V2 = V1 (multi validé) + les 4 vagues demandées : chaos, ville vivante, mini-j
 ## 6. Non vérifié / pistes
 - Pas testé sur Render ni avec de vrais joueurs : équilibrage à régler (fréquence des feux/pannes `sim_chaos.js`, seuil des caisses qui tombent `game.js`, durée des tickets `config.js`).
 - Circulation simple (téléportation au carrefour, la gendarmerie « coupe » quand elle est bloquée).
-- V4 : équilibrage de l'économie à affiner avec de vrais joueurs (`ML.ECO`, `ML.CATALOG`, `ML.STAFF` dans `config.js`). Testé : solo (journée libre, campagne jour 1 → 2, inspection réussie → jeu terminé), journées complètes en avance rapide dans tous les modes, multi 3 navigateurs (invité qui accepte au PC, arrivée en cours de partie, achat par un invité, départ de l'hôte → reprise par un invité depuis la sauvegarde).
+- Pas de migration d'hôte ; campagne liée au PC de l'hôte.
 - Vraie manette non testée (seulement simulée).

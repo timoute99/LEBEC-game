@@ -15,7 +15,7 @@
         { name: ML.Account.name() || 'Moi', helmet: L.hat ? null : 0xf5f5f5, hat: L.hat, vest: (ML.ROLES[ML.Lobby.myRole] || ML.ROLES.poly).color });
       v.pos.set(0, 0, 22); v.target.copy(v.pos); v.yaw = 0.5; v.seen = true; ML.Main.pv = v;
     },
-    menuScene: () => { ML.scene.background.copy(ML.light.day); ML.scene.fog.color.copy(ML.light.day); ML.scene.fog.near = 90; ML.scene.fog.far = 260; ML.light.sun.intensity = 0.85; ML.light.hemi.intensity = 0.8; } };
+    menuScene: () => { ML.Style.setSky(1, 0); ML.scene.fog.color.setHex(ML.PAL.skyHorizon); ML.scene.fog.near = 260; ML.scene.fog.far = 1300; ML.light.sun.intensity = 0.72; ML.light.hemi.intensity = 0.68; } };
   async function boot() {
     const canvas = document.getElementById('gl');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -24,11 +24,12 @@
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const scene = new THREE.Scene();
     const day = new THREE.Color(0xa8d8ff), night = new THREE.Color(0x1b2240);
-    scene.background = day.clone(); scene.fog = new THREE.Fog(day.clone(), 90, 260);
-    const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.05, 600);
+    scene.background = day.clone(); scene.fog = new THREE.Fog(new THREE.Color(ML.PAL.skyHorizon), 260, 1300);
+    ML.Style.sky(scene);                                   // ciel en dégradé + nuages (style.js)
+    const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.05, 2000);
     scene.add(camera);
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x5a6b3a, 0.8); scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xfff2d6, 0.85);
+    const hemi = new THREE.HemisphereLight(0xfff6e8, 0x6d8a4a, 0.68); scene.add(hemi);
+    const sun = new THREE.DirectionalLight(0xfff2d6, 0.72);
     sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
     Object.assign(sun.shadow.camera, { left: -50, right: 50, top: 50, bottom: -50, near: 1, far: 160 });
     sun.shadow.bias = -0.0006; scene.add(sun); scene.add(sun.target);
@@ -38,7 +39,10 @@
     document.getElementById('loading').textContent = 'Chargement des décors…';
     await ML.Assets.load();
     ML.World.build(1234567, {});                 // ville du menu (chaque partie a la sienne)
-    ML.HUD.init(); ML.ERP.init(); ML.Dialogue.init(); ML.Lobby.init();
+    ML.HUD.init(); ML.Dialogue.init(); ML.Lobby.init();
+    // outil de dev : index.html#cam=x,y,z,cx,cy,cz → caméra fixe, menu caché (captures d'écran)
+    const cm = /#cam=([-\d.,]+)/.exec(location.hash);
+    if (cm) { const v = cm[1].split(',').map(Number); ML.debugCam = { p: v.slice(0, 3), t: v.slice(3, 6) }; document.getElementById('lobby').style.display = 'none'; }
     document.getElementById('loading').classList.add('hidden');
     camera.position.set(30, 22, 60); camera.lookAt(0, 0, 0);
 
@@ -55,9 +59,13 @@
         camera.position.set(1.7, 1.3, 25.6); camera.lookAt(1.45, 1.0, 22);
         sun.position.set(10, 30, 40); sun.target.position.set(0, 0, 22); sun.target.updateMatrixWorld();
       } else {
-        menuT += dt * 0.05; camera.position.set(Math.sin(menuT) * 70, 28, 60 + Math.cos(menuT) * 50); camera.lookAt(0, 0, 40);
+        menuT += dt * 0.05;
+        const dc = ML.debugCam;                                   // outil de dev : ML.debugCam = { p:[x,y,z], t:[x,y,z] } dans la console
+        if (dc) { camera.position.set(dc.p[0], dc.p[1], dc.p[2]); camera.lookAt(dc.t[0], dc.t[1], dc.t[2]); }
+        else { camera.position.set(Math.sin(menuT) * 70, 28, 60 + Math.cos(menuT) * 50); camera.lookAt(0, 0, 40); }
         sun.position.set(30, 60, 20); sun.target.position.set(0, 0, 0); sun.target.updateMatrixWorld(); ML.Input.pollPad(dt);
       }
+      ML.Style.follow(camera); if (ML.World.cull) ML.World.cull(camera.position);
       renderer.render(scene, camera);
       ML.Input.endFrame();
     }

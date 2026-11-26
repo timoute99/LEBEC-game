@@ -20,7 +20,7 @@
     img.onerror = () => resolve(false);
     img.onload = () => {
       const tex = new THREE.Texture(img); tex.flipY = false; tex.needsUpdate = true;
-      A.kitMat = new THREE.MeshLambertMaterial({ map: tex });
+      A.kitMat = ML.Style.toon(0xffffff, 0, { map: tex, key: 'kit' });
       const names = Object.keys(src.models), loader = new THREE.GLTFLoader();
       let left = names.length;
       const done = () => { if (--left === 0) { A.ready = true; resolve(true); } };

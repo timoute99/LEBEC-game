@@ -1,7 +1,7 @@
 {
   "name": "Mécanique Lebec — usinage en équipe",
   "short_name": "Mécanique Lebec",
-  "description": "Jeu coopératif d'atelier d'usinage (1 à 6 joueurs). C'est écrit dans le poly !",
+  "description": "Jeu coopératif d'atelier d'usinage (1 à 6 joueurs, carrière sans fin). C'est écrit dans le poly !",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",
