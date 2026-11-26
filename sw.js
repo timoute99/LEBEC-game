@@ -5,7 +5,7 @@
    copie pour pouvoir lancer le jeu sans internet (le solo marche hors ligne).
    Le multijoueur (WebSocket) ne passe pas par ici.
    ===================================================================== */
-const CACHE = 'lebec-v5.2';
+const CACHE = 'lebec-v5.3';
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));

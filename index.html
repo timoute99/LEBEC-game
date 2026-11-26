@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mécanique Lebec — en équipe (V5.2)</title>
+<title>Mécanique Lebec — en équipe (V5.3)</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -91,6 +91,7 @@
       <button id="go-solo" class="choice"><span class="ic">🧑‍🔧</span>SOLO<small>toi contre l'atelier</small></button>
       <button id="go-multi" class="choice"><span class="ic">👥</span>MULTIJOUEUR<small>jusqu'à 5 en ligne</small></button>
     </div>
+    <button id="go-beginner" class="beginner">🐣 <b>Première fois ?</b> Mode DÉBUTANT : on t'explique tout, pas à pas</button>
     <div class="homebar"><button id="go-account" class="link">👤 <span id="acc-mini">Compte</span></button><button id="go-guide" class="link">📖 Guide & astuces</button><button id="go-news" class="link">📰 Nouveautés · idées · bugs</button><button id="go-install" class="link hidden">📲 Installer le jeu</button></div>
   </div>
 
@@ -151,7 +152,7 @@
       <button id="btn-profile-h" class="bigperso">👕 Mon perso<br><span class="dim">apparence, tenue, boutique</span></button>
       <div class="rolepick"><b>Ton rôle</b><div id="h-roles" class="roles"></div><div id="h-role-desc" class="dim small"></div></div>
     </div>
-    <div class="modes box2"><label>Mode <select id="h-mode"><option value="coop">Journée libre</option><option value="campagne">Campagne (mon entreprise)</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label> <label>Difficulté <select id="h-diff"><option value="facile">🙂 Facile</option><option value="normal" selected>😐 Normal</option><option value="difficile">😤 Difficile</option><option value="feu">🔥 LEBEC EN FEU</option></select></label>
+    <div class="modes box2"><label>Mode <select id="h-mode"><option value="debutant">🐣 Débutant (tutoriel complet)</option><option value="coop">Journée libre</option><option value="campagne">Campagne (mon entreprise)</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label> <label>Difficulté <select id="h-diff"><option value="facile">🙂 Facile</option><option value="normal" selected>😐 Normal</option><option value="difficile">😤 Difficile</option><option value="feu">🔥 LEBEC EN FEU</option></select></label>
       <div id="h-desc" class="dim small"></div><div id="h-camp" class="hidden small campbox"><div id="h-camp-info"></div>
         <div class="row2"><input id="h-camp-name" maxlength="30" placeholder="Nom de la nouvelle entreprise"><button id="h-camp-new" class="sec tiny">Créer</button>
         <input id="h-camp-code" maxlength="8" placeholder="Code de sauvegarde"><button id="h-camp-load" class="sec tiny">Charger</button></div></div></div>
@@ -188,7 +189,7 @@
       <button id="btn-profile-r" class="bigperso">👕 Mon perso<br><span class="dim">apparence, tenue, boutique</span></button>
       <div class="rolepick"><b>Ton rôle</b> <span class="dim small">(un par joueur, sauf Polyvalent)</span><div id="r-roles" class="roles"></div><div id="r-role-desc" class="dim small"></div></div>
     </div>
-    <div id="room-opts" class="modes box2"><label>Mode <select id="r-mode"><option value="coop">Journée libre</option><option value="campagne">Campagne (mon entreprise)</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label> <label>Difficulté <select id="r-diff"><option value="facile">🙂 Facile</option><option value="normal" selected>😐 Normal</option><option value="difficile">😤 Difficile</option><option value="feu">🔥 LEBEC EN FEU</option></select></label>
+    <div id="room-opts" class="modes box2"><label>Mode <select id="r-mode"><option value="debutant">🐣 Débutant (tutoriel complet)</option><option value="coop">Journée libre</option><option value="campagne">Campagne (mon entreprise)</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label> <label>Difficulté <select id="r-diff"><option value="facile">🙂 Facile</option><option value="normal" selected>😐 Normal</option><option value="difficile">😤 Difficile</option><option value="feu">🔥 LEBEC EN FEU</option></select></label>
       <label class="chk"><input type="checkbox" id="r-traitor"> 🕵 Traître (3 joueurs min.)</label>
       <div id="r-desc" class="dim small"></div><div id="r-camp" class="hidden small campbox"><div id="r-camp-info"></div>
         <div class="row2"><input id="r-camp-name" maxlength="30" placeholder="Nom de la nouvelle entreprise"><button id="r-camp-new" class="sec tiny">Créer</button>
@@ -199,7 +200,7 @@
   </div>
 </div>
 <div id="toasts"></div>
-<div id="version">V5.2</div>
+<div id="version">V5.3</div>
 
 <!-- Three.js r128 + chargeur glTF (copies locales : marche hors ligne et en double-clic) -->
 <script src="lib/three.min.js"></script>

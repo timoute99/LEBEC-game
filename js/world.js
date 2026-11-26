@@ -689,9 +689,13 @@
       if (!ML.Decor.building(f)) {                                  // maison / boutique / immeuble à balcons… ou modèle KayKit
         const b = place(f.model, 7.5, f.x, f.z, f.rot * Math.PI / 2, false);
         if (!b) U.box(14, 12, 14, T.mat('brique', 3, 3, 0xf6e58d), f.x, 6, f.z, root);
+        else { b.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(b); f.box = [Math.max(bb.min.x, f.x - 7.5), Math.min(bb.max.x, f.x + 7.5), Math.max(bb.min.z, f.z - 7.5), Math.min(bb.max.z, f.z + 7.5)]; }
       }
       const LI = f.lieu && ML.LIEUX[f.lieu];
-      U.boxCollider(f.x, f.z, 15, 15, 'city'); ML.mapRects.push({ x: f.x, z: f.z, w: 15, d: 15, c: f.espacil ? '#13a89e' : LI ? LI.color : '#8e7f74', name: f.espacil ? 'Espacil' : LI ? LI.name.replace(/^(Maison|Appartement) de /, '🏠 ') : undefined });
+      if (f.fp) { const a = f.rot * Math.PI / 2, odd = f.rot % 2 !== 0; U.boxCollider(f.x + f.fp[2] * Math.sin(a), f.z + f.fp[2] * Math.cos(a), odd ? f.fp[1] : f.fp[0], odd ? f.fp[0] : f.fp[1], 'city'); }   // V5.3 : collision à la taille du bâtiment
+      else if (f.box) U.addCollider(f.box[0], f.box[1], f.box[2], f.box[3], 'city');
+      else U.boxCollider(f.x, f.z, 15, 15, 'city');
+      ML.mapRects.push({ x: f.x, z: f.z, w: 15, d: 15, c: f.espacil ? '#13a89e' : LI ? LI.color : '#8e7f74', name: f.espacil ? 'Espacil' : LI ? LI.name.replace(/^(Maison|Appartement) de /, '🏠 ') : undefined });
     }
     for (const c of city.parked) place(c.model, 4.6, c.x, c.z, c.ry, 'small', 0.33);
     const heads = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.12, 0.3), new THREE.MeshLambertMaterial({ color: 0xfff3c4, emissive: 0x000000 }), city.lamps.length);
@@ -785,6 +789,10 @@
   };
   /** V5.2 : étiquettes du poste de prépa et des WC, compte à rebours des zones bloquées */
   W.vieVisuals = (dt, S) => {
+    // V5.3 : cible « quest » (E) sur le lieu du service en cours — elle manquait, on ne pouvait pas finir les quêtes
+    const Q = S.quest, qi = W.targets.findIndex(t => t.id === 'quest');
+    if (Q && Q.st === 'go') { const t = qi >= 0 ? W.targets[qi] : (W.targets.push({ id: 'quest', r: 3.2 }), W.targets[W.targets.length - 1]); t.x = Q.at.x; t.z = Q.at.z; t.y = ML.gy(Q.at.x, Q.at.z) + 1.1; }
+    else if (qi >= 0) W.targets.splice(qi, 1);
     W.vieT = (W.vieT || 0) - dt; if (W.vieT > 0) return; W.vieT = 0.5;
     const up = S.up || {}, blk = S.black ? ML.ECO.black.cat : 1;
     if (W.prepaLabel) {

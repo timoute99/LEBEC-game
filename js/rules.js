@@ -242,4 +242,62 @@
     }
     G.intent({ a: 'use', id });
   };
+
+  /* V5.3 : PETITS CONSEILS — une 2e ligne discrète sous l'action, quand on regarde un truc spécial un moment */
+  const HINT_ID = {
+    rack: 'La couleur du rack = la matière du ticket. Plus de barres ? App 🛒 Fournisseurs du PC.',
+    tool: 'La pastille de couleur du ticket dit quel outil prendre.',
+    coffee: 'Le café fait courir plus vite… un moment.',
+    reception: 'Les bruts commandés au PC et les colis arrivent ici. R pour ouvrir un colis.',
+    printer: 'Sert surtout quand Hervé réclame sa convention.',
+    pc: 'Le pense-bête du bureau dit quoi faire. L\'app 💡 Astuces explique tout.',
+    marbre: 'Jacky (audit) et le jury de SAE notent les caisses posées ici.',
+    panel: 'Coupure ? On réarme ici. Après une explosion, il faut aussi relancer chaque machine.',
+    casques: 'Utile le jour où l\'inspecteur impose le casque.',
+    bac: 'Bac plein = machine bloquée. On le vide dans la benne, dehors à gauche de la porte.',
+    benne: 'Les bacs à copeaux pleins se vident ici.',
+    prepa: 'Un kit = brut + bon outil : donne-le directement à une machine.',
+    wc: 'Toilettes sales = opérateurs lents (et Lebec qui râle).',
+    radar: 'Au-dessus de 60 km/h, ça flashe. 🤫 Il paraît qu\'une meuleuse traîne dans l\'atelier…',
+    frigo: 'Matis travaille beaucoup mieux le ventre plein.',
+    mall: 'Pendant le Black Friday, tout est moins cher.',
+    gym: 'L\'endurance reste sur ton compte : tu cours plus longtemps dans toutes les parties.'
+  };
+  const HINT_NPC = {
+    lebec: 'Le patron voit tout dans l\'atelier… sauf quand tu chasses un intrus.',
+    matis: 'Il ralentit quand il a faim : des viennoiseries le relancent.',
+    brieuc: 'Très rapide, mais quand il a la flemme, une claque le relance.',
+    amaury: 'Tête en l\'air : vérifie qu\'il usine bien la bonne pièce.',
+    jacky: 'Il veut une caisse usinée au MARBRE, et une réponse MIP/MAP.',
+    johan: 'Il vole les caisses prêtes. Lebec ferme les yeux si tu le chasses.',
+    bleuenn: 'Elle bricole n\'importe quoi. Lebec ferme les yeux si tu la chasses.',
+    vigile: 'Tant qu\'il est là, Johan Bois n\'entre pas.',
+    tony: 'Il charge tout seul les palettes du quai dans le camion.',
+    jojo: 'Il livre l\'expédition et passe aussi au TTH.',
+    vendeur: 'Le camion sert aux grosses pièces. Le scooter est le moins cher pour livrer.',
+    gendarme: 'Un ami en prison ? Payer la caution le fait sortir tout de suite.',
+    fred: 'Il te lâche quand ARÉXIS est rempli au PC.',
+    herve: 'Imprimante du bureau → signature de Lebec → retour à Hervé.',
+    mathieu: 'Écoute-le à la place de l\'opérateur, il le libérera.'
+  };
+  const SRC = { viennoiseries: 'à la boulangerie de Mimi', jerrican: 'à la station-service', cle: 'sur le chariot à outils de l\'atelier', extincteur: 'sur le mur gauche de l\'atelier' };
+  R.hint = id => {
+    const S = S_(); if (!S || !id) return null;
+    const [k, a] = id.split(':'), eco = ML.ECO;
+    if (HINT_ID[k]) return HINT_ID[k];
+    if (k === 'mach') { const M = S.machines[a]; if (!M) return null; return M.op ? 'La barre d\'abord, puis l\'outil. L\'opérateur fait le reste.' : 'Pas d\'opérateur : reste devant pour usiner, ou embauche au PC (👷 Personnel).'; }
+    if (k === 'quest') { const Q = S.quest; if (!Q) return null; const w = Q.need || Q.carry; return Q.carry ? 'Arrive avec l\'objet en main : ça se valide tout seul.' : SRC[w] ? `Ça se trouve ${SRC[w]}.` : null; }
+    if (k === 'car') return a !== undefined && id.endsWith('bed') ? 'Une caisse par place. Au-delà de 70 km/h, un choc fait tomber les caisses.' : 'F à la pompe pour le plein · V caméra · H klaxon.';
+    if (k === 'item') { const it = ML.Game.itemViews[a]; if (!it) return null; if (it.type === 'colis') return 'R pour l\'ouvrir.'; if (it.type === 'palette') return 'Trop lourd pour les bras : fenwick (R pour les fourches).'; if (isPart(it)) return 'Le ticket montre l\'étape suivante (l\'icône en couleur).'; if (it.type === 'brut_sp') return 'Ce brut se met dans une machine comme une barre.'; return null; }
+    if (k === 'npc') {
+      if (HINT_NPC[a]) return HINT_NPC[a];
+      const comp = COMP_OF[a], C = comp && COMP[comp]; if (!C) return null;
+      if (C.kind === 'fonderie' || C.kind === 'chaudro') return `Ici : ${(eco.sub || {})[C.kind]} €, le brut sort sur le quai. Depuis le PC : ${(eco.subPC || {})[C.kind]} €, livré à l'atelier.`;
+      if (C.kind === 'tth') return `Confie la caisse, attends ${ML.CFG.SUB_SEC} s, et reprends-la ici.`;
+      if (C.kind === 'matiere' || C.kind === 'outils') return 'Ici, pas de frais de port ni d\'attente… mais seul le magasinier 📦 est servi.';
+      if (C.kind === 'client') return 'Livre à l\'heure : la réputation monte, et les prix avec.';
+      if (C.kind === 'concurrent') return 'UsiFlash rachète tes caisses… Lebec n\'aime pas les traîtres.';
+    }
+    return null;
+  };
 })();

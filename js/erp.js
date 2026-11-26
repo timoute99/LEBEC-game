@@ -10,16 +10,26 @@
    - Bilan : argent du jour, réputation, objectif de la campagne.
    ===================================================================== */
 (function () {
-  const E = ML.ERP = { tab: 'cmd', cart: {} };
+  const E = ML.ERP = { tab: null, cart: {}, menu: false };
   const U = ML.U, $ = id => document.getElementById(id);
   const eur = n => `${Math.round(n).toLocaleString('fr-FR')} €`;
   const COMP = ML.COMPANIES, STEP_ICON = { fonderie: '🔥', chaudro: '⚙️', usinage: '🛠️', tth: '♨️', livraison: '🚚' };
-  const TABS = [['cmd', '📋 Commandes'], ['shop', '🏭 Atelier'], ['sup', '🛒 Fournisseurs'], ['rh', '👷 Personnel'], ['bil', '📊 Bilan'], ['his', '🧾 Historique']];
+  /* V5.3 : LebecOS — un vrai bureau d'ordinateur : icônes d'applications, fenêtre, barre des tâches, menu Démarrer */
+  const APPS = [
+    ['cmd', '📥', 'Commandes', 'Accepte les demandes des clients, suis tes commandes, commande les bruts de fonderie et de mécano-soudé.'],
+    ['sup', '🛒', 'Fournisseurs', 'Barres de matière et outils coupants, livrés par camion à la réception.'],
+    ['shop', '🏭', 'Boutique Atelier', 'Machines, agrandissement, fenwick, poste de préparation, confort, abonnements.'],
+    ['rh', '👷', 'Personnel', 'Embauche des opérateurs pour les machines, des apprentis, un cariste, un livreur.'],
+    ['bil', '📊', 'Bilan', 'L\'argent de la journée, la réputation, l\'objectif.'],
+    ['his', '🧾', 'Historique', 'Qui a dépensé quoi : amendes, achats, investissements.'],
+    ['help', '💡', 'Astuces', 'Le guide de l\'atelier : comment tout marche, et quoi faire quand ça part en vrille.']
+  ];
+  const TABS = APPS.map(a => [a[0], a[1] + ' ' + a[2]]);
 
   E.isOpen = () => ML.ui.modal === 'erp';
   E.open = tab => {
     if (ML.Dialogue.open) ML.Dialogue.forceClose();
-    if (tab) E.tab = tab;
+    E.tab = tab || null; E.menu = false;
     ML.ui.modal = 'erp'; ML.Input.unlock(); ML.HUD.showPause(false);
     $('erp').classList.remove('hidden'); E._html = null; E.render(true);
     ML.Sfx.play('bip');
@@ -30,7 +40,11 @@
     el.addEventListener('click', ev => {
       const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
       const a = b.dataset.act, G = ML.Game;
-      if (a === 'tab') { E.tab = b.dataset.t; E._html = null; E.render(true); return; }
+      if (a === 'tab') { E.tab = b.dataset.t; E.menu = false; E._html = null; E.render(true); ML.Sfx.play('bip'); return; }
+      if (a === 'desk') { E.tab = null; E.menu = false; E.render(true); ML.Sfx.play('bip'); return; }
+      if (a === 'menu') { E.menu = !E.menu; E.render(true); return; }
+      if (a === 'off') return E.close();
+      if (a === 'trash') { ML.HUD.notify('🗑 Corbeille vide : Lebec recycle tout, même les vieux devis.', 'info'); return; }
       if (a === 'hfilter') { E.hf = b.dataset.k; E.render(true); return; }
       if (a === 'close') return E.close();
       if (a === 'arexis') { E.close(); ML.Mini.run('arexis', {}, r => { if (r === 'ok') G.intent({ a: 'use', id: 'pc', mg: 'ok' }); }); return; }
@@ -61,25 +75,51 @@
     const S = ML.Game.S; if (!S) return;
     for (const sp of document.querySelectorAll('#erp .dyn')) {
       const v = sp.dataset.v; let txt = '';
-      if (sp.dataset.k === 't') txt = `${Math.max(0, Math.ceil(+v - S.rt))} s`;
+      if (sp.dataset.k === 'c') { const mins = Math.round(ML.CFG.DAY_START + Math.min(S.rt, ML.CFG.SHIFT_SEC) * (ML.CFG.DAY_END - ML.CFG.DAY_START) / ML.CFG.SHIFT_SEC); txt = `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`; }
+      else if (sp.dataset.k === 't') txt = `${Math.max(0, Math.ceil(+v - S.rt))} s`;
       else { const M = S.machines[v]; txt = M && M.job && M.job.tool ? `${Math.floor(100 * M.job.prog / M.job.total)} %` : ''; }
       if (sp.textContent !== txt) sp.textContent = txt;
     }
   };
 
   /* ---------- Rendu ---------- */
+  /** Ce qu'il y a à faire maintenant (pense-bête du bureau) */
+  function todo(S) {
+    const L = [], props = S.props.length + S.parts.filter(p => p.st === 'wait').length;
+    if (props) L.push(['cmd', `📥 ${props} demande${props > 1 ? 's' : ''} de client à accepter`]);
+    for (const o of S.orders) if ((o.src === 'fonderie' || o.src === 'chaudro') && o.steps[o.si] === o.src && !o.q) L.push(['cmd', `${o.src === 'fonderie' ? '🔥' : '⚙️'} #${o.id} : commander le brut ${o.src === 'fonderie' ? 'de fonderie' : 'mécano-soudé'}`]);
+    for (const o of S.orders) if (o.size === 'l') { const miss = ['fenwick', 'camion'].filter(v => !S.owned.includes(v)); if (miss.length) { L.push([miss.includes('fenwick') ? 'shop' : 'cmd', `🏗 Grosse pièce #${o.id} : il manque ${miss.map(v => v === 'fenwick' ? 'le fenwick (Boutique)' : 'le camion (Garage Pasquier)').join(' et ')}`]); break; } }
+    for (const id of ML.MACHINE_ORDER) if (S.machines[id] && !S.machines[id].op) { L.push(['rh', `👷 ${id} n'a pas d'opérateur`]); break; }
+    const need = {}; for (const o of S.orders) if (o.steps[o.si] === 'usinage' && !o.src && !o.m) { need[o.mat] = (need[o.mat] || 0) + 1; need[o.tool] = (need[o.tool] || 0) + 1; }
+    for (const k in need) if ((S.stock[k] || 0) < need[k]) { L.push(['sup', `🛒 Plus assez de ${(ML.MATERIALS[k] || ML.TOOLS[k]).label.toLowerCase()} en stock`]); break; }
+    if (S.saeBon) L.push(['shop', `🎓 Bon de SAE : −${S.saeBon} % sur une machine`]);
+    if (S.evs && S.evs.fred) L.push(['arexis', '💼 Fred attend : remplir ARÉXIS']);
+    return L;
+  }
   E.render = force => {
     const G = ML.Game, S = G.S; if (!S) return;
-    const head = `<div class="erp-top"><div><b>💻 PC de gestion</b> — ${U.esc(S.co.name || 'Mécanique Lebec')}${S.co.code ? ` <span class="dim">(code ${S.co.code})</span>` : ''}</div>
-      <div class="erp-kpi"><span class="money ${S.money < 0 ? 'neg' : ''}">💶 ${eur(S.money)}</span><span>⭐ ${S.rep}/100</span><span>📅 jour ${S.co.day}</span><button class="sec tiny" data-act="close">Fermer (Échap)</button></div></div>
+    const nProps = S.props.length + S.parts.filter(p => p.st === 'wait').length, app = APPS.find(a => a[0] === E.tab);
+    const clock = '<span class="dyn" data-k="c" data-v="0"></span>';
+    const icons = APPS.map(([k, ic, n]) => `<button class="os-ico ${E.tab === k ? 'on' : ''}" data-act="tab" data-t="${k}"><i>${ic}</i><span>${n}</span>${k === 'cmd' && nProps ? `<b class="badge">${nProps}</b>` : ''}</button>`).join('') +
+      (S.evs && S.evs.fred ? '<button class="os-ico hot" data-act="arexis"><i>💼</i><span>ARÉXIS</span><b class="badge">!</b></button>' : '') +
+      '<button class="os-ico" data-act="trash"><i>🗑</i><span>Corbeille</span></button>';
+    const T2 = todo(S);
+    const widgets = `<div class="os-note"><div class="os-nh">📌 À faire maintenant</div>${T2.length ? T2.map(([k, t]) => `<button data-act="${k === 'arexis' ? 'arexis' : 'tab'}" data-t="${k}">${U.esc(t)}</button>`).join('') : '<div class="os-ok">✅ Rien d\'urgent. Bon boulot !</div>'}</div>
+      <div class="os-info"><b>${U.esc(S.co.name || 'Mécanique Lebec')}</b><br>📅 Jour ${S.co.day || S.day} · ${clock}<br>⭐ Réputation ${S.rep}/100<br><span class="${S.money < 0 ? 'red' : 'ok'}">💶 ${eur(S.money)}</span>${S.co.code ? `<br><span class="dim small">code ${S.co.code}</span>` : ''}</div>
+      ${S.black ? '<div class="os-black">🛍 BLACK FRIDAY<br><span>tout est moins cher aujourd\'hui</span></div>' : ''}
+      <div class="os-hint">💡 Clique une icône pour ouvrir une application. <b>Échap</b> : éteindre le PC.</div>`;
+    const win = app ? `<div class="os-win"><div class="os-title"><span class="os-tn">${app[1]} ${app[2]}</span><span class="os-td">${U.esc(app[3])}</span><button class="os-x" data-act="desk" title="Fermer la fenêtre">✕</button></div>
       ${S.evs && S.evs.fred ? '<div class="erp-alert">💼 Fred Castells attend que quelqu\'un remplisse ARÉXIS… <button data-act="arexis">Remplir ARÉXIS</button></div>' : ''}
-      <div class="erp-tabs">${TABS.map(([k, n]) => `<button class="${E.tab === k ? 'on' : ''}" data-act="tab" data-t="${k}">${n}${k === 'cmd' && (S.props.length + S.parts.filter(p => p.st === 'wait').length) ? ` <i class="badge">${S.props.length + S.parts.filter(p => p.st === 'wait').length}</i>` : ''}</button>`).join('')}</div>`;
-    const body = { cmd: tabCmd, shop: tabShop, sup: tabSup, rh: tabRh, bil: tabBil, his: tabHis }[E.tab](S);
-    const html = head + `<div class="erp-body">${body}</div>`;
+      <div class="erp-body">${({ cmd: tabCmd, shop: tabShop, sup: tabSup, rh: tabRh, bil: tabBil, his: tabHis, help: tabHelp })[app[0]](S)}</div></div>` : '';
+    const menu = E.menu ? `<div class="os-menu"><div class="os-mh">🔧 LebecOS 95</div>${APPS.map(([k, ic, n]) => `<button data-act="tab" data-t="${k}">${ic} ${n}</button>`).join('')}<hr><button data-act="off">⏻ Éteindre le PC</button></div>` : '';
+    const html = `<div class="os"><div class="os-screen"><div class="os-desk"><div class="os-logo">LEBEC<small>usinage · depuis 1987</small></div><div class="os-icons">${icons}</div><div class="os-side">${widgets}</div>${win}${menu}</div>
+      <div class="os-bar"><button class="os-start ${E.menu ? 'on' : ''}" data-act="menu">🔧 Démarrer</button>${app ? `<button class="os-task on" data-act="desk">${app[1]} ${app[2]}</button>` : ''}
+        <span class="os-tray"><span class="${S.money < 0 ? 'red' : ''}">💶 ${eur(S.money)}</span><span>⭐ ${S.rep}</span><span>📅 J${S.co.day || S.day}</span><span class="os-clock">${clock}</span><button class="os-off" data-act="off" title="Éteindre (Échap)">⏻</button></span></div></div>
+      <div class="os-bezel"><span>LEBEC</span><i class="led"></i></div></div>`;
     if (!force && html === E._html) return;
     const sc = $('erp-card').querySelector('.erp-body'), top = sc ? sc.scrollTop : 0;
     $('erp-card').innerHTML = html; E._html = html;
-    const sc2 = $('erp-card').querySelector('.erp-body'); if (sc2) sc2.scrollTop = top;
+    const sc2 = $('erp-card').querySelector('.erp-body'); if (sc2 && E._scTab === E.tab) sc2.scrollTop = top; E._scTab = E.tab;
     E.tick();
   };
   const chips = o => `<span class="chip" style="background:${ML.MATERIALS[o.mat].css};color:#111">${ML.MATERIALS[o.mat].label}</span><span class="chip">${ML.MTYPE[o.mtype]}</span><span class="chip" style="background:${ML.TOOLS[o.tool].css};color:#111">${ML.TOOLS[o.tool].label}</span>${o.size === 'l' ? '<span class="chip big">GROSSE (fenwick + camion)</span>' : o.size === 's' ? '<span class="chip">petite</span>' : ''}`;
@@ -195,6 +235,75 @@
   }
 
   /** V5 : HISTORIQUE des dépenses — qui a dépensé quoi (amendes, achats…), et les jours précédents */
+  /* V5.3 : l'application ASTUCES — le guide de l'atelier (tout ce qui n'est pas évident) */
+  function tabHelp(S) {
+    const sec = (ic, t, L, open) => `<details class="os-help" ${open ? 'open' : ''}><summary>${ic} ${t}</summary><ul>${L.map(x => `<li>${x}</li>`).join('')}</ul></details>`;
+    const eco = ML.ECO, sp = eco.subPC || {}, sd = eco.sub || {};
+    let h = '<p class="dim">Clique un titre pour le déplier. Les astuces marquées 🤫 sont des petits secrets d\'atelier.</p>';
+    h += sec('📥', 'Une commande, du début à la fin', [
+      'Ouvre <b>📥 Commandes</b> et <b>accepte</b> une demande (regarde le délai et la taille).',
+      'Prends la <b>barre de matière</b> au rack (la couleur du ticket = la matière) et le bon <b>outil</b> au chariot.',
+      'Pose la barre puis l\'outil dans une <b>machine libre</b> (E). L\'opérateur usine tout seul, ou toi si personne n\'est à son poste.',
+      'Récupère la <b>caisse</b> usinée et pose-la en <b>EXPÉDITION</b> (zone verte à la porte).',
+      'Charge la caisse dans un véhicule (E en visant la benne), suis le <b>GPS</b> jusqu\'au client et décharge chez lui.',
+      '🤫 Les tickets s\'affichent au-dessus des caisses : l\'icône en couleur, c\'est l\'étape en cours.'
+    ], true);
+    h += sec('⚙️', 'Mécano-soudé et fonderie (les bruts spéciaux)', [
+      'Certaines pièces ne partent pas d\'une barre mais d\'un <b>brut</b> : 🔥 fonderie (fonte) ou ⚙️ mécano-soudé (chaudronnerie).',
+      `<b>Le plus simple :</b> dans 📥 Commandes, bouton <b>« Commander au PC »</b> (${eur(sp.fonderie || 90)} fonderie, ${eur(sp.chaudro || 100)} mécano-soudé). Le brut arrive tout seul à la <b>RÉCEPTION</b> de l'atelier en 2 minutes environ.`,
+      `<b>Moins cher mais il faut y aller :</b> va voir le patron à la <b>Fonderie Boulard</b> ou à la <b>Chaudronnerie Babinsky</b> (carte M), paie-le (${eur(sd.fonderie || 60)} / ${eur(sd.chaudro || 70)}), attends un peu et prends le brut sur <b>son quai</b>.`,
+      'Ensuite, le brut se met dans une machine comme une barre (pas besoin de matière du rack).',
+      '🤫 Le livreur IA (Personnel) peut faire les allers-retours à ta place.'
+    ]);
+    h += sec('♨️', 'Traitement thermique (TTH)', [
+      'Si le ticket montre ♨️ après l\'usinage : la caisse doit passer chez <b>TTH Ouest</b> (M. Maurseau) avant d\'être livrée.',
+      `Apporte la caisse là-bas, E sur Maurseau (${eur(sd.tth || 45)}), attends ${ML.CFG.SUB_SEC || 16} s et reprends-la sur place.`,
+      'Puis retour à l\'expédition ou directement chez le client.'
+    ]);
+    h += sec('🏗', 'Grosses pièces, fenwick et camion', [
+      'Une commande marquée <b>GROSSE</b> sort en <b>palette</b> au <b>QUAI GROS COLIS</b> : elle ne tient pas dans les bras.',
+      `Il faut le <b>fenwick</b> (🏭 Boutique, ${eur((ML.CATALOG.fenwick || {}).price || 650)}) : approche les fourches, <b>R</b> pour lever / poser.`,
+      'Puis le <b>camion</b> (Garage Pasquier) : pose la palette dans la benne avec le fenwick, et <b>R</b> à l\'arrivée pour décharger.',
+      'Les grosses pièces payent beaucoup plus : à plusieurs, c\'est le meilleur investissement.'
+    ]);
+    h += sec('📏', 'Contrôle au marbre et poste de préparation', [
+      'Le <b>MARBRE</b> sert aux audits (Jacky) et à la SAE : pose une caisse dessus (E) et réponds à la question.',
+      'Le <b>poste de préparation</b> (Boutique) prépare tout seul des <b>kits</b> (brut + bon outil) pour les commandes acceptées : prends le kit et donne-le à la machine, sans passer par le rack.'
+    ]);
+    h += sec('👷', 'Le personnel', [
+      'Un <b>opérateur</b> par machine : sans lui, c\'est toi qui dois rester devant.',
+      'Les <b>apprentis</b> coûtent peu mais sont lents (ils progressent). 🤫 Brieuc a la flemme : une claque le relance.',
+      'Tony le <b>cariste</b> charge les palettes du quai dans le camion, Jojo le <b>livreur</b> fait les tournées (et le TTH).',
+      'Les salaires tombent <b>le soir</b> : regarde le 📊 Bilan avant d\'embaucher.'
+    ]);
+    const ev = Object.keys(ML.EVTIPS).map(k => { const [t, L] = ML.EVTIPS[k]; return `<b>${t}</b> : ${L.join(' ')}`; });
+    h += sec('🚨', 'Les événements (quoi faire quand ça part en vrille)', ev);
+    h += sec('🙋', 'Quêtes, SAE et visiteurs', [
+      'Quand quelqu\'un demande un service, parle-lui (E). Si tu acceptes, un <b>repère</b> apparaît sur la carte (M) et un bandeau en haut de l\'écran donne la distance.',
+      'Va au repère et appuie sur <b>E</b> dessus (ou apporte l\'objet demandé), puis reviens voir la personne.',
+      'Les visiteurs pénibles (Johan Bois, Bleuenn) peuvent être chassés à la claque : <b>Lebec ne t\'en voudra pas</b>.',
+      'La <b>soufflette</b> nettoie les taches dans l\'atelier <b>et devant la porte</b>.'
+    ]);
+    h += sec('🚗', 'Véhicules, essence, radars, gendarmes', [
+      'E pour monter, <b>V</b> change de caméra, <b>H</b> klaxonne, <b>F</b> à la station pour faire le plein.',
+      'Au-delà de 60 km/h en ville, les <b>radars</b> flashent (amende). Le Pass Radar ou la meuleuse 🤫 règlent le problème…',
+      'Taper un piéton ou fuir les gendarmes coûte cher. Les véhicules n\'entrent pas dans l\'atelier.',
+      'Le <b>scooter</b> est le moins cher pour livrer de petites caisses.'
+    ]);
+    h += sec('💶', 'L\'argent', [
+      'Livrer <b>à l\'heure</b> fait monter la réputation, et avec elle les prix des commandes.',
+      'Le <b>Black Friday</b> (certains jours) fait baisser tous les prix : c\'est le moment d\'acheter une machine.',
+      'Une zone ou une machine pas encore débloquée peut s\'acheter <b>en avance</b>, plus cher.',
+      'Sous ' + eur(eco.bankrupt) + ' le soir : faillite. Garde toujours de quoi payer les salaires.'
+    ]);
+    h += sec('⌨️', 'Les touches', [
+      '<b>ZQSD / WASD</b> se déplacer · <b>Maj</b> courir · <b>Espace</b> sauter · <b>E</b> interagir · <b>G</b> lâcher · <b>R</b> ouvrir un colis / fourches / décharger',
+      '<b>Clic gauche</b> utiliser l\'objet en main (claque, soufflette, extincteur) · <b>Clic droit</b> lancer',
+      '<b>1 2 3</b> ou molette : emplacements · <b>4 à 9</b> émotes · <b>T</b> ping · <b>M</b> carte · <b>Tab</b> aide · <b>K</b> son'
+    ]);
+    return h;
+  }
+
   function tabHis(S) {
     const G = ML.Game, L = (G.ledger || []).slice().reverse(), f = E.hf || 'all';
     const players = Object.keys(S.pl).map(pid => S.pl[pid]);

@@ -93,6 +93,7 @@
     L.roles = {}; L.hostCfg = null; L.myRole = ML.ROLES[localStorage.getItem('ml_role')] ? localStorage.getItem('ml_role') : 'poly';
     // navigation
     $('go-solo').onclick = () => { L.screen('scr-solo'); L.renderRoles(); L.renderModes(); };
+    $('go-beginner').onclick = () => { $('h-mode').value = 'debutant'; $('h-diff').value = 'facile'; L.screen('scr-solo'); L.renderRoles(); L.renderModes(); };   // V5.3
     $('go-multi').onclick = async () => { L.screen('scr-multi'); if (await L.ensure()) N.send({ t: 'list' }); };
     $('go-account').onclick = () => { L.screen('scr-account'); L.renderAccount(); };
     $('go-guide').onclick = () => { L.screen('scr-guide'); $('guide-tips').innerHTML = ML.TIPS.map(t => `<li>${U.esc(t)}</li>`).join(''); };
@@ -327,9 +328,13 @@
       $(p + '-camp').classList.toggle('hidden', mode !== 'campagne');
       const mine = (A.prof.camps || []).filter(x => !c || x.code !== c.code);
       $(p + '-camp-info').innerHTML = (c ? `${ML.Company.summary(c)}<br><span class="dim">${ML.Company.goal(c)}</span>` : '<b>Aucune entreprise.</b> Donne-lui un nom et crée-la, ou charge une entreprise avec son code.') +
-        (mine.length ? `<div class="campacc">📂 <b>Mes entreprises${A.logged() ? ' (compte ' + U.esc(A.user) + ')' : ' (ce PC)'} :</b> ${mine.map(x => `<button class="sec tiny" data-camp="${x.code}">${U.esc(x.name)} · jour ${x.day}</button>`).join('')}</div>` : '');
+        (mine.length ? `<div class="campacc">📂 <b>Mes entreprises${A.logged() ? ' (compte ' + U.esc(A.user) + ')' : ' (ce PC)'} :</b> ${mine.map(x => `<button class="sec tiny" data-camp="${x.code}">${U.esc(x.name)} · jour ${x.day}</button>`).join('')}</div>` : '') +
+        // V5.3 : toutes les entreprises enregistrées sur le serveur, ouvertes à tout le monde
+        `<div class="campacc">🌍 <button class="sec tiny" data-allcamp="1">Voir toutes les entreprises du serveur</button>${L.allCamps ? `<div class="allcamps">${L.allCamps.length ? L.allCamps.map(x => `<button class="sec tiny" data-camp="${x.code}" title="code ${x.code}">${U.esc(x.name)} · jour ${x.day} · ${x.money.toLocaleString('fr-FR')} €</button>`).join('') : '<span class="dim">Aucune pour l\'instant.</span>'}</div>` : ''}</div>`;
+      const allB = $(p + '-camp-info').querySelector('[data-allcamp]');
+      if (allB) allB.onclick = async () => { allB.disabled = true; allB.textContent = 'Chargement…'; const r = await N.camp('list', {}); if (r.ok) { L.allCamps = r.list; L.renderModes(); } else { ML.HUD.toast(r.m || 'Liste indisponible.'); allB.disabled = false; allB.textContent = 'Voir toutes les entreprises du serveur'; } };
       for (const b of $(p + '-camp-info').querySelectorAll('[data-camp]')) b.onclick = async () => { const E = await Camp.fetch(b.dataset.camp); if (E) { ML.HUD.toast(`Entreprise « ${E.name} » chargée (jour ${E.day}).`); L.renderModes(); if (p === 'r') L.sendCfg(); } };
-      const desc = { coop: 'Une journée seule : petit atelier (T1, F1, un opérateur, le vieux Kangoo) et 1 500 € pour investir au PC.', campagne: 'Fais grandir ton atelier jour après jour : argent, machines, embauches, véhicules. Sauvegardé sur le serveur avec un CODE (n\'importe qui peut reprendre). L\'inspecteur vient quand l\'atelier est prêt : le réussir termine le jeu.', inspection: "Boss : l'inspecteur de l'Éducation Nationale impose des règles absurdes qui changent.", course: 'Course de Mégane dans la ville : 5 manches, premier arrivé devant l\'entreprise indiquée !' }[mode];
+      const desc = { debutant: 'PREMIÈRE PARTIE : un tutoriel complet te guide pas à pas (PC, commande, machine, livraison, mécano-soudé…). Journée calme : pas d\'imprévus pendant le tuto, délais très larges.', coop: 'Une journée seule : petit atelier (T1, F1, un opérateur, le vieux Kangoo) et 1 500 € pour investir au PC.', campagne: 'Fais grandir ton atelier jour après jour : argent, machines, embauches, véhicules. Sauvegardé sur le serveur avec un CODE (n\'importe qui peut reprendre). L\'inspecteur vient quand l\'atelier est prêt : le réussir termine le jeu.', inspection: "Boss : l'inspecteur de l'Éducation Nationale impose des règles absurdes qui changent.", course: 'Course de Mégane dans la ville : 5 manches, premier arrivé devant l\'entreprise indiquée !' }[mode];
       const D = ML.DIFFS[$(p + '-diff').value] || ML.DIFFS.normal;
       $(p + '-desc').textContent = desc + ' — ' + D.icon + ' ' + D.name + ' : ' + D.desc;
     }
@@ -339,7 +344,7 @@
   L.renderHostCfg = () => {
     const c = L.hostCfg, el = $('room-cfg'); if (!el) return;
     if (!c || (N.room && N.room.host === N.id)) { el.textContent = ''; return; }
-    const D = ML.DIFFS[c.diff] || ML.DIFFS.normal, M = { coop: 'Journée libre', campagne: 'Campagne', inspection: 'Inspection (boss)', course: 'Course de Mégane' }[c.mode] || c.mode;
+    const D = ML.DIFFS[c.diff] || ML.DIFFS.normal, M = { debutant: '🐣 Débutant', coop: 'Journée libre', campagne: 'Campagne', inspection: 'Inspection (boss)', course: 'Course de Mégane' }[c.mode] || c.mode;
     el.innerHTML = `Choix de l'hôte : <b>${U.esc(M)}</b>${c.co ? ` « ${U.esc(c.co.name)} », jour ${c.co.day}${c.co.code ? ` (code ${U.esc(c.co.code)})` : ''}` : ''} · ${D.icon} <b>${D.name}</b>${c.traitor ? ' · 🕵 traître' : ''}`;
   };
   L.gameCfg = p => {
@@ -354,7 +359,7 @@
   };
   L.cfgRoles = p => (p === 'h' ? { solo: L.myRole } : L.resolveRoles());
   /** Journée hors campagne : petit atelier de départ, 1 500 € pour investir, nouvelle ville */
-  L.freeCfg = (mode, diff, traitor, roles) => ({ mode, day: 1, E: ML.Company.fresh(mode === 'coop' ? 'Journée libre' : 'Mécanique Lebec', mode === 'course' ? 0 : ML.ECO.freeMoney), city: (Math.random() * 1e9) >>> 0, traitor, diff, roles });
+  L.freeCfg = (mode, diff, traitor, roles) => mode === 'debutant' ? Object.assign(L.freeCfg('coop', 'facile', false, roles), { beginner: true }) : ({ mode, day: 1, E: ML.Company.fresh(mode === 'coop' ? 'Journée libre' : 'Mécanique Lebec', mode === 'course' ? 0 : ML.ECO.freeMoney), city: (Math.random() * 1e9) >>> 0, traitor, diff, roles });
   L.noop = () => {
   };
 

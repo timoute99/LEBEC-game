@@ -1,4 +1,4 @@
-MÉCANIQUE LEBEC — usinage en équipe (V5.2, 1 à 6 joueurs)
+MÉCANIQUE LEBEC — usinage en équipe (V5.3, 1 à 6 joueurs)
 ==========================================================
 En ligne : https://lebec-game.onrender.com
 
@@ -38,6 +38,24 @@ MODES
   avec le code peut la reprendre ; l'Inspecteur vient quand l'atelier est prêt, le réussir
   termine le jeu) · Inspection (boss : règles absurdes qui changent) · Course de Mégane
   (5 manches) · Mode traître (3 joueurs minimum : un joueur payé par UsiFlash, vote à la fin).
+
+NOUVEAU EN V5.3
+  - PC de gestion = un vrai ordinateur « LebecOS » : bureau, icônes d'applications (Commandes, Fournisseurs,
+    Boutique Atelier, Personnel, Bilan, Historique, Astuces), fenêtres, barre des tâches, menu Démarrer,
+    pense-bête « À faire maintenant » qui ouvre la bonne appli.
+  - Appli 💡 ASTUCES : le guide complet (mécano-soudé : « Commander au PC » ou payer le fournisseur sur place,
+    fonderie, TTH, grosses pièces + fenwick + camion, marbre, prépa, personnel, événements, véhicules, argent, touches).
+  - Petits conseils : regarder un objet / une personne 1,5 s affiche une 2e ligne 💡 sous l'action.
+  - MODE DÉBUTANT (bouton vert de l'accueil, ou Mode « Débutant » en solo / salon) : tutoriel complet en 22 étapes,
+    temps 2× plus lent et aucun imprévu pendant le tuto, livraison du brut express. Le tutoriel normal reste.
+  - Comptes et sauvegardes : le serveur ne réécrit jamais les comptes s'il n'a pas pu les relire (fusion),
+    réessaie tout seul, enregistre à l'arrêt ; le jeu garde le profil en local et le renvoie plus tard ;
+    liste 🌍 de TOUTES les entreprises du serveur dans la boîte Campagne (jouables par tout le monde).
+  - Plus de pièces (+20, et des pièces propres à chaque client), journées de 7 min, difficulté Normal/Facile adoucie.
+  - Grosses pièces dès le jour 2 (ou dès le début à 3 joueurs et +) ; fenwick 650 €, camion 1 500 €.
+  - Services (quêtes) : validés en arrivant avec l'objet, distance affichée, 260 s, 60 à 140 €.
+  - Soufflette utilisable dans la cour devant l'atelier ; frapper Johan Bois / Bleuenn ne fâche plus Lebec ;
+    collisions des maisons à leur vraie taille (plus de murs invisibles en voiture).
 
 NOUVEAU EN V5.2 (les idées envoyées par les joueurs)
   - Tickets du haut : barre d'AVANCEMENT + ligne 👷 « qui s'en occupe » (machine, en main, dans un véhicule…).

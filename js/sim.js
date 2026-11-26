@@ -57,6 +57,9 @@
     K.D.interval *= DT.orders; K.D.dur *= DT.dur;
     K.D.events = [Math.max(0, K.D.events[0] + DT.ev), Math.max(0, K.D.events[1] + DT.ev)];
     if (DT.ev > 0) K.D.events[0] = Math.max(K.D.events[0], DT.ev);                 // journée calme : il se passe forcément quelque chose
+    // V5.3 : MODE DÉBUTANT : pas d'imprévus, tickets très longs, Lebec très patient, commandes espacées
+    S.beginner = !!g.beginner;
+    if (S.beginner) { K.D.events = [0, 0]; K.D.dur *= 1.8; K.D.interval *= 1.6; K.D.anger *= 0.25; K.D.chaos *= 0.15; K.D.dmg = (K.D.dmg || 1) * 0.4; }
     S.anger = C.LEBEC.base + K.D.base;
     const roles = (g.roles || {});
     for (const p of cfg.players) S.pl[p.id] = { name: p.name, idx: p.idx, inv: [null, null, null], car: null, ride: null, stun: 0, coffee: 0, hp: C.HP.max, ko: false, role: ML.ROLES[roles[p.id]] ? roles[p.id] : 'poly' };
@@ -148,6 +151,7 @@
   };
   K.strip = o => ({ type: o.type, d: o.d });
   /** Remet une soufflette sur son crochet (le tuyau la ramène) */
+  K.hoseZone = p => U.inWorkshop(p) || (Math.abs(p.x) < 17 && p.z > 13 && p.z < 30);   // V5.3 : la soufflette va jusque dans la cour (taches devant la porte)
   K.hookBack = it => { const h = ML.LOC.hooks.find(x => x.type === 'soufflette' && x.h === ((it.d || {}).h || 0)) || ML.LOC.hooks.find(x => x.type === 'soufflette'); if (h) K.spawnItem({ type: 'soufflette', d: { h: h.h || 0 } }, h.x, h.y, h.z); };
   K.removeItem = o => { const i = S.items.indexOf(o); if (i >= 0) S.items.splice(i, 1); Sim.dirty = true; };
   K.foot = P => P.car === null && P.ride == null;
@@ -217,23 +221,25 @@
     return Math.round(K.points(base) / 5) * 5;
   };
   /** Nouvelle DEMANDE client : elle arrive au PC, il faut l'accepter (ou l'ERP+ le fait) */
-  function genOrder() {
+  function genOrder(force, forceSize) {
     S.nOrders++;
     const types = new Set(Object.keys(S.machines).map(id => ML.MACHINES.find(m => m.id === id).type));
     const lv = K.lvl, kinds = ['plain', 'plain', 'plain'];
     if (lv >= 0.12 || S.day >= 2) kinds.push('tth');
     if (lv >= 0.28 || S.day >= 3) kinds.push('fonderie', 'chaudro');
-    const kind = S.nOrders <= 2 ? 'plain' : rng.pick(kinds);
+    const kind = force || (S.nOrders <= 2 || (S.beginner && !S.tutoDone) ? 'plain' : rng.pick(kinds));
     const cls = K.clients(); if (!cls.length) return;
     const client = rng.pick(cls), cl = ML.LOC.comp[client], far = Math.hypot(cl.x, cl.z) > 200;
     // V5 : certains clients ont leurs propres pièces (Espacil : gonds, platines de boîtes aux lettres…)
-    const own = kind === 'plain' && ML.PARTS[client] ? ML.PARTS[client].filter(x => types.has(x[2])) : [];
+    const own = kind === 'plain' && ML.PARTS[client] && (client === 'espacil' || rng() < 0.55) ? ML.PARTS[client].filter(x => types.has(x[2])) : [];   // V5.3 : chaque client a ses pièces
     const list = own.length ? own : ML.PARTS[kind].filter(x => types.has(x[2])); if (!list.length) return;
     const [part, mat, mtype, tool] = rng.pick(list);
     const steps = kind === 'plain' ? ['usinage', 'livraison'] : kind === 'tth' ? ['usinage', 'tth', 'livraison'] : [kind, 'usinage', 'livraison'];
-    const big = S.owned.includes('fenwick') && S.owned.includes('camion');
-    const sr = rng(); let size = kind === 'plain' ? (sr < 0.3 ? 's' : sr < 0.78 ? 'm' : 'l') : kind === 'chaudro' ? (sr < 0.5 ? 'm' : 'l') : kind === 'tth' ? (sr < 0.5 ? 's' : 'm') : 'm';
-    if (size === 'l' && !big) size = 'm';
+    // V5.3 : les GROSSES pièces arrivent plus tôt (dès le jour 2, ou tout de suite à 3 joueurs et plus) : il faut alors le fenwick (PC) et le camion (garage)
+    const veh = S.owned.includes('fenwick') && S.owned.includes('camion'), day = S.co.day || S.day || 1;
+    const big = !S.beginner && S.mode !== 'inspection' && (veh || day >= 2 || S.n >= 3) && (veh || ![...S.orders, ...S.props].some(o => o.size === 'l'));
+    const sr = rng(); let size = kind === 'plain' ? (sr < 0.28 ? 's' : sr < (veh ? 0.74 : 0.84) ? 'm' : 'l') : kind === 'chaudro' ? (sr < (veh ? 0.5 : 0.7) ? 'm' : 'l') : kind === 'tth' ? (sr < 0.5 ? 's' : 'm') : 'm';
+    if (forceSize) size = forceSize; else if (size === 'l' && !big) size = 'm';
     const dur = (C.ORDER.base + C.ORDER.perStep * (steps.length - 2) + (far ? C.ORDER.far : 0)) * (K.H.dur || 1) * K.D.dur * (1.25 - 0.35 * lv) * (size === 'l' ? 1.3 : 1) * ML.ECO.playerTime[Math.min(4, Math.max(1, S.n)) - 1];
     const p = { id: S.nextOid++, client, part, mat, mtype, tool, steps, si: 0, size, src: kind === 'fonderie' || kind === 'chaudro' ? kind : null, dur, price: K.orderPrice(steps, size, far), exp: S.rt + ML.ECO.propLife };
     S.props.push(p); Sim.dirty = true;
@@ -249,6 +255,7 @@
     S.orders.push(o); Sim.dirty = true;
     const who = pid && S.pl[pid] ? ` (${S.pl[pid].name})` : auto ? ' (ERP+)' : '';
     all(`📋 Commande #${o.id} acceptée${who} — ${COMP[o.client].name} : ${o.part}${o.size === 'l' ? ' (GROSSE pièce : fenwick + camion)' : o.size === 's' ? ' (petite)' : ''} · ${K.eur(o.price)}`, 'info'); sfx('order');
+    if (o.size === 'l') { const miss = ['fenwick', 'camion'].filter(v => !S.owned.includes(v)); if (miss.length) all(`🏗 GROSSE pièce : il vous faut ${miss.map(v => v === 'fenwick' ? 'le FENWICK (PC → Atelier, ' + K.price(ML.CATALOG.fenwick.price, 'cat') + ' €)' : 'le CAMION plateau (Garage Pasquier, ' + K.price(ML.DEALER.camion.price, 'dealer') + ' €)').join(' et ')}.`, 'warn'); }
     return o;
   };
   K.failOrder = (o, why) => {
@@ -343,6 +350,10 @@
         const o = K.spawnItem(held, ps.x, (ps.y || 0) + 1.5, ps.z, v); o.thr = pid; sfx('whoosh', ps.x, ps.z);
       } break;
       case 'hit': hit(pid, ps, String(m.id || ''), held); break;
+      case 'tuto':                                                       // V5.3 : le tutoriel complet demande une commande précise (mécano-soudé, fonderie, TTH…)
+        if (S.beginner && ['plain', 'chaudro', 'fonderie', 'tth'].includes(m.k) && S.props.length < 4) genOrder(m.k, 'm');
+        if (S.beginner && m.k === 'done' && !S.tutoDone) { S.tutoDone = true; K.questT = 40; K.all('🎓 Tutoriel terminé ! Demain, ce sera une vraie journée (avec ses imprévus). En attente : un service à rendre arrive bientôt.', 'good'); }
+        break;
       case 'rename': Sim.rename(pid, m.name); break;
       case 'eliott': {
         const n = npcs.eliott; if (!n.active || !near(ps, n.x, n.z, 7)) return;
@@ -527,7 +538,9 @@
     if (n.id === 'lebec') { say(n, ML.line('lebec', 'frappe', "TU M'AS FRAPPÉ ?! COUP DE PELLE !!!"), true); S.anger = 100; K.stat(by, 'slap_lebec'); K.startChase(by); return; }
     if (ML.PEOPLE[n.id].op && ['pause', 'toPause', 'forgot', 'rant'].includes(n.state)) { K.backToWork(n); say(n, ML.line(n.id, 'claque', "Aïe ! OK OK, j'y retourne !")); }
     else say(n, ML.line(n.id, 'claque', ['Aïe !', 'Hé ! Ça va pas ?!', 'Ouille !']));
-    K.witness(by, n.x, n.z);
+    // V5.3 : Lebec ne punit que les claques aux gens de l'atelier (pas aux intrus : Johan, Bleuenn, Hervé, Mathieu, visiteurs…)
+    if (!ML.PEOPLE[n.id].visitor) K.witness(by, n.x, n.z);
+    else if (npcs.lebec.active && Math.hypot(npcs.lebec.x - n.x, npcs.lebec.z - n.z) < 15 && rng() < 0.4) say(npcs.lebec, ['Bien fait !', 'Allez, dehors !', 'Ça, je l\'ai pas vu.'][Math.floor(rng() * 3)]);
   };
   K.playerHit = (tid, by, dur) => {
     const T = S.pl[tid]; if (!T || T.stun > S.rt) return;
@@ -741,7 +754,7 @@
   Sim.step = dt => {
     if (S.over) return;
     if (S.voting) { S.rt += dt; for (const m of Sim.mods) if (m.voteStep) m.voteStep(dt); return; }
-    S.rt += dt;
+    S.rt += dt * (S.beginner && !S.tutoDone ? 0.5 : 1);                 // V5.3 : mode débutant : le temps passe 2× moins vite pendant le tutoriel
     updateOrders(dt);
     for (const def of ML.MACHINES) {
       const M = S.machines[def.id]; if (!M) continue;
@@ -796,14 +809,14 @@
       P.inv.forEach((it, i) => {
         if (!it || it.type !== 'soufflette') return;
         const R = ML.LOC.reels[(it.d || {}).h || 0] || ML.LOC.reels[0], far = Math.hypot(ps.x - R.x, ps.z - R.z) > ML.LOC.hoseLen;
-        if ((P.car === null && P.ride == null && U.inWorkshop(ps) && !far)) return;
+        if ((P.car === null && P.ride == null && K.hoseZone(ps) && !far)) return;
         P.inv[i] = null; K.hookBack(it); Sim.dirty = true;
         note(pid, '🌀 Le tuyau d\'air est au bout : la soufflette te glisse des mains et retourne à son enrouleur !', 'warn'); sfx('whoosh', ps.x, ps.z);
       });
     }
-    for (const o of S.items) if (o.type === 'soufflette' && o.rest && !U.inWorkshop(o)) { K.removeItem(o); K.hookBack(o); break; }
+    for (const o of S.items) if (o.type === 'soufflette' && o.rest && !K.hoseZone(o)) { K.removeItem(o); K.hookBack(o); break; }
     for (const m of Sim.mods) if (m.step) m.step(dt);
-    if (S.rt >= C.SHIFT_SEC && S.mode !== 'course') K.end();
+    if (S.rt >= C.SHIFT_SEC && S.mode !== 'course' && !(S.beginner && !S.tutoDone && S.rt < C.SHIFT_SEC * 1.5)) K.end();     // V5.3 : pas de fin de journée en plein tutoriel
   };
   K.salaries = () => S.staff.reduce((a, id) => a + (ML.STAFF[id] ? ML.STAFF[id].pay : 0), 0) + Object.keys(ML.AI_STAFF).reduce((a, k) => a + (S.ai[k] ? ML.AI_STAFF[k].pay : 0), 0);
   K.end = extra => {

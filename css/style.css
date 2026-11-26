@@ -361,3 +361,70 @@ button.mini.del { background: rgba(231,76,60,.35); } button.mini:disabled { opac
 .mg-tapis { display: flex; gap: 18px; justify-content: center; margin: 10px 0; }
 .mg-tapis kbd { font-size: 28px; padding: 8px 18px; border-radius: 8px; background: #2c3e50; border: 2px solid #555; color: #fff; }
 .mg-tapis kbd.on { background: #27ae60; border-color: #3ecf6e; transform: scale(1.12); }
+/* V5.3 */
+.allcamps { display: flex; flex-wrap: wrap; gap: 4px; max-height: 120px; overflow-y: auto; margin-top: 4px; }
+
+/* ===== V5.3 : LebecOS — le PC de gestion façon vrai ordinateur ===== */
+#erp-card:has(.os) { padding: 0; background: none; border: none; box-shadow: none; width: min(1120px, 97vw); max-height: 96vh; }
+.os { background: linear-gradient(#d8d3c6, #b9b3a4); border-radius: 18px; padding: 16px 16px 8px; box-shadow: 0 18px 60px rgba(0,0,0,.7), inset 0 2px 0 rgba(255,255,255,.6); }
+.os-screen { position: relative; height: min(82vh, 660px); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; color: #eee;
+  background: radial-gradient(ellipse at 30% 20%, #2f6fa8 0%, #1d4a78 45%, #10263f 100%); box-shadow: inset 0 0 0 3px #222, inset 0 0 40px rgba(0,0,0,.6); }
+.os-screen::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 3px); }
+.os-desk { position: relative; flex: 1; min-height: 0; }
+.os-logo { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); font: 900 86px/1 Impact, 'Arial Black', sans-serif; letter-spacing: 8px; color: rgba(255,255,255,.07); text-align: center; pointer-events: none; }
+.os-logo small { display: block; font-size: 15px; letter-spacing: 4px; font-weight: 600; margin-top: 4px; }
+.os-icons { position: absolute; left: 10px; top: 10px; bottom: 10px; display: grid; grid-auto-flow: column; grid-template-rows: repeat(auto-fill, 78px); grid-auto-columns: 92px; gap: 4px; }
+.os-ico { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: 1px solid transparent; border-radius: 6px; padding: 6px 2px; color: #fff; cursor: pointer; }
+.os-ico i { font-style: normal; font-size: 32px; line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,.5)); }
+.os-ico span { font-size: 12px; text-shadow: 0 1px 2px #000, 0 0 4px #000; line-height: 1.15; text-align: center; }
+.os-ico:hover { background: rgba(120,180,255,.18); border-color: rgba(160,200,255,.45); }
+.os-ico.on { background: rgba(120,180,255,.3); border-color: rgba(190,220,255,.7); }
+.os-ico.hot { animation: osHot 1s infinite alternate; }
+@keyframes osHot { to { background: rgba(255,170,60,.35); } }
+.os-ico .badge { position: absolute; top: 2px; right: 14px; background: #e74c3c; color: #fff; border-radius: 10px; padding: 0 6px; font-size: 12px; font-style: normal; box-shadow: 0 0 0 2px #10263f; }
+.os-side { position: absolute; right: 12px; top: 12px; width: 270px; display: flex; flex-direction: column; gap: 10px; }
+.os-note { background: #fff4a8; color: #3a3200; border-radius: 3px 3px 3px 18px; padding: 10px 12px 12px; box-shadow: 3px 5px 12px rgba(0,0,0,.45); transform: rotate(-1deg); font-family: 'Comic Sans MS', 'Segoe Print', cursive; }
+.os-nh { font-weight: 800; margin-bottom: 6px; }
+.os-note button { display: block; width: 100%; text-align: left; background: none; border: none; border-bottom: 1px dashed rgba(90,70,0,.3); color: #3a3200; padding: 5px 2px; font: inherit; font-size: 13px; cursor: pointer; }
+.os-note button:hover { background: rgba(255,200,0,.35); }
+.os-ok { font-size: 13px; }
+.os-info { background: rgba(10,20,35,.72); border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.6; }
+.os-info .ok { color: #7dffa8; } .os-info .red, .os-tray .red { color: #ff7b7b; }
+.os-black { background: #111; color: #ffd257; border: 2px solid #ffd257; border-radius: 8px; padding: 8px; font-weight: 900; letter-spacing: 2px; text-align: center; }
+.os-black span { font-size: 11px; letter-spacing: 0; font-weight: 600; }
+.os-hint { font-size: 12px; color: rgba(255,255,255,.75); padding: 0 4px; }
+.os-win { position: absolute; left: 112px; right: 14px; top: 12px; bottom: 12px; display: flex; flex-direction: column; background: #18202c; border: 1px solid #5b7fa8; border-radius: 8px; overflow: hidden; box-shadow: 0 14px 40px rgba(0,0,0,.65); animation: osOpen .14s ease-out; }
+@keyframes osOpen { from { transform: scale(.96); opacity: 0; } }
+.os-title { display: flex; align-items: center; gap: 12px; padding: 6px 8px 6px 12px; background: linear-gradient(90deg, #2563a8, #3b86d1); color: #fff; flex-shrink: 0; }
+.os-tn { font-weight: 800; white-space: nowrap; }
+.os-td { font-size: 12px; opacity: .85; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.os-x { background: #d9534f; color: #fff; border: none; border-radius: 4px; width: 30px; height: 24px; padding: 0; font-weight: 900; cursor: pointer; }
+.os-x:hover { background: #ff6b66; }
+.os-win .erp-alert { margin: 8px 12px 0; }
+.os-win .erp-body { padding: 4px 14px 14px; }
+.os-menu { position: absolute; left: 0; bottom: 0; width: 240px; background: #1e2a3a; border: 1px solid #5b7fa8; border-bottom: none; border-radius: 0 8px 0 0; box-shadow: 4px -4px 20px rgba(0,0,0,.5); padding-bottom: 6px; z-index: 3; }
+.os-mh { background: linear-gradient(90deg, #ff9f1a, #e67e22); color: #111; font-weight: 900; padding: 10px 12px; margin-bottom: 4px; }
+.os-menu button { display: block; width: 100%; text-align: left; background: none; border: none; color: #eee; padding: 8px 14px; font-size: 14px; cursor: pointer; border-radius: 0; }
+.os-menu button:hover { background: #2e86de; }
+.os-menu hr { border: none; border-top: 1px solid rgba(255,255,255,.15); margin: 4px 0; }
+.os-bar { position: relative; z-index: 4; flex-shrink: 0; height: 42px; display: flex; align-items: center; gap: 6px; padding: 0 6px; background: linear-gradient(#2b3a4f, #1a2433); border-top: 1px solid #5b7fa8; }
+.os-start { background: linear-gradient(#ffb347, #e67e22); color: #111; font-weight: 900; border: none; border-radius: 5px; padding: 6px 14px; cursor: pointer; }
+.os-start.on, .os-start:hover { filter: brightness(1.15); }
+.os-task { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.25); border-radius: 5px; padding: 5px 12px; font-size: 13px; max-width: 220px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+.os-task.on { background: rgba(120,180,255,.3); }
+.os-tray { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 13px; background: rgba(0,0,0,.25); border-radius: 5px; padding: 4px 10px; }
+.os-clock { font-variant-numeric: tabular-nums; font-weight: 700; }
+.os-off { background: #c0392b; color: #fff; border: none; border-radius: 50%; width: 26px; height: 26px; padding: 0; font-size: 14px; cursor: pointer; }
+.os-bezel { display: flex; justify-content: center; align-items: center; gap: 10px; height: 22px; color: #6d6656; font: 800 12px/1 sans-serif; letter-spacing: 5px; }
+.os-bezel .led { width: 7px; height: 7px; border-radius: 50%; background: #3eff6e; box-shadow: 0 0 6px #3eff6e; }
+.os-help { margin: 6px 0; background: rgba(255,255,255,.05); border-radius: 8px; padding: 2px 12px; }
+.os-help summary { cursor: pointer; font-weight: 700; padding: 8px 0; color: #ffd257; }
+.os-help ul { margin: 0 0 10px; padding-left: 20px; } .os-help li { margin: 5px 0; font-size: 14px; line-height: 1.4; }
+@media (max-width: 760px) { .os-side { display: none; } .os-win { left: 8px; right: 8px; } .os-logo { font-size: 50px; } }
+#prompt .hint { position: static; display: block; text-align: center; margin-left: auto; margin-right: auto; font-size: 12.5px; color: #cfe6ff; opacity: .9; margin-top: 3px; white-space: normal; width: max-content; max-width: min(440px, 80vw); animation: hintIn .4s ease-out; }
+@keyframes hintIn { from { opacity: 0; transform: translateY(-3px); } }
+.beginner { display: block; width: 100%; margin: -8px 0 18px; padding: 12px; font-size: 16px; border-radius: 12px; background: linear-gradient(90deg, #2f6f3e, #3c8f4f); color: #fff; border: 2px solid #7be08f; cursor: pointer; animation: begGlow 2.4s ease-in-out infinite; }
+.beginner:hover { filter: brightness(1.15); }
+@keyframes begGlow { 50% { box-shadow: 0 0 18px rgba(123,224,143,.55); } }
+#tuto .nx { margin-top: 6px; color: #ffd257; font-size: 13px; animation: begGlow 1.6s infinite; }
+#tuto .dim { color: #b8c4d8; font-size: 13px; }

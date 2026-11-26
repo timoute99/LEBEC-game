@@ -96,7 +96,12 @@
     let pr = '';
     if (p.ride) pr = '<b>[E]</b> Descendre · <b>clic droit</b> lancer';
     else if (p.car !== null) { const c = ML.Cars.list[p.car]; pr = c && Math.abs(c.speed) < 2 ? (G.nearPump() ? '<b>[E]</b> Descendre · <b>[F]</b> Faire le plein' : '<b>[E]</b> Descendre') + (c.kind === 'fenwick' ? ' · <b>[R]</b> Fourches' : c.kind === 'camion' ? ' · <b>[R]</b> Décharger' : '') : ''; }
-    else if (G.cur) pr = `<b>[E]</b> ${U.esc(G.cur.label)}`;
+    else if (G.cur) {
+      pr = `<b>[E]</b> ${U.esc(G.cur.label)}`;
+      // V5.3 : petit conseil discret si on regarde la même chose plus d'une seconde et demie
+      const now = performance.now(); if (H._hid !== G.cur.id) { H._hid = G.cur.id; H._ht = now; }
+      if (now - H._ht > 1500 && (ML.Account.prof.hints !== false)) { const t = ML.Rules.hint(G.cur.id); if (t) pr += `<div class="hint">💡 ${U.esc(t)}</div>`; }
+    } else H._hid = null;
     if (pr !== H._pr) { H.el.prompt.innerHTML = pr; H._pr = pr; }
     if (p.car !== null && S && S.cars[p.car]) {
       const c = ML.Cars.list[p.car], sc = S.cars[p.car], bed = sc.bed, tp = sc.kind === 'tp' || sc.kind === 'fenwick';
@@ -202,9 +207,9 @@
     if (S.tour) out.push(`<span class="ev info">🚚 Jojo en tournée (${S.tour.n} colis) : ${Math.max(0, Math.ceil(S.tour.end - S.rt))} s</span>`);
     for (const p of (S.parts || [])) if (p.st === 'wait') out.push(`<span class="ev part">🙋 Client au COMPTOIR : ${Math.max(0, Math.ceil(p.exp - S.rt))} s</span>`);
     // V5.2 : service (quête), SAE, arrêts d'urgence, Black Friday
-    const Q = S.quest;
+    const Q = S.quest, G0 = ML.Game;
     if (Q && Q.st === 'ask') out.push(`<span class="ev part">🙋 ${U.esc(Q.who)} demande un service à l'entrée (${Q.reward} €)</span>`);
-    if (Q && Q.st === 'go') out.push(`<span class="ev quest">🙋 Service pour ${U.esc(Q.who)} : ${Q.need ? 'apporter ' + ML.Items.TYPES[Q.need].icon : Q.carry ? 'livrer ' + ML.Items.TYPES[Q.carry].icon : ''} → ${U.esc(Q.at.name)} <b>${Math.max(0, Math.ceil(Q.until - S.rt))} s</b></span>`);
+    if (Q && Q.st === 'go') out.push(`<span class="ev quest">🙋 Service pour ${U.esc(Q.who)} : ${Q.need ? 'apporter ' + ML.Items.TYPES[Q.need].icon : Q.carry ? 'livrer ' + ML.Items.TYPES[Q.carry].icon : ''} → ${U.esc(Q.at.name)}${G0.p ? ` (${Math.round(Math.hypot(G0.p.pos.x - Q.at.x, G0.p.pos.z - Q.at.z))} m)` : ''} <b>${Math.max(0, Math.ceil(Q.until - S.rt))} s</b>${Q.carry ? ` <span class="dim">${Q.phone && !Object.values(S.pl).some(P => (P.inv || []).some(x => x && x.type === Q.carry)) ? '· à prendre au COMPTOIR' : ''}</span>` : ''}</span>`);
     const A = S.sae;
     if (A && A.st === 'prod') out.push(`<span class="ev sae">🎓 ${U.esc(A.code)} : ${A.oids.length} × ${U.esc(A.part)} · jury vers ${ML.Sim.K.clockAt ? ML.Sim.K.clockAt(A.jury) : ''}</span>`);
     if (A && A.st === 'jury') out.push(`<span class="ev sae">🎓 JURY au marbre : ${A.got.length}/${A.oids.length} pièces <b>${Math.max(0, Math.ceil(A.end - S.rt))} s</b></span>`);

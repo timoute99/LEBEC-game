@@ -51,31 +51,56 @@ if (!SECRET) {
 }
 /** Un fichier JSON stocké soit dans server/data, soit dans le dépôt GitHub privé (Render efface ses fichiers) */
 function makeStore(ghFile, localFile, label) {
-  const st = { data: {}, sha: null, timer: null };
+  // V5.3 : « ready » = fichier bien lu. Tant que ce n'est pas le cas, on n'écrit JAMAIS (sinon on écraserait tous les comptes
+  // avec un fichier vide si GitHub ne répond pas au démarrage) et on réessaie toutes les 20 s. On fusionne ce qui a été lu
+  // avec ce qui a pu être créé entre-temps.
+  const st = { data: {}, sha: null, timer: null, ready: false, pending: false, label };
+  const mergeIn = loaded => {
+    if (!loaded || typeof loaded !== 'object') return;
+    for (const k of Object.keys(loaded)) {
+      if (Array.isArray(loaded[k]) && Array.isArray(st.data[k])) st.data[k] = loaded[k].concat(st.data[k]);
+      else if (!(k in st.data)) st.data[k] = loaded[k];
+    }
+  };
   const api = (method, body) => fetch(`https://api.github.com/repos/${GH.repo}/contents/${encodeURIComponent(ghFile)}`, { method, headers: { Authorization: `Bearer ${GH.token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'lebec-relay' }, body: body ? JSON.stringify(body) : undefined });
   st.load = async () => {
     if (useGitHub) {
       try {
         const r = await api('GET');
-        if (r.status === 200) { const j = await r.json(); st.sha = j.sha; st.data = JSON.parse(Buffer.from(j.content, 'base64').toString('utf8')) || {}; }
-        else if (r.status !== 404) console.warn(`GitHub (${label}) : lecture impossible`, r.status);
+        if (r.status === 200) {
+          const j = await r.json(); st.sha = j.sha;
+          // les gros fichiers (> 1 Mo) n'ont pas de « content » : on passe par le blob
+          let txt = j.content ? Buffer.from(j.content, 'base64').toString('utf8') : null;
+          if (!txt && j.git_url) { const b = await fetch(j.git_url, { headers: { Authorization: `Bearer ${GH.token}`, 'User-Agent': 'lebec-relay' } }); if (b.ok) txt = Buffer.from((await b.json()).content, 'base64').toString('utf8'); }
+          if (txt === null) throw new Error('contenu illisible');
+          mergeIn(JSON.parse(txt) || {}); st.ready = true;
+        } else if (r.status === 404) st.ready = true;                      // pas encore de fichier : on le créera
+        else console.warn(`GitHub (${label}) : lecture impossible`, r.status);
       } catch (e) { console.warn(`GitHub (${label}) : erreur`, e.message); }
-    } else { try { st.data = JSON.parse(fs.readFileSync(path.join(DATA, localFile), 'utf8')); } catch (e) { st.data = {}; } }
+      if (!st.ready) { setTimeout(st.load, 20000); return; }
+    } else { try { mergeIn(JSON.parse(fs.readFileSync(path.join(DATA, localFile), 'utf8'))); } catch (e) { /* pas de fichier */ } st.ready = true; }
     console.log(`${label} chargés : ${Object.keys(st.data).length} (stockage ${useGitHub ? 'github' : 'fichier'})`);
+    if (st.pending) st.save();
   };
-  st.save = () => {
-    clearTimeout(st.timer);
-    st.timer = setTimeout(async () => {
-      const txt = JSON.stringify(st.data);
-      if (useGitHub) {
+  const write = async () => {
+    if (!st.ready) { st.pending = true; return; }
+    st.pending = false;
+    const txt = JSON.stringify(st.data);
+    if (useGitHub) {
+      for (let tries = 0; tries < 3; tries++) {
         try {
           const r = await api('PUT', { message: label + ' Lebec', content: Buffer.from(txt).toString('base64'), sha: st.sha || undefined });
-          if (r.ok) { const j = await r.json(); st.sha = j.content.sha; }
-          else { console.warn(`GitHub (${label}) : écriture refusée`, r.status); if (r.status === 409 || r.status === 422) { const g = await api('GET'); if (g.ok) st.sha = (await g.json()).sha; st.save(); } }
+          if (r.ok) { const j = await r.json(); st.sha = j.content.sha; return; }
+          console.warn(`GitHub (${label}) : écriture refusée`, r.status);
+          if (r.status === 409 || r.status === 422) { const g = await api('GET'); if (g.ok) st.sha = (await g.json()).sha; continue; }
         } catch (e) { console.warn(`GitHub (${label}) : erreur`, e.message); }
-      } else { ensureData(); try { fs.writeFileSync(path.join(DATA, localFile), txt); } catch (e) { console.warn('Écriture impossible', e.message); } }
-    }, 2000);
+        await new Promise(r2 => setTimeout(r2, 1500));
+      }
+      st.pending = true; setTimeout(() => { if (st.pending) st.save(); }, 30000);           // on réessaiera plus tard, sans rien perdre
+    } else { ensureData(); try { fs.writeFileSync(path.join(DATA, localFile), txt); } catch (e) { console.warn('Écriture impossible', e.message); } }
   };
+  st.save = () => { clearTimeout(st.timer); st.dirty = true; st.timer = setTimeout(() => { st.dirty = false; write(); }, 2000); };
+  st.flush = async () => { if (st.dirty || st.pending) { clearTimeout(st.timer); st.dirty = false; await write(); } };
   return st;
 }
 const ACC = makeStore(process.env.GITHUB_PATH || 'lebec-accounts.json', 'accounts.json', 'Comptes');
@@ -122,13 +147,18 @@ function campOp(m) {
   const okData = d => d && typeof d === 'object' && !Array.isArray(d) && JSON.stringify(d).length <= SAVE_MAX_LEN;
   switch (m.op) {
     case 'create': {
+      if (!SAVES.ready) return { ok: false, m: 'Le serveur des sauvegardes démarre, réessaie dans 30 secondes.' };
       if (!okData(m.data)) return { ok: false, m: 'Sauvegarde invalide.' };
       const keys = Object.keys(SAVES.data);
       if (keys.length >= MAX_SAVES) { keys.sort((a, b) => SAVES.data[a].t - SAVES.data[b].t); for (const k of keys.slice(0, 100)) delete SAVES.data[k]; }
       const c = newSaveCode(); SAVES.data[c] = { t: Date.now(), d: Object.assign({}, m.data, { code: c }) }; SAVES.save();
       return { ok: true, code: c, data: SAVES.data[c].d };
     }
-    case 'load': { const e = SAVES.data[code]; return e ? { ok: true, code, data: e.d } : { ok: false, m: 'Aucune entreprise avec ce code.' }; }
+    case 'load': { const e = SAVES.data[code]; return e ? { ok: true, code, data: e.d } : { ok: false, m: SAVES.ready ? 'Aucune entreprise avec ce code.' : 'Le serveur des sauvegardes démarre, réessaie dans 30 secondes.' }; }
+    case 'list': {                                                        // V5.3 : toutes les entreprises, pour que tout le monde y ait accès
+      const L = Object.keys(SAVES.data).map(k => { const e = SAVES.data[k], d = e.d || {}; return { code: k, name: String(d.name || '?').slice(0, 30), day: +d.day || 1, money: Math.round(+d.money || 0), mach: Array.isArray(d.mach) ? d.mach.length : 0, t: e.t || 0 }; });
+      L.sort((a, b) => b.t - a.t); return { ok: true, list: L.slice(0, 80) };
+    }
     case 'put': {
       const e = SAVES.data[code]; if (!e) return { ok: false, m: 'Code inconnu.' };
       if (!okData(m.data)) return { ok: false, m: 'Sauvegarde trop grosse.' };
@@ -159,6 +189,7 @@ function cleanProfile(p, name) {
   };
 }
 function accountOp(m) {
+  if (!ACC.ready) return { ok: false, m: 'Le serveur des comptes démarre, réessaie dans 30 secondes.', wait: 1 };
   const user = String(m.user || '').trim().slice(0, 16), key = user.toLowerCase();
   switch (m.op) {
     case 'register': {
@@ -193,7 +224,7 @@ const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
   if (url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-    res.end(JSON.stringify({ ok: true, v: VERSION, rooms: rooms.size, players: clients.size, accounts: Object.keys(accounts).length, saves: Object.keys(SAVES.data).length, storage: useGitHub ? 'github' : 'fichier' }));
+    res.end(JSON.stringify({ ok: true, v: VERSION, rooms: rooms.size, players: clients.size, accounts: Object.keys(accounts).length, saves: Object.keys(SAVES.data).length, storage: useGitHub ? 'github' : 'fichier', ready: { comptes: ACC.ready, sauvegardes: SAVES.ready, retours: FEED.ready } }));
     return;
   }
   if (url === '/retours.txt') { res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end(fbText() || 'Aucun retour pour l\'instant.'); return; }
@@ -315,4 +346,7 @@ wss.on('connection', ws => {
 });
 setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; try { ws.ping(); } catch (e) { /* ignoré */ } } }, 15000);
 
+// V5.3 : Render arrête le serveur avec SIGTERM (mise en veille, redéploiement) : on écrit tout avant de partir
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { try { await Promise.race([Promise.all([ACC.flush(), SAVES.flush(), FEED.flush()]), new Promise(r => setTimeout(r, 8000))]); } finally { process.exit(0); } });
+accounts = ACC.data;                                                       // même objet pour toujours (les lectures fusionnent dedans)
 Promise.all([ACC.load(), SAVES.load(), FEED.load()]).then(() => { accounts = ACC.data; server.listen(PORT, () => console.log(`Mécanique Lebec V4 — serveur prêt : http://localhost:${PORT}/`)); });

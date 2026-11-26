@@ -34,6 +34,7 @@
     // SAE : un jour sur quatre (jours 2, 6, 10…), pas en inspection
     const day = S.co.day || S.day;
     K.saeAt = play && S.mode !== 'inspection' && day >= 2 && day % ECO.sae.every === 2 % ECO.sae.every ? 35 + rng() * 25 : 9e9;
+    if (S.beginner) { K.questT = 9e9; K.saeAt = 9e9; K.johanT = 9e9; }          // V5.3 : mode débutant (les quêtes arrivent à la fin du tutoriel)
     if (S.black && play) K.all(`🛍 C'est le BLACK FRIDAY ! Aujourd'hui : machines et équipements −${Math.round((1 - ECO.black.cat) * 100)} % au PC, matière −${Math.round((1 - ECO.black.supply) * 100)} %, véhicules −${Math.round((1 - ECO.black.dealer) * 100)} %, centre commercial −${Math.round((1 - ECO.black.mall) * 100)} %.`, 'good');
   };
 
@@ -135,7 +136,7 @@
   /* ---------- Toilettes ---------- */
   function wcStep(dt) {
     if (S.mode === 'course') return;
-    const before = S.wc; S.wc = Math.min(100, Math.round((S.wc + dt * ECO.wc.rate * (0.7 + 0.3 * Math.max(1, S.n))) * 100) / 100);
+    const before = S.wc; S.wc = Math.min(100, Math.round((S.wc + dt * ECO.wc.rate * (S.beginner ? 0.25 : 1) * (0.7 + 0.3 * Math.max(1, S.n))) * 100) / 100);
     if (before < ECO.wc.slow && S.wc >= ECO.wc.slow) {
       S.evs.wc = { until: 1e9 }; K.ev({ e: 'tip', k: 'wc' }); K.sfx('fail');
       K.all('🚽 Les toilettes sont DÉGOÛTANTES : les opérateurs traînent (cabine WC à gauche de l\'atelier, dehors).', 'warn');
@@ -178,6 +179,19 @@
       return;
     }
     if (Q.st === 'ask' && S.rt > Q.exp) { const n = npcs[Q.giver]; if (n) goAway(n, 'Bon… tant pis, je vais demander ailleurs.'); S.quest = null; Sim.dirty = true; return; }
+    // V5.3 : le service se termine tout seul quand on arrive sur place avec le bon objet en main (ou posé par terre à côté)
+    if (Q.st === 'go' && !Q.mg) {
+      Q.chk = (Q.chk || 0) - dt;
+      if (Q.chk <= 0) {
+        Q.chk = 0.5; const want = Q.need || Q.carry;
+        for (const pid in S.pl) {
+          const P = S.pl[pid], ps = K.pose[pid]; if (!ps || Math.hypot(ps.x - Q.at.x, ps.z - Q.at.z) > 4.5) continue;
+          const i = P.inv.findIndex(x => x && x.type === want); if (i >= 0) { questDone(pid, P, i, P.inv[i], {}); return; }
+        }
+        const it = want && S.items.find(o => o.type === want && Math.hypot(o.x - Q.at.x, o.z - Q.at.z) < 5);
+        if (it) { S.items = S.items.filter(o => o !== it); finish(Object.keys(S.pl).find(pid => name(pid) === Q.by) || Object.keys(S.pl)[0]); return; }
+      }
+    }
     if (Q.st === 'go' && S.rt > Q.until) {
       K.all(`⌛ Service raté pour ${Q.who} : trop tard (réputation −1).`, 'warn'); K.repAdd(-1);
       if (Q.carry) { S.items = S.items.filter(o => o.type !== Q.carry); for (const pid in S.pl) S.pl[pid].inv = S.pl[pid].inv.map(x => (x && x.type === Q.carry ? null : x)); }
@@ -217,6 +231,10 @@
     if (want && (!held || held.type !== want)) return K.note(pid, `Il faut avoir en main : ${IT.TYPES[want].icon} ${typeof IT.TYPES[want].name === 'function' ? IT.TYPES[want].name({ to: Q.at.name }) : IT.TYPES[want].name}.`, 'warn');
     if (Q.mg && m.mg !== 'ok') return;
     if (Q.carry || ['viennoiseries', 'jerrican'].includes(Q.need)) P.inv[sel] = null;       // les outils de l'atelier, eux, on les garde
+    finish(pid);
+  }
+  function finish(pid) {
+    const Q = S.quest; if (!Q) return;
     K.bonus(Q.reward, `Service rendu à ${Q.who}`, pid); K.repAdd(2); K.stat(pid, 'quest');
     K.big(`🙋 Service rendu à ${Q.who} : +${Q.reward} €`, '#3ecf6e'); K.sfx('cash');
     K.all(`🙋 ${name(pid)} a rendu service à ${Q.who} (${Q.at.name}) : « ${ML.QUESTS[Q.qi].done} » +${Q.reward} €, réputation +2.`, 'good');

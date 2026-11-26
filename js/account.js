@@ -21,9 +21,14 @@
   A.name = () => (A.logged() ? A.user : (A.prof.name || ''));
 
   /** Enregistre (localement + sur le serveur si connecté à un compte) */
+  // V5.3 : si le serveur n'est pas joignable (réseau, Render qui se réveille…), on garde le profil ici et on l'envoie dès le retour
   A.save = async () => {
     localStorage.setItem('ml_profile', JSON.stringify(A.prof));
-    if (A.logged() && N.online) { const r = await N.acc('save', { token: A.token, profile: A.prof }); if (!r.ok && /expir/i.test(r.m || '')) A.logout(); }
+    if (!A.logged()) return;
+    if (!N.online) { localStorage.setItem('ml_dirty', '1'); return; }
+    const r = await N.acc('save', { token: A.token, profile: A.prof });
+    if (r.ok) localStorage.removeItem('ml_dirty');
+    else if (/expir/i.test(r.m || '')) A.logout(); else localStorage.setItem('ml_dirty', '1');
   };
   A.auth = async (op, user, pass) => {
     const r = await N.acc(op, { user, pass, profile: op === 'register' ? A.prof : undefined });
@@ -34,12 +39,15 @@
   };
   A.resume = async () => {
     if (!A.token || !N.online) return false;
-    const r = await N.acc('resume', { token: A.token });
-    if (!r.ok) { A.logout(); return false; }
-    A.user = r.user; A.prof = Object.assign(fresh(r.user), r.profile || {}); localStorage.setItem('ml_profile', JSON.stringify(A.prof));
+    let r = await N.acc('resume', { token: A.token });
+    for (let i = 0; i < 4 && !r.ok && r.wait; i++) { await new Promise(ok => setTimeout(ok, 8000)); r = await N.acc('resume', { token: A.token }); }   // serveur qui démarre
+    if (!r.ok) { if (/expir/i.test(r.m || '')) A.logout(); return false; }     // une simple coupure ne déconnecte plus le compte
+    A.user = r.user;
+    if (localStorage.getItem('ml_dirty') === '1' && A.prof && A.prof.v === 2) A.save();   // des progrès faits hors ligne : on les envoie
+    else { A.prof = Object.assign(fresh(r.user), r.profile || {}); localStorage.setItem('ml_profile', JSON.stringify(A.prof)); }
     return true;
   };
-  A.logout = () => { A.token = null; A.user = null; localStorage.removeItem('ml_token'); localStorage.removeItem('ml_user'); };
+  A.logout = () => { A.token = null; A.user = null; localStorage.removeItem('ml_token'); localStorage.removeItem('ml_user'); localStorage.removeItem('ml_dirty'); };
 
   /* ---------- Boutique ---------- */
   A.owns = id => A.prof.owned.includes(id);

@@ -132,7 +132,7 @@
         const o = S.orders.find(x => x.id === +m.id); if (!o || o.q) return;
         const st = K.stage(o); if (st !== 'fonderie' && st !== 'chaudro') return;
         if (!K.spend(pid, ECO.subPC[st], 'achat', 'le brut')) return;
-        o.q = true; const d = ECO.subDelay, eta = S.rt + d[0] + rng() * (d[1] - d[0]);
+        o.q = true; const d = ECO.subDelay, eta = S.rt + (d[0] + rng() * (d[1] - d[0])) * (S.beginner && !S.tutoDone ? 0.2 : 1);     // V5.3 : mode débutant (tutoriel) = livraison express
         S.deliv.push({ id: S.nextId++, oid: o.id, sub: st, eta, from: st, name: `Brut ${st === 'fonderie' ? 'de fonderie' : 'mécano-soudé'} #${o.id}` });
         K.all(`🛒 ${name(pid)} a commandé le brut de la #${o.id} chez ${COMP[st].name} (${ECO.subPC[st]} €) : livré à l'atelier dans ~${Math.round((eta - S.rt) / 6) / 10} min.`, 'info');
         Sim.dirty = true; return;

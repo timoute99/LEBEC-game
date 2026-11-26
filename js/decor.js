@@ -339,7 +339,7 @@
     }
   }
   function house(F) {
-    const w = 9 + rng() * 3, d = 7.5 + rng() * 2, floors = rng() < 0.55 ? 1 : 2, h = floors * 2.9, wall = pick(WALLS), roof = pick(ROOFS), z0 = -1;
+    const w = 9 + rng() * 3, d = 7.5 + rng() * 2, floors = rng() < 0.55 ? 1 : 2, h = floors * 2.9, wall = pick(WALLS), roof = pick(ROOFS), z0 = -1; FP = [w, d, z0];
     F.box(w, h, d, 0, h / 2, z0, wall, { jit: 0.04 }); F.box(w + 0.1, 0.4, d + 0.1, 0, 0.2, z0, 0x7f8c8d);
     F.sh('prism', w + 0.8, 2.4, d + 1.0, 0, h + 1.2, z0, roof, { jit: 0.04 });
     F.box(0.8, 2.2, 0.8, w * 0.25, h + 2.1, z0 - d * 0.15, 0x8d6e63); F.box(0.95, 0.15, 0.95, w * 0.25, h + 3.25, z0 - d * 0.15, 0x5d4037);
@@ -360,7 +360,7 @@
     else if (rng() < 0.3) { F.sh('cyl', 2.2, 0.1, 2.2, w * 0.3, 0.7, gz + 0.6, 0x2c3e50); for (const s of [-1, 1]) F.box(0.06, 0.7, 0.06, w * 0.3 + s * 0.9, 0.35, gz + 0.6, 0x7f8c8d); }  // trampoline
   }
   function shop(F) {
-    const w = 12 + rng() * 1.5, d = 10, floors = 2 + Math.floor(rng() * 2), fh = 3.2, h = floors * fh + 0.6, wall = pick(WALLS), zf = d / 2 - 1;
+    const w = 12 + rng() * 1.5, d = 10, floors = 2 + Math.floor(rng() * 2), fh = 3.2, h = floors * fh + 0.6, wall = pick(WALLS), zf = d / 2 - 1; FP = [w, d, -1];
     F.box(w, h, d, 0, h / 2, -1, wall, { jit: 0.04 });
     F.box(w + 0.1, fh, 0.15, 0, fh / 2, zf + 0.02, 0x2c3e50); F.glass(w - 3.4, fh - 1.1, 0.12, -0.8, fh / 2 - 0.2, zf + 0.06, 0x9fd3f0);
     for (let i = 0; i < 3; i++) F.box(0.9, 0.6, 0.03, -w / 2 + 2.2 + i * 2.6, 1.2 + (i % 2) * 0.5, zf + 0.13, pick([0xff7eb6, 0xf1c40f, 0xffffff, 0x2ecc71]));   // affiches « PROMO » sur la vitrine
@@ -374,7 +374,7 @@
     sign(n, s, '#' + new THREE.Color(c1).getHexString(), '#ffffff', Math.min(w - 2, 8), 1.3, p.x, fh + 1.15, p.z, F.a, { border: '#ffffff', glow: true });
   }
   function flats(F) {
-    const w = 12.5, d = 11, floors = 4 + Math.floor(rng() * 3), fh = 3, h = floors * fh + 0.4, wall = pick(WALLS), band = pick(WALLS), zf = d / 2 - 1.5;
+    const w = 12.5, d = 11, floors = 4 + Math.floor(rng() * 3), fh = 3, h = floors * fh + 0.4, wall = pick(WALLS), band = pick(WALLS), zf = d / 2 - 1.5; FP = [w, d, -1.5];
     F.box(w, h, d, 0, h / 2, -1.5, wall, { jit: 0.04 }); F.box(w + 0.1, 1.1, d + 0.1, 0, 0.55, -1.5, 0x7f8c8d);
     for (let f = 1; f < floors; f += 2) F.box(w + 0.06, 0.35, d + 0.06, 0, f * fh, -1.5, band);
     windows(F, w - 1, floors, fh, 0, zf + 0.02, 0); windows(F, d - 2, floors, fh, 0, w / 2 + 0.02, 1, {}); windows(F, d - 2, floors, fh, 0, w / 2 + 0.02, -1, {});
@@ -396,7 +396,7 @@
   /** Immeuble de remplissage : true si on l'a dessiné (sinon world.js pose un modèle KayKit) */
   const RESID = ['Résidence Les Tilleuls', 'Résidence du Taraud', 'Les Hauts de la Fraiseuse', 'Résidence Le Copeau', 'Les Jardins du Mandrin', 'Résidence Pied à Coulisse'];
   function espacil(F, f) {                                                 // V5 : immeubles Espacil (bailleur social, client de l'atelier)
-    const w = 13, d = 11, floors = 5 + Math.floor(rng() * 3), fh = 3, h = floors * fh + 0.4, zf = d / 2 - 1.5, teal = 0x13a89e;
+    const w = 13, d = 11, floors = 5 + Math.floor(rng() * 3), fh = 3, h = floors * fh + 0.4, zf = d / 2 - 1.5, teal = 0x13a89e; FP = [w, d, -1.5];
     F.box(w, h, d, 0, h / 2, -1.5, 0xf3efe6, { jit: 0.03 }); F.box(w + 0.1, 1.1, d + 0.1, 0, 0.55, -1.5, 0x8d969c);
     for (let fl = 1; fl < floors; fl++) F.box(w + 0.06, 0.25, d + 0.06, 0, fl * fh, -1.5, fl % 2 ? teal : 0xd5d8dc);
     F.box(0.8, h, 0.15, -w / 2 + 2, h / 2, zf + 0.06, teal); F.box(0.8, h, 0.15, w / 2 - 2, h / 2, zf + 0.06, 0xf39c12);
@@ -408,7 +408,9 @@
     sign('ESPACIL', name, '#13a89e', '#ffffff', 4.2, 1.2, p.x, 3.4, p.z, F.a, { border: '#ffffff', glow: true });
     for (let i = 0; i < 4; i++) F.box(0.8, 1.1, 0.5, -w / 2 + 1 + i * 0.95, 0.55, zf + 2.4, [0x27ae60, 0xf1c40f, 0x2c3e50, 0x95a5a6][i]);   // poubelles de tri
   }
-  D.building = f => {
+  let FP = null;                                                          // V5.3 : emprise réelle du dernier bâtiment (collision = ce qu'on voit)
+  D.building = f => { FP = null; const ok = building(f); f.fp = ok && FP ? [FP[0] + 0.5, FP[1] + 0.5, FP[2]] : null; return ok; };
+  function building(f) {
     const r = rng();
     if (f.espacil) { f.style = 'espacil'; espacil(frame(f.x, f.z, f.rot), f); return true; }
     if (f.lieu && ML.LIEUX[f.lieu]) {                                     // V5.2 : maison / appartement d'un copain, avec son nom
@@ -423,7 +425,7 @@
     f.style = r < 0.55 ? 'maison' : r < 0.78 ? 'boutique' : 'immeuble';
     if (r < 0.55) house(F); else if (r < 0.78) shop(F); else flats(F);
     return true;
-  };
+  }
 
   /* =====================================================================
      RUES et NATURE

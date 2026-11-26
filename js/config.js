@@ -8,7 +8,7 @@ window.ML = window.ML || {};
 ML.debug = /[?&]debug/.test(location.search);
 
 ML.CFG = {
-  SHIFT_SEC: 480,                      // une journée (7h → 19h) = 8 minutes réelles
+  SHIFT_SEC: 420,                      // une journée (7h → 19h) = 7 minutes réelles (V5.3 : plus courte)
   DAY_START: 7 * 60, DAY_END: 19 * 60,
   PLAYER: { eye: 1.65, r: 0.35, walk: 5.6, sprint: 8.8, stamina: 4 },
   CAR: { accel: 13, brake: 24, max: 27, rev: 7, steer: 0.55, wb: 2.6, cap: 4, fuelUse: 0.04 },
@@ -48,10 +48,18 @@ ML.STEP = { fonderie: 'Fonderie', chaudro: 'Chaudronnerie', usinage: 'Usinage', 
 
 ML.PARTS = {
   plain: [['Arbre Ø40', 'acier', 'tour', 'plaquette'], ['Bague', 'alu', 'tour', 'plaquette'], ['Axe épaulé', 'inox', 'tour', 'plaquette'],
-          ['Bride de serrage', 'acier', 'fraiseuse', 'fraise'], ['Platine percée', 'alu', 'fraiseuse', 'foret'], ['Équerre', 'inox', 'fraiseuse', 'foret']],
-  fonderie: [['Corps de vanne', 'fonte', 'fraiseuse', 'fraise'], ['Moyeu fonte', 'fonte', 'tour', 'plaquette']],
-  chaudro: [['Bâti mécano-soudé', 'soude', 'fraiseuse', 'foret'], ['Embase soudée', 'soude', 'fraiseuse', 'fraise']],
-  tth: [['Arbre traité', 'acier', 'tour', 'plaquette'], ['Pignon traité', 'acier', 'fraiseuse', 'fraise']],
+          ['Bride de serrage', 'acier', 'fraiseuse', 'fraise'], ['Platine percée', 'alu', 'fraiseuse', 'foret'], ['Équerre', 'inox', 'fraiseuse', 'foret'],
+          // V5.3 : plus de pièces différentes
+          ['Entretoise', 'alu', 'tour', 'plaquette'], ['Douille', 'acier', 'tour', 'plaquette'], ['Goupille épaulée', 'inox', 'tour', 'plaquette'], ['Flasque', 'alu', 'tour', 'plaquette'],
+          ['Support de palier', 'acier', 'fraiseuse', 'fraise'], ['Plaque de base', 'alu', 'fraiseuse', 'fraise'], ['Came', 'acier', 'fraiseuse', 'fraise'],
+          ['Raidisseur', 'acier', 'fraiseuse', 'foret'], ['Cale de réglage', 'inox', 'fraiseuse', 'fraise'], ['Rondelle épaisse', 'acier', 'tour', 'plaquette']],
+  fonderie: [['Corps de vanne', 'fonte', 'fraiseuse', 'fraise'], ['Moyeu fonte', 'fonte', 'tour', 'plaquette'], ['Carter de réducteur', 'fonte', 'fraiseuse', 'fraise'], ['Poulie fonte', 'fonte', 'tour', 'plaquette'], ['Palier fonte', 'fonte', 'fraiseuse', 'foret']],
+  chaudro: [['Bâti mécano-soudé', 'soude', 'fraiseuse', 'foret'], ['Embase soudée', 'soude', 'fraiseuse', 'fraise'], ['Châssis soudé', 'soude', 'fraiseuse', 'fraise'], ['Potence soudée', 'soude', 'fraiseuse', 'foret'], ['Cadre de protection', 'soude', 'fraiseuse', 'foret']],
+  tth: [['Arbre traité', 'acier', 'tour', 'plaquette'], ['Pignon traité', 'acier', 'fraiseuse', 'fraise'], ['Axe cémenté', 'acier', 'tour', 'plaquette'], ['Came trempée', 'acier', 'fraiseuse', 'fraise'], ['Couteau de broyeur', 'acier', 'fraiseuse', 'fraise']],
+  aerotech: [['Ferrure d\'aile', 'alu', 'fraiseuse', 'fraise'], ['Axe de train', 'inox', 'tour', 'plaquette'], ['Support de capteur', 'alu', 'fraiseuse', 'foret']],
+  agrimeca: [['Dent de herse', 'acier', 'fraiseuse', 'foret'], ['Moyeu de roue', 'acier', 'tour', 'plaquette'], ['Axe de relevage', 'acier', 'tour', 'plaquette']],
+  novatics: [['Boîtier électronique', 'alu', 'fraiseuse', 'fraise'], ['Radiateur', 'alu', 'fraiseuse', 'foret'], ['Entretoise filetée', 'inox', 'tour', 'plaquette']],
+  ublo: [['Boîtier de montre', 'inox', 'tour', 'plaquette'], ['Couronne', 'inox', 'tour', 'plaquette'], ['Platine de mouvement', 'alu', 'fraiseuse', 'foret']],
   // pièces propres à un client (demandes « simples »)
   espacil: [['Gond de portail', 'acier', 'tour', 'plaquette'], ['Axe de porte de garage', 'inox', 'tour', 'plaquette'], ['Platine de boîte aux lettres', 'alu', 'fraiseuse', 'foret'],
             ['Patte de garde-corps', 'acier', 'fraiseuse', 'fraise'], ['Fouillot de serrure', 'inox', 'fraiseuse', 'foret'], ['Galet de porte coulissante', 'alu', 'tour', 'plaquette']]
@@ -188,7 +196,7 @@ ML.EVTIPS = {
   johan: ['🦹 Johan Bois', ['Il vole les caisses PRÊTES (expédition).', 'Claque-le pour qu\'il lâche la caisse !', 'Au PC : un VIGILE l\'empêche d\'entrer.']],
   bleuenn: ['💣 Bleuenn a tout fait sauter', ['Plus de courant : TABLEAU ÉLECTRIQUE (mur droit).', 'Puis E sur CHAQUE machine pour la redémarrer.', 'Éteins les feux à l\'extincteur.']],
   wc: ['🚽 Toilettes dégoûtantes', ['Les opérateurs ralentissent (et Lebec râle).', 'Cabine WC à gauche de l\'atelier, dehors.', 'E puis tape Espace pour nettoyer.']],
-  quest: ['🙋 Quelqu\'un demande un service', ['Va le voir (E) au comptoir.', 'Accepte : un repère s\'affiche sur la carte (M).', 'Récompense en euros + réputation.']],
+  quest: ['🙋 Quelqu\'un demande un service', ['Il arrive à l\'entrée (E sur lui) ou il appelle.', 'Prends l\'objet demandé (ou celui posé au COMPTOIR).', 'Va au repère (M) avec l\'objet en main : c\'est validé tout seul !']],
   sae: ['🎓 SAE du jour', ['Usine les pièces SAE (tickets violets).', 'Contrôle-les au MARBRE (meilleure note).', 'Apporte-les au JURY au marbre avant la fin.']]
 };
 
@@ -280,13 +288,13 @@ ML.ECO = {
   jail: { peds: 3, sec: 45, bail: 150 },                        // 3 passants renversés → la gendarmerie te poursuit ; prison 45 s (caution 150 €)
   bonus: { audit: 30, mathieu: 10, fred: 10, herve: 20 },
   rep: { ok: 2, late: 1, fail: 3, expire: 1, part: 3, partFail: 3, audit: 3 },
-  stars: [100, 350, 700],                                       // bénéfice du jour pour 1, 2, 3 étoiles (× nb joueurs, machines…)
+  stars: [80, 290, 600],                                       // bénéfice du jour pour 1, 2, 3 étoiles (× nb joueurs, machines…)
   // --- V5.2 ---
   black: { every: 5, cat: 0.6, supply: 0.7, dealer: 0.75, mall: 0.5 },    // BLACK FRIDAY un jour sur 5 : multiplicateurs de prix
   radarWitness: 0.35,                                           // casser un radar : risque d'être vu (amende « vandal »)
   wc: { rate: 0.12, slow: 70 },                                 // toilettes : salissure par seconde (× joueurs) ; au-delà de 70 % les opérateurs ralentissent
   gym: 10, enduMax: 10,                                         // séance de tapis (€) ; niveau d'endurance max
-  quest: { every: [130, 220], life: 200, reward: [50, 120] },   // quêtes secondaires
+  quest: { every: [130, 220], life: 260, reward: [60, 140] },   // quêtes secondaires
   sae: { every: 4, parts: 2, bon: 2.5, max: 50 }                // SAE : tous les 4 jours ; 2 pièces ; bon de réduction = note × 2,5 % (50 % max) sur une machine
 };
 /* Produits commandés au PC (prix à l'unité). Tout arrive dans UN colis en réception : on l'ouvre (R) et on range.
@@ -309,7 +317,7 @@ ML.CATALOG = {
   T4: { cat: 'machine', name: 'Tour CN T4', price: 1900, mach: 'T4', need: 'extension', desc: 'Dans l\'extension Est.' },
   F4: { cat: 'machine', name: 'Fraiseuse CN F4', price: 1900, mach: 'F4', need: 'extension', desc: 'Dans l\'extension Est.' },
   tp: { cat: 'equip', name: 'Transpalette', price: 250, veh: 'tp', desc: 'Déplace 4 caisses dans l\'atelier.' },
-  fenwick: { cat: 'equip', name: 'Fenwick', price: 1200, veh: 'fenwick', desc: 'Indispensable pour les GROSSES pièces (rôle cariste).' },
+  fenwick: { cat: 'equip', name: 'Fenwick', price: 650, veh: 'fenwick', desc: 'Indispensable pour les GROSSES pièces sur palette (quai gros colis). Avec le camion plateau du garage, elles rapportent gros.' },
   erp_auto: { cat: 'atelier', name: 'Logiciel ERP+ (acceptation auto)', price: 450, desc: 'Les demandes des clients sont acceptées toutes seules.', now: true },
   isolation: { cat: 'atelier', name: 'Isolation du bâtiment', price: 500, desc: 'Moins de flaques par temps de pluie, opérateurs +5 %.', now: true },
   eclairage: { cat: 'atelier', name: 'Éclairage LED', price: 400, desc: 'Opérateurs +8 % (et on y voit enfin le soir).', now: true },
@@ -346,7 +354,7 @@ ML.DEALER = {
   megane: { name: 'Méga Mégane (tunée)', price: 900, desc: 'Rapide, benne de 4 caisses, 3 places.', specs: [['Vitesse max', 'CAR'], ['Benne', '4 caisses (6 avec rehausses)'], ['Places', '3 (+2 dans la benne)'], ['Conso', 'raisonnable'], ['Bonus', 'aileron et flammes possibles']] },
   ducato: { name: 'Ducato', price: 1400, desc: 'Grosse benne (6 caisses), stable.', specs: [['Vitesse max', 'DUCATO'], ['Benne', '6 caisses'], ['Places', '3'], ['Conso', 'moyenne'], ['Bonus', 'très stable dans les virages']] },
   scooter: { name: 'Scooter de livraison', price: 380, desc: 'Pas cher et sobre, mais lent : un top-case de 2 caisses.', specs: [['Vitesse max', 'SCOOTER'], ['Top-case', '2 caisses'], ['Places', '1 (pilote)'], ['Conso', 'presque rien'], ['Bonus', 'se faufile partout']] },
-  camion: { name: 'Camion plateau (poids lourd)', price: 2600, desc: 'Palettes ET caisses, rapide et stable (rôle livreur).', specs: [['Vitesse max', 'CAMION'], ['Plateau', '8 places (palette = 4)'], ['Places', '1 passager'], ['Conso', 'gourmand'], ['Permis', 'rôle 🚚 Livreur']] }
+  camion: { name: 'Camion plateau (poids lourd)', price: 1500, desc: 'Palettes ET caisses, rapide et stable (rôle livreur).', specs: [['Vitesse max', 'CAMION'], ['Plateau', '8 places (palette = 4)'], ['Places', '1 passager'], ['Conso', 'gourmand'], ['Permis', 'rôle 🚚 Livreur']] }
 };
 /* V5.2 : CENTRE COMMERCIAL (stands) : de quoi manger (R : manger) et de quoi se taper (clic gauche) */
 ML.MALL = {
@@ -381,8 +389,8 @@ ML.APP_IDS = ['app1', 'app2', 'app3', 'app4', 'app5'];
 /* Rôles (choisis au salon). Sans joueur pour un rôle, un PNJ le fait… lentement. */
 /* Difficultés : durée des tickets, cadence, chaos, colère de Lebec, dégâts, points, seuils d'étoiles */
 ML.DIFFS = {
-  facile: { name: 'Facile', icon: '🙂', desc: 'Tickets longs, peu de chaos, Lebec patient.', dur: 1.4, interval: 1.3, chaos: 0.5, anger: 0.6, base: 0, run: 0.9, dmg: 0.6, points: 1, stars: 0.75, events: [1, 2] },
-  normal: { name: 'Normal', icon: '😐', desc: 'L\'atelier comme d\'habitude.', dur: 1, interval: 1, chaos: 1, anger: 1, base: 0, run: 1, dmg: 1, points: 1, stars: 1, events: [2, 4] },
+  facile: { name: 'Facile', icon: '🙂', desc: 'Tickets longs, peu de chaos, Lebec patient.', dur: 1.6, interval: 1.3, chaos: 0.45, anger: 0.5, base: 0, run: 0.9, dmg: 0.5, points: 1, stars: 0.7, events: [0, 2] },
+  normal: { name: 'Normal', icon: '😐', desc: 'L\'atelier comme d\'habitude.', dur: 1.15, interval: 1.05, chaos: 0.85, anger: 0.8, base: 0, run: 1, dmg: 0.85, points: 1, stars: 1, events: [1, 3] },
   difficile: { name: 'Difficile', icon: '😤', desc: 'Tickets serrés, pannes et feux fréquents, Lebec à cran.', dur: 0.85, interval: 0.85, chaos: 1.5, anger: 1.3, base: 10, run: 1.08, dmg: 1.25, points: 1.2, stars: 1.1, events: [3, 4] },
   feu: { name: 'LEBEC EN FEU', icon: '🔥', desc: 'Tout brûle. Lebec voit tout, court vite et cogne fort. Points ×1,5.', dur: 0.75, interval: 0.7, chaos: 2.2, anger: 1.8, base: 25, run: 1.18, dmg: 1.5, points: 1.5, stars: 1.2, events: [4, 5], sight: 1.6 }
 };

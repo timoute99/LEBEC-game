@@ -6,6 +6,20 @@
    serveur : https://lebec-game.onrender.com/retours (et /retours.txt).
    ===================================================================== */
 ML.PATCH = [
+  { v: 'V5.3', d: 'novembre 2026', t: 'Un vrai ordinateur, un mode débutant, et l\'atelier plus facile à prendre en main', l: [
+    '💻 Le PC de gestion devient un VRAI ORDINATEUR (« LebecOS ») : un bureau avec des icônes d\'applications, des fenêtres, une barre des tâches, un menu Démarrer… et un 📌 pense-bête qui dit quoi faire maintenant.',
+    '💡 Nouvelle appli ASTUCES sur le PC : le guide complet (mécano-soudé, fonderie, TTH, grosses pièces, événements, véhicules, argent, touches).',
+    '💡 Regarde un objet ou une personne un moment : un petit conseil discret s\'affiche sous l\'action.',
+    '🐣 MODE DÉBUTANT (gros bouton vert sur l\'accueil) : un tutoriel complet qui explique TOUT, pas à pas, du premier pas à la commande mécano-soudée. Le temps passe 2× moins vite et il n\'y a aucun imprévu pendant le tuto. L\'ancien tutoriel est toujours là.',
+    '👤 Comptes plus solides : rien n\'est perdu si le serveur redémarre, on n\'est plus déconnecté pour rien, et 🌍 TOUTES les entreprises du serveur sont visibles et jouables par tout le monde.',
+    '🔩 Beaucoup plus de pièces différentes, et chaque client a les siennes (AéroTech, AgriMéca, Novatics, Ublo…).',
+    '⏱ Journées plus courtes (7 min) et un peu plus faciles : délais plus longs, moins d\'imprévus, Lebec plus patient.',
+    '🏗 Les GROSSES pièces arrivent dès le jour 2 (tout de suite à 3 joueurs et plus). Fenwick à 650 € et camion à 1 500 € : enfin utiles !',
+    '🙋 Les services (clés de Trit, carton de Patrick…) marchent : il suffit d\'arriver sur place avec l\'objet. Distance affichée, plus de temps, plus de sous.',
+    '💨 La soufflette va jusque dans la cour : on peut nettoyer les taches devant la porte.',
+    '🦹 Taper Johan Bois ou Bleuenn ne vaut plus de coups de pelle : Lebec ferme les yeux.',
+    '🚗 Fini les murs invisibles en ville : les collisions des maisons suivent enfin leur vraie taille.'
+  ] },
   { v: 'V5.2', d: 'novembre 2026', t: 'Vos idées : Johan Bois, Bleuenn, SAE, centre commercial, quêtes…', l: [
     '📋 Tickets du haut : une barre d\'AVANCEMENT et une ligne 👷 qui dit QUI s\'occupe de la commande (et où elle en est : machine, en main, dans la Mégane…).',
     '🔒 Zones bloquées : le compte à rebours descend VRAIMENT pendant la journée, et on peut les débloquer TOUT DE SUITE au PC (plus cher).',
