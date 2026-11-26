@@ -41,18 +41,34 @@
     opts = opts || {};
     const g = new THREE.Group(), d = it.d || {}, U = ML.U;
     switch (it.type) {
-      case 'brut_acier': case 'brut_alu': case 'brut_inox':
-        U.cyl(0.075, 0.075, 0.6, M[I.TYPES[it.type].mat].color, 0, 0.075, 0, g).rotation.z = Math.PI / 2; break;
+      case 'brut_acier': case 'brut_alu': case 'brut_inox': {                       // V5 : barre avec bout peint (code couleur) + étiquette
+        const mat = I.TYPES[it.type].mat, b = U.cyl(0.075, 0.075, 0.6, M[mat].color, 0, 0.075, 0, g, 12); b.rotation.z = Math.PI / 2;
+        const paint = { acier: 0x2e6fd6, alu: 0x27ae60, inox: 0xe74c3c }[mat];
+        U.cyl(0.077, 0.077, 0.05, paint, 0, 0.275, 0, b, 12); U.cyl(0.065, 0.075, 0.015, 0x666666, 0, -0.305, 0, b, 12);
+        U.box(0.02, 0.12, 0.06, 0xffffff, 0.072, 0.05, 0, b, false); break;
+      }
       case 'brut_sp':
         if (d.mat === 'fonte') { U.cyl(0.22, 0.22, 0.25, M.fonte.color, 0, 0.125, 0, g); U.cyl(0.08, 0.08, 0.3, 0x3a322c, 0, 0.15, 0, g); }
         else { U.box(0.55, 0.06, 0.4, M.soude.color, 0, 0.03, 0, g); U.box(0.06, 0.3, 0.4, M.soude.color, -0.25, 0.18, 0, g); U.box(0.06, 0.3, 0.4, M.soude.color, 0.25, 0.18, 0, g); }
         break;
-      case 'plaquette': U.box(0.25, 0.1, 0.18, 0x333333, 0, 0.05, 0, g); U.box(0.12, 0.03, 0.12, T.plaquette.color, 0, 0.11, 0, g); break;
-      case 'fraise': U.cyl(0.045, 0.045, 0.28, T.fraise.color, 0, 0.14, 0, g); break;
-      case 'foret': U.cyl(0.02, 0.025, 0.34, T.foret.color, 0, 0.17, 0, g); break;
+      case 'plaquette': {                                                              // boîte + plaquette en losange (trou de vis)
+        U.box(0.25, 0.1, 0.18, 0x333333, 0, 0.05, 0, g); U.box(0.2, 0.012, 0.13, 0x111111, 0, 0.101, 0, g);
+        const p2 = U.box(0.11, 0.03, 0.11, T.plaquette.color, 0, 0.12, 0, g); p2.rotation.y = Math.PI / 4; p2.scale.set(1, 1, 0.62);
+        U.cyl(0.018, 0.018, 0.035, 0x222222, 0, 0.125, 0, g, 8); break;
+      }
+      case 'fraise': {                                                                 // fraise 2 tailles : queue lisse + goujures en spirale
+        U.cyl(0.045, 0.045, 0.14, 0xb2bec3, 0, 0.07, 0, g, 10);
+        for (let i = 0; i < 6; i++) { const f = U.box(0.1, 0.022, 0.03, T.fraise.color, 0, 0.16 + i * 0.022, 0, g); f.rotation.y = i * 0.55; }
+        U.cyl(0.046, 0.04, 0.02, T.fraise.color, 0, 0.29, 0, g, 10); break;
+      }
+      case 'foret': {                                                                  // foret hélicoïdal + pointe
+        U.cyl(0.022, 0.022, 0.13, 0x95a5a6, 0, 0.065, 0, g, 8);
+        for (let i = 0; i < 8; i++) { const f = U.box(0.05, 0.022, 0.014, T.foret.color, 0, 0.14 + i * 0.022, 0, g); f.rotation.y = i * 0.7; }
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.05, 8), U.mat(T.foret.color)); tip.position.y = 0.335; g.add(tip); break;
+      }
       case 'extincteur': U.cyl(0.11, 0.11, 0.55, 0xd62d20, 0, 0.28, 0, g); U.box(0.08, 0.1, 0.18, 0x222222, 0, 0.6, 0.05, g); break;
       case 'cle': U.box(0.06, 0.03, 0.34, 0x95a5a6, 0, 0.02, 0, g); U.box(0.12, 0.035, 0.08, 0x7f8c8d, 0, 0.02, 0.18, g); break;
-      case 'soufflette': U.box(0.06, 0.16, 0.08, 0xf1c40f, 0, 0.08, 0, g); U.cyl(0.015, 0.015, 0.3, 0x95a5a6, 0, 0.16, 0.18, g).rotation.x = Math.PI / 2; break;
+      case 'soufflette': U.box(0.06, 0.16, 0.08, 0xf1c40f, 0, 0.08, 0, g); U.box(0.05, 0.04, 0.1, 0x2c3e50, 0, 0.13, -0.06, g); U.cyl(0.015, 0.015, 0.3, 0x95a5a6, 0, 0.16, 0.18, g).rotation.x = Math.PI / 2; U.cyl(0.02, 0.02, 0.05, 0x2980b9, 0, 0.0, 0, g, 8); break;
       case 'jerrican': U.box(0.3, 0.38, 0.16, 0x27ae60, 0, 0.19, 0, g); U.box(0.1, 0.06, 0.06, 0x222222, 0.08, 0.41, 0, g); break;
       case 'casque': { const m = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), U.mat(0xf1c40f)); g.add(m); break; }
       case 'convention': U.box(0.34, 0.012, 0.24, 0xffffff, 0, 0.01, 0, g); U.box(0.08, 0.016, 0.04, d.signee ? 0x27ae60 : 0xc0392b, 0.1, 0.012, 0.08, g); break;

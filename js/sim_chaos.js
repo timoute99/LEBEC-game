@@ -16,7 +16,7 @@
     for (const id in S.machines) S.machines[id].chips = Math.floor(rng() * 35);
     K.pudT = (40 + rng() * 40) / K.D.chaos; K.slipCd = {};
     if (rng() < 0.6) addPuddle(-8 + rng() * 16, -2 + rng() * 6);
-    if (S.weather === 'pluie' && !S.up.isolation) for (let i = 0; i < 3; i++) addPuddle(-8 + rng() * 16, 16 + rng() * 6);
+    if ((ML.WEATHER[S.weather] || {}).wet && !S.up.isolation) for (let i = 0; i < 3; i++) addPuddle(-8 + rng() * 16, 16 + rng() * 6);
     const perch = rng.pick(ML.LOC.perches) || { x: 30, y: 6, z: 40 };
     pg = K.pg = { x: perch.x, y: perch.y, z: perch.z, perch, state: 'perch', T: 150 + rng() * 120, path: [], carry: null, hold: 0 };
   };
@@ -106,12 +106,12 @@
       f.hp = Math.min(100, f.hp + dt * 1.5);
       if (S.rt - f.t0 > 50) {
         S.fires.splice(S.fires.indexOf(f), 1); S.machines[f.mid].chips = 0;
-        K.breakMachine(f.mid, 'brûlée'); K.fine(ML.ECO.fines.burn); K.all(`🔥 ${f.mid} a cramé ! Réparations : −${ML.ECO.fines.burn} €`, 'warn');
+        K.breakMachine(f.mid, 'brûlée'); K.fine(ML.ECO.fines.burn, `${f.mid} brûlée (réparations)`); K.all(`🔥 ${f.mid} a cramé ! Réparations : −${ML.ECO.fines.burn} €`, 'warn');
       }
     }
     K.pudT -= dt;
     if (K.pudT <= 0) {
-      K.pudT = ((S.weather === 'pluie' ? (S.up.isolation ? 70 : 35) : 55) + rng() * 40) / K.D.chaos;
+      K.pudT = (((ML.WEATHER[S.weather] || {}).wet ? (S.up.isolation ? 70 : 35) : 55) + rng() * 40) / K.D.chaos;
       const ids = Object.keys(S.machines), W = ML.World.machines[rng.pick(ids)];
       if (W) { addPuddle(W.station.x + (rng() - 0.5) * 2, W.station.z + (rng() - 0.5) * 2); K.all('💧 Fuite d\'huile soluble près de ' + W.def.id + ' : attention, ça glisse !', 'info'); }
     }

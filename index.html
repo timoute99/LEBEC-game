@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mécanique Lebec — en équipe (V4.5)</title>
+<title>Mécanique Lebec — en équipe (V5.0)</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -18,6 +18,7 @@
 <div id="hud" class="hidden">
   <div id="tl" class="box">
     <div id="clock">07:00</div>
+    <div id="wx" class="wx"></div>
     <div class="row">💶 Caisse <b id="score">0</b></div>
     <div id="props" class="props hidden"></div>
     <div class="gauge"><span>Satisfaction client</span><div class="bar"><i id="sat"></i></div></div>
@@ -28,6 +29,7 @@
   <div id="raceboard" class="box hidden"></div>
   <div id="secret" class="hidden"></div>
   <div id="tr"><canvas id="minimap" width="180" height="196"></canvas><div id="gps" class="hidden"></div><div id="team" class="box"></div></div>
+  <div id="jail" class="hidden"></div>
   <div id="crosshair"></div>
   <div id="prompt"></div>
   <div id="subtitle"></div>
@@ -162,6 +164,7 @@
     <h2>Salon <span id="room-code" class="code big"></span> <button id="btn-copy" class="sec tiny">copier</button></h2>
     <p class="dim small">Donne ce code à tes amis : Multijoueur → Rejoindre.</p>
     <div id="room-players"></div>
+    <div id="room-join" class="hidden"><b>🔨 La partie a déjà commencé !</b> <span class="dim">Choisis ton rôle et ton perso ci-dessous (et ton perso), puis :</span><div class="actions"><button id="btn-join-play" class="go">▶ JOUER</button></div></div>
     <div id="room-name-row" class="field"><label>Ton pseudo <input id="r-name" maxlength="16" placeholder="Ton pseudo"></label></div>
     <div class="row2">
       <button id="btn-profile-r" class="bigperso">👕 Mon perso<br><span class="dim">apparence, tenue, boutique</span></button>
@@ -178,7 +181,7 @@
   </div>
 </div>
 <div id="toasts"></div>
-<div id="version">V4.5</div>
+<div id="version">V5.0</div>
 
 <!-- Three.js r128 + chargeur glTF (copies locales : marche hors ligne et en double-clic) -->
 <script src="lib/three.min.js"></script>

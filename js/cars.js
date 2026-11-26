@@ -74,6 +74,12 @@
     c.wing = new THREE.Group(); c.flames = new THREE.Group();
     c.slots = [[0, 1.2, -0.3], [0, 1.2, -2.7]];
   }
+  /** V5 : modèle seul (showroom du garage), sans l'enregistrer comme véhicule */
+  Cars.model = (kind, color) => {
+    const g = new THREE.Group(), c = { kind, group: g, wheels: [], bed: new THREE.Group() }, spec = { kind, color };
+    if (kind === 'tp') buildTP(c); else if (kind === 'fenwick') buildFenwick(c); else if (kind === 'camion') buildCamion(c, spec); else buildVan(c, spec);
+    return g;
+  };
   Cars.build = (i, spec) => {
     const g = new THREE.Group(); g.rotation.order = 'YXZ';
     const c = { i, kind: spec.kind, group: g, wheels: [], bed: new THREE.Group(), bedKey: '', pos: new THREE.Vector3(spec.x, 0, spec.z), target: new THREE.Vector3(spec.x, 0, spec.z), h: spec.h, th: spec.h, speed: 0, steer: 0, local: false, fuel: spec.fuel, tuneKey: '' };
@@ -101,20 +107,22 @@
     c.wing.visible = !!t.aileron; c.flames.visible = !!t.flammes; c.rimMat.color.setHex(t.jantes ? 0xffd700 : 0xbdc3c7); c.rimMat.emissive.setHex(t.jantes ? 0x443300 : 0);
   };
 
+  const gy = p => ML.gy(p.x, p.z);                                       // V5 : relief
   Cars.fwd = h => ({ x: Math.sin(h), z: Math.cos(h) });
   Cars.left = h => ({ x: Math.cos(h), z: -Math.sin(h) });
   Cars.doorPos = c => { const l = Cars.left(c.h), tp = c.kind === 'tp', f = Cars.fwd(c.h);
-    if (c.kind === 'camion') return new THREE.Vector3(c.pos.x + l.x * 1.6 + f.x * 2.6, 1.3, c.pos.z + l.z * 1.6 + f.z * 2.6);
-    if (c.kind === 'fenwick') return new THREE.Vector3(c.pos.x + l.x * 1.1, 1.2, c.pos.z + l.z * 1.1);
-    return tp ? new THREE.Vector3(c.pos.x + Cars.fwd(c.h).x * 1.1, 1.0, c.pos.z + Cars.fwd(c.h).z * 1.1) : new THREE.Vector3(c.pos.x + l.x * 1.3, 1.1, c.pos.z + l.z * 1.3); };
-  Cars.rearPos = c => { const f = Cars.fwd(c.h), k = c.kind === 'tp' ? 1.2 : c.kind === 'camion' ? 4.6 : c.kind === 'fenwick' ? -2.2 : 2.6; return new THREE.Vector3(c.pos.x - f.x * k, c.kind === 'tp' ? 0.6 : 1.1, c.pos.z - f.z * k); };
+    const y = gy(c.pos);
+    if (c.kind === 'camion') return new THREE.Vector3(c.pos.x + l.x * 1.6 + f.x * 2.6, y + 1.3, c.pos.z + l.z * 1.6 + f.z * 2.6);
+    if (c.kind === 'fenwick') return new THREE.Vector3(c.pos.x + l.x * 1.1, y + 1.2, c.pos.z + l.z * 1.1);
+    return tp ? new THREE.Vector3(c.pos.x + Cars.fwd(c.h).x * 1.1, y + 1.0, c.pos.z + Cars.fwd(c.h).z * 1.1) : new THREE.Vector3(c.pos.x + l.x * 1.3, y + 1.1, c.pos.z + l.z * 1.3); };
+  Cars.rearPos = c => { const f = Cars.fwd(c.h), k = c.kind === 'tp' ? 1.2 : c.kind === 'camion' ? 4.6 : c.kind === 'fenwick' ? -2.2 : 2.6; return new THREE.Vector3(c.pos.x - f.x * k, gy(c.pos) + (c.kind === 'tp' ? 0.6 : 1.1), c.pos.z - f.z * k); };
   const R = c => (c.kind === 'tp' ? 0.55 : c.kind === 'camion' ? 1.3 : c.kind === 'fenwick' ? 0.8 : 1.0), OFF = c => (c.kind === 'tp' ? [0.6, -0.6] : c.kind === 'camion' ? [2.8, 1.2, -0.6, -2.4, -3.8] : c.kind === 'fenwick' ? [0.6, -0.6] : [1.2, 0, -1.2]);
   /** Place d'un passager (cabine ou benne) */
   Cars.seatPos = (c, seat) => {
-    const f = Cars.fwd(c.h), l = Cars.left(c.h);
-    if (seat === 'cab') return c.kind === 'camion' ? { x: c.pos.x - l.x * 0.55 + f.x * 2.7, y: 1.6, z: c.pos.z - l.z * 0.55 + f.z * 2.7 } : { x: c.pos.x + f.x * 0.15 - l.x * 0.38, y: 0.75, z: c.pos.z + f.z * 0.15 - l.z * 0.38 };
+    const f = Cars.fwd(c.h), l = Cars.left(c.h), y = gy(c.pos);
+    if (seat === 'cab') return c.kind === 'camion' ? { x: c.pos.x - l.x * 0.55 + f.x * 2.7, y: y + 1.6, z: c.pos.z - l.z * 0.55 + f.z * 2.7 } : { x: c.pos.x + f.x * 0.15 - l.x * 0.38, y: y + 0.75, z: c.pos.z + f.z * 0.15 - l.z * 0.38 };
     const s = seat === 'bed1' ? -1 : 1;
-    return { x: c.pos.x - f.x * 1.25 + l.x * 0.45 * s, y: 1.05, z: c.pos.z - f.z * 1.25 + l.z * 0.45 * s };
+    return { x: c.pos.x - f.x * 1.25 + l.x * 0.45 * s, y: y + 1.05, z: c.pos.z - f.z * 1.25 + l.z * 0.45 * s };
   };
 
   /** Repousse un point (joueur) hors des carrosseries */
@@ -143,7 +151,7 @@
     else if (thr < 0) c.speed -= (c.speed > 0.5 ? P.brake : P.accel * 0.6) * -thr * dt;
     else c.speed -= Math.sign(c.speed) * Math.min(Math.abs(c.speed), 3 * dt);
     c.speed = U.clamp(c.speed, -P.rev, P.max * turbo);
-    const grip = env.rain ? 0.75 : 1;
+    const grip = env.wet ? Math.max(0.5, 1 - 0.25 * env.wet) : env.rain ? 0.75 : 1;      // pluie, orage, neige : ça glisse
     const target = st * P.steer * (1 - 0.55 * Math.min(1, Math.abs(c.speed) / P.max));     // V4 : direction plus douce à haute vitesse
     c.steer = U.lerp(c.steer, target, Math.min(1, 6 * grip * dt));
     const yawRate = c.speed * Math.tan(c.steer) / P.wb;
@@ -179,7 +187,8 @@
       c.h = U.lerpAngle(c.h, c.th, k); c.steer = 0;
       roll = Math.hypot(c.pos.x - ox, c.pos.z - oz);
     }
-    c.group.position.copy(c.pos); c.group.rotation.y = c.h;
+    c.group.position.copy(c.pos); c.group.position.y = gy(c.pos); c.group.rotation.y = c.h;
+    { const f = Cars.fwd(c.h), k = c.kind === 'camion' ? 3 : 1.6, d = ML.gy(c.pos.x + f.x * k, c.pos.z + f.z * k) - ML.gy(c.pos.x - f.x * k, c.pos.z - f.z * k); c.group.rotation.x = U.lerp(c.group.rotation.x, -Math.atan2(d, 2 * k), 0.3); }   // tangage en côte
     c.group.rotation.z = c.local ? U.lerp(c.group.rotation.z, -c.steer * Math.min(1, Math.abs(c.speed) / 20) * 0.12, 0.2) : 0;   // roulis « physique exagérée »
     for (const w of c.wheels) { w.rotation.x += roll / 0.38; if (w.front) w.rotation.y = c.steer; }
     const key = JSON.stringify(bedItems || []);
@@ -227,7 +236,7 @@
     for (const t of Cars.traffic) if (t.visible) { t.position.lerp(t.userData.t, k); t.rotation.y = U.lerpAngle(t.rotation.y, t.userData.h, k); }
     const P = Cars.police;
     if (P && P.visible) {
-      P.position.lerp(P.userData.t, k); P.rotation.y = U.lerpAngle(P.rotation.y, P.userData.h, k);
+      P.position.lerp(P.userData.t, k); P.position.y = ML.gy(P.position.x, P.position.z); P.rotation.y = U.lerpAngle(P.rotation.y, P.userData.h, k);
       const on = Math.floor(performance.now() / 180) % 2; Cars.polBlue.visible = !!on; Cars.polRed.visible = !on;
       if (Math.floor(performance.now() / 700) % 2 && !Cars._sir) { Cars._sir = true; ML.Sfx.at('siren', P.position.x, P.position.z); } else if (!(Math.floor(performance.now() / 700) % 2)) Cars._sir = false;
     }
@@ -236,24 +245,24 @@
   Cars.parkPolice = () => {
     const L = ML.LOC.comp.police; if (!L) return;
     const g = carModel('city_car_sedan', 0xffffff); U.box(1, 0.18, 0.3, U.mat(0x2255ff), 0, 2.05, 0, g, false);
-    g.position.set(L.dock.x + L.tan.x * 4, 0, L.dock.z + L.tan.z * 4); g.rotation.y = Math.atan2(L.tan.x, L.tan.z); ML.scene.add(g); Cars.parkedPolice = g;
+    g.position.set(L.dock.x + L.tan.x * 4, ML.gy(L.dock.x + L.tan.x * 4, L.dock.z + L.tan.z * 4), L.dock.z + L.tan.z * 4); g.rotation.y = Math.atan2(L.tan.x, L.tan.z); ML.scene.add(g); Cars.parkedPolice = g;
   };
 
   /** Caméra du conducteur : vue conduite ou extérieure (V) */
   Cars.camera = (c, mode, look) => {
-    const cam = ML.camera, f = Cars.fwd(c.h), l = Cars.left(c.h), tp = c.kind === 'tp';
-    if (mode === 'cab' && c.kind === 'camion') { cam.position.set(c.pos.x + f.x * 2.9 + l.x * 0.55, 2.75, c.pos.z + f.z * 2.9 + l.z * 0.55); cam.rotation.set(look.p - 0.08, c.h + Math.PI + look.y, 0, 'YXZ'); return; }
-    if (mode === 'cab' && c.kind === 'fenwick') { cam.position.set(c.pos.x - f.x * 0.3, 2.15, c.pos.z - f.z * 0.3); cam.rotation.set(look.p - 0.2, c.h + Math.PI + look.y, 0, 'YXZ'); return; }
+    const cam = ML.camera, f = Cars.fwd(c.h), l = Cars.left(c.h), tp = c.kind === 'tp', y = c.group.position.y, px = -c.group.rotation.x;
+    if (mode === 'cab' && c.kind === 'camion') { cam.position.set(c.pos.x + f.x * 2.9 + l.x * 0.55, y + 2.75, c.pos.z + f.z * 2.9 + l.z * 0.55); cam.rotation.set(look.p - 0.08 + px, c.h + Math.PI + look.y, 0, 'YXZ'); return; }
+    if (mode === 'cab' && c.kind === 'fenwick') { cam.position.set(c.pos.x - f.x * 0.3, y + 2.15, c.pos.z - f.z * 0.3); cam.rotation.set(look.p - 0.2 + px, c.h + Math.PI + look.y, 0, 'YXZ'); return; }
     if (mode === 'cab' && !tp) {
-      cam.position.set(c.pos.x + f.x * 0.15 + l.x * 0.38, 1.55, c.pos.z + f.z * 0.15 + l.z * 0.38);
-      cam.rotation.set(look.p, c.h + Math.PI + look.y, -c.group.rotation.z, 'YXZ');
+      cam.position.set(c.pos.x + f.x * 0.15 + l.x * 0.38, y + 1.55, c.pos.z + f.z * 0.15 + l.z * 0.38);
+      cam.rotation.set(look.p + px, c.h + Math.PI + look.y, -c.group.rotation.z, 'YXZ');
     } else if (tp && mode === 'cab') {
-      cam.position.set(c.pos.x + f.x * 1.6, 1.65, c.pos.z + f.z * 1.6);
+      cam.position.set(c.pos.x + f.x * 1.6, y + 1.65, c.pos.z + f.z * 1.6);
       cam.rotation.set(look.p - 0.25, c.h + look.y, 0, 'YXZ');
     } else {
       const a = c.h + look.y, dist = tp ? 5 : c.kind === 'camion' ? 13 : c.kind === 'fenwick' ? 6.5 : 8;
-      cam.position.set(c.pos.x - Math.sin(a) * dist, (tp ? 3 : 3.8) - look.p * 3, c.pos.z - Math.cos(a) * dist);
-      cam.lookAt(c.pos.x, 1.2, c.pos.z);
+      cam.position.set(c.pos.x - Math.sin(a) * dist, Math.max(y, ML.gy(c.pos.x - Math.sin(a) * dist, c.pos.z - Math.cos(a) * dist)) + (tp ? 3 : 3.8) - look.p * 3, c.pos.z - Math.cos(a) * dist);
+      cam.lookAt(c.pos.x, y + 1.2, c.pos.z);
     }
   };
 })();

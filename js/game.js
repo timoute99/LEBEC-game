@@ -20,7 +20,8 @@
       lastSnap: performance.now(), poseT: 0, fastT: 0, slowT: 0, cur: null, camMode: 'cab', sprayT: 0, fxT: 0, dryOnce: false, spillT: 0, auraT: 0, power: true, endShown: false, saveT: 60 });
     cfg.players.forEach(p => { G.players[p.id] = p; });
     if (!game.E) game.E = ML.Company.fresh('', game.mode === 'course' ? 0 : ML.ECO.freeMoney);
-    ML.World.build(game.city || cfg.seed, game.E.up || {}, game.E.mach);
+    ML.World.build(game.city || cfg.seed, game.E.up || {}, game.E.mach, { day: game.E.day || game.day || 1 });
+    G.ledger = []; G.jailUntil = 0; G.wx = null;
     ML.World.setPower(true); ML.Fx.reset(); ML.Cars.clear(); ML.Cars.parkPolice(); ML.GPS.reset();
     const meP = G.players[G.me], sp = ML.LOC.spawn[meP.idx % 6];
     G.p = { pos: new THREE.Vector3(sp.x, 0, sp.z), vy: 0, yaw: Math.PI / 2, pitch: -0.05, sel: 0, stamina: C.PLAYER.stamina, stun: 0, punchT: 0, bob: 0, car: null, look: { y: 0, p: 0 }, slip: 0, slipV: null, push: null, rag: null, roll: 0 };
@@ -43,6 +44,8 @@
     if (ML.Dialogue.open) ML.Dialogue.forceClose();
     ML.Mini.forceClose(); ML.Cars.clear();
     if (G.rain) { ML.scene.remove(G.rain); G.rain = null; }
+    if (G.snow) { ML.scene.remove(G.snow); G.snow = null; }
+    if (G.hoses) { ML.scene.remove(G.hoses); G.hoses = null; }
     ML.Sfx.setEngine(false, 0); if (ML.GPS) ML.GPS.reset();
   };
   G.stop = msg => {
@@ -59,6 +62,14 @@
       { name: role.icon + ' ' + p.name, nameColor: c.css, helmet: L.hat ? null : 0xf5f5f5, hat: L.hat, vest: role.color });
     const old = G.avatars[p.id]; if (old) { v.pos.copy(old.pos); v.target.copy(old.target); v.seen = old.seen; v.inCar = old.inCar; }
     v.group.visible = false; G.avatars[p.id] = v; return v;
+  };
+  /** V5 : changer de pseudo en pleine partie (menu Pause) */
+  G.rename = name => {
+    name = String(name || '').replace(/[<>&"`]/g, '').trim().slice(0, 16); if (!name) return;
+    try { localStorage.setItem('ml_name', name); } catch (e) { /* rien */ }
+    if (ML.Account && ML.Account.prof && !(ML.Account.logged && ML.Account.logged())) { ML.Account.prof.name = name; if (ML.Account.save) ML.Account.save(); }
+    if (G.players[G.me]) G.players[G.me].name = name;
+    G.intent({ a: 'rename', name });
   };
   G.sendLook = () => { if (!G.on) return; const look = ML.Account.look(); G.looks[G.me] = look; if (!G.solo) ML.Net.relay({ k: 'look', look }); };
 
@@ -104,7 +115,7 @@
       const seen = {};
       for (const [id, x, z, yaw, mv, st, b] of d.n) {
         const v = G.npcViews[id]; if (!v) continue; seen[id] = 1;
-        v.target.set(x, 0, z); v.tYaw = yaw; v.st = st; v.mv = mv;
+        v.target.set(x, ML.gy(x, z), z); v.tYaw = yaw; v.st = st; v.mv = mv;
         ML.People.setBubble(v, b, b && b[0] === '❓' ? '#7a3b00' : '#111');
         if (!v.seen) { v.pos.copy(v.target); v.seen = true; }
         v.group.visible = true;
@@ -145,6 +156,7 @@
         if (!c.local && sc.dr !== G.me) { c.target.set(sc.x, 0, sc.z); c.th = sc.h; c.fuel = sc.fuel; }
       });
       for (const pid in G.avatars) { const P = d.S.pl[pid], r = G.remote[pid]; ML.People.setHeld(G.avatars[pid], P && r ? P.inv[r.sel || 0] : null); }
+      for (const pid in d.S.pl) if (G.players[pid] && G.players[pid].name !== d.S.pl[pid].name) { G.players[pid].name = d.S.pl[pid].name; if (pid !== G.me && G.avatars[pid]) G.addAvatar(G.players[pid]); }   // pseudo changé
       if (d.S.power !== G.power) { G.power = d.S.power; ML.World.setPower(G.power); }
       ML.Fx.sync(d.S);
     } else if (d.k === 'e') {
@@ -189,6 +201,18 @@
         break;
       }
       case 'arrest': if (e.to === G.me) ML.Sfx.play('siren'); break;
+      case 'jail':                                                    // V5 : garde à vue (trop de passants renversés)
+        if (e.to === G.me) {
+          if (G.p.car !== null) { const c = ML.Cars.list[G.p.car]; if (c) c.speed = 0; G.leaveCarLocal(); }
+          if (G.p.ride) G.p.ride = null;
+          if (ML.Dialogue.open) ML.Dialogue.forceClose(); ML.Mini.forceClose(); if (ML.ERP.isOpen()) ML.ERP.close();
+          G.p.pos.set(e.x, 0, e.z); G.p.yaw = (e.yaw || 0) + Math.PI; G.jailUntil = performance.now() + e.t * 1000;
+          ML.HUD.flash('rgba(40,80,255,0.5)'); ML.HUD.big('🚔 GARDE À VUE !', '#3498db'); ML.Sfx.play('siren');
+        } else ML.HUD.notify(`🚔 ${pname(e.to)} est en garde à vue à la gendarmerie (${e.t} s). Caution possible à l'accueil.`, 'warn');
+        break;
+      case 'free': if (e.to === G.me) { G.jailUntil = 0; G.p.pos.set(e.x, 0, e.z); ML.HUD.big('🔓 LIBÉRÉ·E', '#3ecf6e'); ML.HUD.notify(e.bail ? `💶 ${e.bail} a payé ta caution !` : '🔓 Tu es libre. Et cette fois, regarde les piétons !', 'good'); } break;
+      case 'led': G.ledger.push(e.l); if (G.ledger.length > 400) G.ledger.shift(); break;
+      case 'wx': if (ML.WEATHER[e.w]) ML.HUD.notify(`${ML.WEATHER[e.w].icon} Météo : ${ML.WEATHER[e.w].name}`, 'info'); break;
       case 'fuel': { const c = ML.Cars.list[e.car]; if (c) c.fuel = e.f; break; }
       case 'drive': break;
       case 'vote': ML.HUD.showVote(e.players, e.until); break;
@@ -286,7 +310,8 @@
       if (!c) { p.car = null; return; }
       if (can) { p.look.y = U.clamp(p.look.y - I.mdx * 0.002, -2, 2); p.look.p = U.clamp(p.look.p - I.mdy * 0.002, -0.8, 0.6); }
       const onPud = S && (S.puddles || []).some(q => Math.hypot(q.x - c.pos.x, q.z - c.pos.z) < q.r + 0.8);
-      const r = ML.Cars.drive(c, dt, can, { frozen: sc && sc.frozen > S.rt, rain: S && S.weather === 'pluie', puddle: onPud });
+      const W = S && ML.WEATHER[S.weather];
+      const r = ML.Cars.drive(c, dt, can, { frozen: sc && sc.frozen > S.rt, rain: !!(W && W.wet), wet: W && W.wet ? W.wet : 0, puddle: onPud });
       ML.Sfx.setEngine(true, c.speed);
       G.spillT -= dt;
       // V4.1 : les caisses ne tombent QUE si on percute le décor à plus de 70 km/h (19,4 m/s)
@@ -336,12 +361,14 @@
     for (const id in G.npcViews) if (G.npcViews[id].seen) push(G.npcViews[id].pos, PC.r + 0.3);
     for (const id in G.avatars) if (G.avatars[id].group.visible) push(G.avatars[id].pos, PC.r + 0.35);
     ML.Cars.pushOut(p.pos, PC.r);
-    if (can && !ko && I.pressed('Space') && p.pos.y <= 0.001) p.vy = 5.2;
-    p.vy -= 15 * dt; p.pos.y += p.vy * dt; if (p.pos.y < 0) { p.pos.y = 0; p.vy = 0; }
+    const gy = ML.gy(p.pos.x, p.pos.z);                                 // V5 : relief (collines, berges, ponts)
+    if (can && !ko && I.pressed('Space') && p.pos.y <= gy + 0.02) p.vy = 5.2;
+    p.vy -= 15 * dt; p.pos.y += p.vy * dt;
+    if (p.pos.y < gy) { p.pos.y = gy; p.vy = 0; } else if (p.vy <= 0 && p.pos.y - gy < 0.35) { p.pos.y = gy; p.vy = 0; }   // on colle au sol en descente
     p.moving = len > 0 || p.slip > 0;
     // flaque : on glisse (et on lâche ce qu'on tient)
     const moved = Math.hypot(p.pos.x - ox, p.pos.z - oz) / Math.max(dt, 1e-3);
-    if (S && !p.slip && moved > 3 && p.pos.y < 0.1 && (S.puddles || []).some(q => Math.hypot(q.x - p.pos.x, q.z - p.pos.z) < q.r * 0.85)) {
+    if (S && !p.slip && moved > 3 && p.pos.y - gy < 0.1 && (S.puddles || []).some(q => Math.hypot(q.x - p.pos.x, q.z - p.pos.z) < q.r * 0.85)) {
       p.slip = 1.3; p.slipV = new THREE.Vector3(p.pos.x - ox, 0, p.pos.z - oz).normalize().multiplyScalar(Math.max(6, moved * 1.4));
       ML.HUD.notify('💧 Huile soluble ! Tu glisses…', 'warn'); ML.Sfx.play('slip'); G.intent({ a: 'slip' });
     }
@@ -471,12 +498,43 @@
       m.rotation.y = U.lerpAngle(m.rotation.y, iv.ry, Math.min(1, dt * 10));
       if (m.userData.spin) { m.userData.spin.rotation.y = t * 2; m.userData.spin.position.y = 0.45 + Math.sin(t * 3) * 0.12; }
     }
+    G.renderHoses();
     ML.Cars.list.forEach((c, i) => {
       const sc = G.S && G.S.cars[i];
       if (sc && sc.dr && G.looks[sc.dr]) ML.Cars.tune(c, G.looks[sc.dr].tune, sc.color);
       if (c.label) c.label.visible = !(G.p.car === i || (G.p.ride && G.p.ride.car === i));
       ML.Cars.render(c, dt, sc ? sc.bed : [], sc ? sc.load : null);
     });
+  };
+
+  /** V5 : tuyaux d'air comprimé des soufflettes (de l'enrouleur à la soufflette, qu'elle soit en main ou par terre) */
+  const SEG = 18, _o = new THREE.Object3D(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _w = new THREE.Vector3();
+  G.renderHoses = () => {
+    const S = G.S, reels = ML.LOC && ML.LOC.reels; if (!S || !reels) return;
+    if (!G.hoses) {
+      const geo = new THREE.CylinderGeometry(0.035, 0.035, 1, 6); geo.rotateX(Math.PI / 2); geo.translate(0, 0, 0.5);
+      G.hoses = new THREE.InstancedMesh(geo, U.mat(0xf1c40f), reels.length * SEG); G.hoses.frustumCulled = false; ML.scene.add(G.hoses);
+    }
+    reels.forEach((R, h) => {
+      let end = null;
+      const isMine = it => it && it.type === 'soufflette' && (it.d || {}).h === h;
+      if (isMine(G.held()) && G.heldMesh && G.p.car === null) end = G.heldMesh.getWorldPosition(_w).clone();
+      if (!end) for (const pid in G.avatars) { const P = S.pl[pid], r = G.remote[pid], av = G.avatars[pid]; if (P && r && av.group.visible && isMine(P.inv[r.sel || 0])) { end = av.hand.getWorldPosition(_w).clone(); break; } }
+      if (!end) for (const id in G.itemViews) { const iv = G.itemViews[id]; if (iv.type === 'soufflette' && (iv.d || {}).h === h) { end = iv.mesh.position.clone(); end.y += 0.12; break; } }
+      if (!end && G.S.pl[G.me] && isMine(G.S.pl[G.me].inv.find(isMine))) end = G.p.pos.clone().setY(G.p.pos.y + 1);
+      const d = end ? Math.hypot(end.x - R.x, end.z - R.z) : 0, sag = Math.min(1.6, 0.25 + d * 0.06);
+      let prev = null;
+      for (let i = 0; i <= SEG; i++) {
+        const t = i / SEG;
+        if (end) { _b.set(R.x + (end.x - R.x) * t, R.y + (end.y - R.y) * t - sag * Math.sin(Math.PI * t), R.z + (end.z - R.z) * t); _b.y = Math.max(_b.y, ML.gy(_b.x, _b.z) + 0.035); }
+        if (i > 0) {
+          if (end) { _o.position.copy(prev); _o.lookAt(_b); _o.scale.set(1, 1, prev.distanceTo(_b) + 0.01); } else _o.scale.set(0, 0, 0);
+          _o.updateMatrix(); G.hoses.setMatrixAt(h * SEG + i - 1, _o.matrix);
+        }
+        prev = (prev || new THREE.Vector3()).copy(_b);
+      }
+    });
+    G.hoses.instanceMatrix.needsUpdate = true;
   };
 
   G.updateView = dt => {
@@ -503,27 +561,53 @@
     if (p.punchT > 0) { const k = Math.sin((1 - p.punchT / 0.25) * Math.PI); G.fist.position.set(0.22 - k * 0.12, -0.3 + k * 0.12, -0.45 - k * 0.45); }
   };
 
-  /** Lumière : soleil qui suit la caméra, soir après 17 h, météo (pluie, brouillard), coupure de courant */
+  /** Lumière : soleil qui suit la caméra, matin / soir (aube et coucher de soleil), météo qui CHANGE
+      (nuages, pluie, orage avec éclairs, brouillard, neige, vent), coupure de courant */
+  const SUNSET = new THREE.Color(0xffa36b), DAWN = new THREE.Color(0xffc9a0), GREY = new THREE.Color(0x8a939b), WHITE = new THREE.Color(0xf0f6ff);
+  function particles(n, spread, size, color, opacity) {
+    const pos = new Float32Array(n * 3); for (let i = 0; i < n * 3; i++) pos[i] = (Math.random() - 0.5) * (i % 3 === 1 ? 30 : spread);
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const p = new THREE.Points(geo, new THREE.PointsMaterial({ color, size, transparent: true, opacity })); ML.scene.add(p); return p;
+  }
   G.updateLight = dt => {
     const L = ML.light, cam = ML.camera.position, S = G.S;
     L.sun.position.set(cam.x + 30, 60, cam.z + 20); L.sun.target.position.set(cam.x, 0, cam.z); L.sun.target.updateMatrixWorld();
     const min = C.DAY_START + (G.rt || 0) * (C.DAY_END - C.DAY_START) / C.SHIFT_SEC;
     let k = min > 17 * 60 ? U.lerp(1, 0.3, Math.min(1, (min - 1020) / 120)) : 1;
-    const wx = S ? S.weather : 'beau'; if (wx === 'pluie') k *= 0.72; if (wx === 'brouillard') k *= 0.85;
+    const wx = S && ML.WEATHER[S.weather] ? S.weather : 'beau', W = ML.WEATHER[wx];
+    // transition douce d'une météo à l'autre (lumière, brouillard)
+    const cur = G.wx || (G.wx = { light: W.light, fog: W.fog, grey: wx === 'beau' ? 0 : 0.5 });
+    const kk = Math.min(1, dt * 0.35); cur.light = U.lerp(cur.light, W.light, kk); cur.fog = U.lerp(cur.fog, W.fog, kk); cur.grey = U.lerp(cur.grey, wx === 'beau' || wx === 'vent' ? 0 : wx === 'nuageux' ? 0.35 : W.snow ? 0.45 : 0.55, kk);
+    k *= cur.light;
     L.sun.intensity = 0.85 * k; L.hemi.intensity = 0.35 + 0.45 * k;
-    ML.scene.background.copy(L.day).lerp(L.night, 1 - k); if (wx !== 'beau') ML.scene.background.lerp(new THREE.Color(0x8a939b), 0.5);
+    ML.scene.background.copy(L.day).lerp(L.night, 1 - k);
+    if (min < 8.5 * 60) ML.scene.background.lerp(DAWN, 0.35 * (1 - (min - 420) / 90));                  // aube
+    else if (min > 16.5 * 60 && min < 18.6 * 60) ML.scene.background.lerp(SUNSET, 0.4 * Math.sin(Math.PI * (min - 990) / 126)); // coucher de soleil
+    ML.scene.background.lerp(W.snow ? WHITE : GREY, cur.grey);
+    // éclairs (orage) : flash blanc + tonnerre
+    if (wx === 'orage') {
+      G.boltT = (G.boltT === undefined ? 4 : G.boltT) - dt;
+      if (G.boltT <= 0) { G.boltT = 5 + Math.random() * 9; G.bolt = 0.25; if (!U.indoors(cam)) ML.HUD.flash('rgba(235,240,255,0.55)'); setTimeout(() => ML.Sfx.play('thunder', U.indoors(cam) ? 0.5 : 1), 400 + Math.random() * 900); }
+      if (G.bolt > 0) { G.bolt -= dt; ML.scene.background.lerp(WHITE, 0.8); L.hemi.intensity += 0.9; }
+    }
     ML.scene.fog.color.copy(ML.scene.background);
-    ML.scene.fog.near = wx === 'brouillard' ? 12 : 90; ML.scene.fog.far = wx === 'brouillard' ? 75 : wx === 'pluie' ? 190 : 260;
-    ML.World.setDaylight(k);
-    if (G.rain && wx !== 'pluie') G.rain.visible = false;
-    if (wx === 'pluie') {
-      if (!G.rain) {
-        const n = 1800, pos = new Float32Array(n * 3); for (let i = 0; i < n * 3; i++) pos[i] = (Math.random() - 0.5) * (i % 3 === 1 ? 30 : 60);
-        const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-        G.rain = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xaaccff, size: 0.12, transparent: true, opacity: 0.6 })); ML.scene.add(G.rain);
-      }
-      const a = G.rain.geometry.attributes.position; for (let i = 1; i < a.array.length; i += 3) { a.array[i] -= dt * 22; if (a.array[i] < -2) a.array[i] += 30; }
-      a.needsUpdate = true; G.rain.position.set(cam.x, cam.y, cam.z); G.rain.visible = !U.inWorkshop(cam);
+    ML.scene.fog.near = cur.fog < 100 ? 12 : 90; ML.scene.fog.far = cur.fog;
+    ML.World.setDaylight(k); if (ML.World.tick) ML.World.tick(dt);
+    // pluie (pluie, orage) / neige
+    const rain = !!(W.wet && !W.snow), heavy = wx === 'orage', inside = U.indoors(cam);
+    if (G.rain) G.rain.visible = rain && !inside;
+    if (rain) {
+      if (!G.rain) G.rain = particles(2400, 60, 0.12, 0xaaccff, 0.6);
+      const a = G.rain.geometry.attributes.position, sp = heavy ? 30 : 22, wind = heavy ? 6 : 0;
+      for (let i = 0; i < a.array.length; i += 3) { a.array[i + 1] -= dt * sp; a.array[i] += dt * wind; if (a.array[i + 1] < -2) { a.array[i + 1] += 30; a.array[i] = (Math.random() - 0.5) * 60; } }
+      a.needsUpdate = true; G.rain.position.set(cam.x, cam.y, cam.z); G.rain.material.opacity = heavy ? 0.8 : 0.55;
+    }
+    if (G.snow) G.snow.visible = !!W.snow && !inside;
+    if (W.snow) {
+      if (!G.snow) G.snow = particles(1600, 50, 0.22, 0xffffff, 0.9);
+      const a = G.snow.geometry.attributes.position, t = performance.now() / 1000;
+      for (let i = 0; i < a.array.length; i += 3) { a.array[i + 1] -= dt * 2.2; a.array[i] += Math.sin(t + i) * dt * 0.6; if (a.array[i + 1] < -2) a.array[i + 1] += 30; }
+      a.needsUpdate = true; G.snow.position.set(cam.x, cam.y, cam.z);
     }
   };
   G.clockMin = () => C.DAY_START + (G.rt || 0) * (C.DAY_END - C.DAY_START) / C.SHIFT_SEC;

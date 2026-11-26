@@ -110,6 +110,7 @@
     m.position.set(x, y, z); m.rotation.y = ry || 0; root.add(m); return m;
   }
   D.sign = (...a) => sign(...a);
+  D.frame = (cx, cz, rot) => frame(cx, cz, rot);                       // V5 : intérieurs (world.js)
   const stripes = (L, vertical, x, y, z, ax, n, o) => {               // bande jaune / noire (sécurité)
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) / n - 0.5, col = i % 2 ? 0x111111 : 0xf1c40f;
@@ -125,21 +126,29 @@
   /* =====================================================================
      L'ATELIER
      ===================================================================== */
-  D.atelier = () => {
+  D.atelier = W => {
+    W = W || {}; const P = W.pal || { lane: 0x7f9c8a, dado: 0x2f6f8f, outer: 0x2e8b57, trim: 0xe67e22 }, ext = !!W.ext, up = W.up || {};
     // --- sol : allée centrale, emplacements des machines (bandes de sécurité), flèches ---
-    box(36, 0.01, 4.7, -2, 0.032, -1.05, 0x7f9c8a);
-    for (let x = -16; x <= 14; x += 6) { box(1.6, 0.012, 0.35, x, 0.037, -1.05, 0xffffff); B.add('pyr', 0.9, 0.012, 0.9, x + 1.1, 0.037, -1.05, 0xffffff, { ry: Math.PI / 4 }); }
+    box(36, 0.01, 4.7, -2, 0.032, -1.05, P.lane);
+    if (ext) box(13, 0.01, 4.7, 26.5, 0.032, -1.05, P.lane);
+    for (let x = -16; x <= (ext ? 30 : 14); x += 6) { box(1.6, 0.012, 0.35, x, 0.037, -1.05, 0xffffff); B.add('pyr', 0.9, 0.012, 0.9, x + 1.1, 0.037, -1.05, 0xffffff, { ry: Math.PI / 4 }); }
     for (const def of ML.MACHINES) {
+      if (def.ext && !ext) continue;                                       // extension pas encore construite
+      if ((def.id === 'T3' || def.id === 'F3') && !up.agrandissement) continue;   // zone grise « se débloque… » (world.js)
       const w = def.type === 'tour' ? def.len + 1.4 : 3.3, d = def.type === 'tour' ? 2.6 : 3.3, zc = def.z + (def.type === 'tour' ? 0.35 : -0.35);
       stripes(w, false, def.x, 0.036, zc - d / 2, 'x', 10, { d: 0.18 }); stripes(w, false, def.x, 0.036, zc + d / 2, 'x', 10, { d: 0.18 });
       stripes(d, false, def.x - w / 2, 0.036, zc, 'z', 6, { d: 0.18 }); stripes(d, false, def.x + w / 2, 0.036, zc, 'z', 6, { d: 0.18 });
       box(w - 0.3, 0.008, d - 0.3, def.x, 0.033, zc, 0x9aa5ab);
     }
     // --- murs intérieurs : soubassement coloré + liseré jaune ---
-    const dado = 0x2f6f8f;
-    box(40, 1.3, 0.06, 0, 0.65, -13.77, dado); box(0.06, 1.3, 28, -19.77, 0.65, 0, dado); box(0.06, 1.3, 28, 19.77, 0.65, 0, dado);
+    const dado = P.dado;
+    box(40, 1.3, 0.06, 0, 0.65, -13.77, dado); box(0.06, 1.3, 28, -19.77, 0.65, 0, dado);
+    if (ext) { box(0.06, 1.3, 11.7, 19.77, 0.65, -8.15, dado); box(0.06, 1.3, 9.4, 19.77, 0.65, 9.3, dado); box(0.07, 0.1, 11.7, 19.77, 1.35, -8.15, 0xf1c40f); box(0.07, 0.1, 9.4, 19.77, 1.35, 9.3, 0xf1c40f); }
+    else { box(0.06, 1.3, 28, 19.77, 0.65, 0, dado); box(0.07, 0.1, 28, 19.77, 1.35, 0, 0xf1c40f); }
     box(15, 1.3, 0.06, -12.5, 0.65, 13.77, dado); box(15, 1.3, 0.06, 12.5, 0.65, 13.77, dado);
-    box(40, 0.1, 0.07, 0, 1.35, -13.77, 0xf1c40f); box(0.07, 0.1, 28, -19.77, 1.35, 0, 0xf1c40f); box(0.07, 0.1, 28, 19.77, 1.35, 0, 0xf1c40f);
+    box(40, 0.1, 0.07, 0, 1.35, -13.77, 0xf1c40f); box(0.07, 0.1, 28, -19.77, 1.35, 0, 0xf1c40f);
+    if (W.reno >= 3) for (let x = -18; x <= 18; x += 4) box(0.12, 4.6, 0.04, x, 3.6, -13.74, 0xb08a5a);     // bardage bois au fond (jour 10)
+    if (W.reno >= 2) { box(40, 0.06, 0.08, 0, 4.0, -13.75, 0x2ecc71); box(0.08, 0.06, 28, -19.75, 4.0, 0, 0x2ecc71); }   // liseré LED
     // --- fenêtres hautes (dedans + dehors) ---
     for (let x = -16; x <= 16; x += 6.4) { glass(4.4, 1.3, 0.5, x, 5.1, -14, 0xa9d6f5); box(4.6, 0.12, 0.6, x, 4.4, -14, 0xecf0f1); }
     for (let z = -10; z <= 10; z += 5) for (const s of [-1, 1]) { glass(0.5, 1.3, 3.2, 20 * s, 5.1, z, 0xa9d6f5); box(0.6, 0.12, 3.4, 20 * s, 4.4, z, 0xecf0f1); }
@@ -185,6 +194,32 @@
     box(0.7, 1.4, 0.6, 10.3, 0.7, -13.3, 0x7f8c8d); for (const y of [0.35, 0.8, 1.2]) box(0.3, 0.05, 0.02, 10.3, y, -12.99, 0x2c3e50);
     box(0.6, 0.1, 0.6, 12, 0.5, -9.3, 0x2c3e50); box(0.6, 0.7, 0.1, 12, 0.9, -9.6, 0x2c3e50); cyl(0.05, 0.45, 12, 0.25, -9.3, 0x555555);
     cyl(0.25, 0.4, 16.8, 0.2, -13.2, 0x8d6e63); B.add('ball', 0.9, 1.1, 0.9, 16.8, 0.9, -13.2, 0x27ae60);
+    // --- V5 : ARMOIRE À OUTILS détaillée (tiroirs, poignées, outils posés dessus) ---
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+      const x = 0.55 + c * 1.45, y = 0.18 + r * 0.24;
+      box(1.3, 0.22, 0.03, x, y, -12.88, 0xd64541); box(0.5, 0.04, 0.05, x, y + 0.05, -12.86, 0xbdc3c7); box(0.3, 0.06, 0.01, x - 0.45, y + 0.04, -12.865, 0xffffff);
+    }
+    box(4.5, 0.06, 0.85, 2, 1.33, -13.3, 0x2c3e50);                                          // plateau
+    // bloc de forets (du plus petit au plus gros) + coffret de plaquettes + fraises debout
+    box(1.1, 0.12, 0.35, 0.6, 1.42, -13.25, 0x7f8c8d);
+    for (let i = 0; i < 12; i++) cyl(0.01 + i * 0.0035, 0.18 + i * 0.012, 0.15 + i * 0.075, 1.5 + 0.06 + i * 0.006, -13.25, 0xff7a3f);
+    box(0.7, 0.1, 0.45, 2, 1.41, -13.25, 0x1e1e1e); for (let i = 0; i < 8; i++) box(0.09, 0.02, 0.09, 1.76 + (i % 4) * 0.16, 1.47, -13.36 + Math.floor(i / 4) * 0.2, 0xffd23f, { ry: Math.PI / 4 });
+    for (let i = 0; i < 6; i++) { cyl(0.035, 0.26, 2.75 + i * 0.17, 1.5, -13.2, 0x3fa7ff); cyl(0.05, 0.06, 2.75 + i * 0.17, 1.39, -13.2, 0x7f8c8d); }
+    // panneau perforé au-dessus de l'armoire : silhouettes peintes + outils accrochés
+    box(4.4, 1.5, 0.05, 2, 2.4, -13.72, 0x95a5a6);
+    for (let x = -0.05; x < 4.1; x += 0.2) for (let y = 1.75; y < 3.1; y += 0.2) box(0.03, 0.03, 0.01, x, y, -13.69, 0x5d6d7e);
+    [[0.3, 2.6, 0.06, 0.55, 0x7f8c8d], [0.6, 2.6, 0.07, 0.48, 0x7f8c8d], [0.9, 2.6, 0.08, 0.42, 0x7f8c8d], [1.4, 2.45, 0.35, 0.08, 0x111111], [1.4, 2.7, 0.06, 0.4, 0x8d6e63], [2.1, 2.55, 0.05, 0.7, 0xbdc3c7], [2.5, 2.4, 0.3, 0.3, 0xf39c12], [3.0, 2.6, 0.08, 0.5, 0xc0392b], [3.4, 2.6, 0.08, 0.5, 0x2980b9], [3.8, 2.5, 0.12, 0.35, 0x27ae60]].forEach(([x, y, w, h, c]) => { box(w + 0.06, h + 0.06, 0.01, x, y, -13.69, 0x2c3e50); box(w, h, 0.04, x, y, -13.67, c); });
+    // --- V5 : SOUFFLETTES sur enrouleurs d'air comprimé (elles ne quittent pas l'atelier) ---
+    box(0.06, 2.6, 2.6, -19.73, 1.9, 6.0, 0x2c3e50);                                          // tableau d'outillage
+    for (const z of [2.6, 4.6, 5.4, 6.3, 7.1]) box(0.01, z < 3 ? 0.7 : 0.4, 0.3, -19.69, z < 3 ? 0.5 : 1.15, z, 0x95a5a6);   // silhouettes
+    cyl(0.07, 5.2, -19.5, 4.0, 6.7, 0x2980b9);                                                // descente d'air
+    box(0.1, 0.1, 1.2, -19.5, 2.15, 6.7, 0x2980b9);
+    for (const z of [6.3, 7.1]) { cyl(0.32, 0.18, -19.4, 2.15, z, 0xf1c40f, { rx: Math.PI / 2 }); cyl(0.12, 0.2, -19.4, 2.15, z, 0x2c3e50, { rx: Math.PI / 2 }); }
+    sign('AIR COMPRIMÉ 7 bar', 'soufflettes attachées au tuyau', '#2980b9', '#fff', 1.8, 0.5, -19.7, 2.9, 6.7, Math.PI / 2, {});
+    // compresseur (dehors, contre le mur ouest) : cuve + moteur + tuyau qui traverse le mur
+    cyl(0.5, 2.0, -21.4, 0.75, 6.7, 0x2471a3, { rx: Math.PI / 2 }); for (const dz of [-0.7, 0.7]) box(0.12, 0.25, 0.9, -21.4, 0.13, 6.7 + dz, 0x2c3e50);
+    box(0.7, 0.55, 0.7, -21.4, 1.5, 6.3, 0x34495e); cyl(0.25, 0.4, -21.4, 1.5, 7.0, 0x7f8c8d, { rx: Math.PI / 2 }); cyl(0.05, 1.4, -20.8, 2.2, 6.7, 0x2980b9, { rz: Math.PI / 2 });
+    U.boxCollider(-21.4, 6.7, 1.1, 2.2, 'compresseur');
     // --- horloge murale ---
     cyl(0.55, 0.1, -4, 4.7, -13.72, 0x2c3e50, { rx: Math.PI / 2 }); cyl(0.48, 0.12, -4, 4.7, -13.7, 0xffffff, { rx: Math.PI / 2 });
     box(0.05, 0.3, 0.02, -4, 4.82, -13.62, 0x111111); box(0.22, 0.04, 0.02, -3.9, 4.7, -13.62, 0x111111, { rz: 0.4 });
@@ -194,16 +229,18 @@
     sign('0 JOUR SANS\nACCIDENT', 'record : 0', '#ffffff', '#c0392b', 2.6, 1.6, -4, 3.3, -13.72, 0, { border: '#c0392b' });
     sign('PLANNING', '#1 T1 ✔  #2 F1 ✔  #3 ???  #4 « Brieuc : flemme »', '#fdfefe', '#2c3e50', 3, 1.5, 13.5, 2.5, -13.72, 0, { border: '#7f8c8d' });
     sign('PORT DES EPI\nOBLIGATOIRE', 'casque · lunettes · chaussures', '#1f4e9a', '#fff', 2.8, 1.6, -19.72, 3.2, -10.5, Math.PI / 2, { border: '#fff' });
-    sign('MIP / MAP', 'appui plan sur la Réf A !', '#ffd257', '#222', 2.8, 1.4, 19.72, 3.2, 1.2, -Math.PI / 2, { border: '#222' });
+    sign('MIP / MAP', 'appui plan sur la Réf A !', '#ffd257', '#222', 2.8, 1.4, 19.72, 3.2, ext ? -8 : 1.2, -Math.PI / 2, { border: '#222' });
+    if (ext) sign('→ EXTENSION EST', 'T4 · F4', '#1a2340', '#ffd257', 3, 0.8, 19.7, 5.2, 1.15, -Math.PI / 2, {});
     sign('INTERDIT DE COURIR', '(sauf si Lebec arrive avec sa pelle)', '#c0392b', '#fff', 4.2, 1.2, -12.5, 3.3, 13.72, Math.PI, {});
     sign('QUALITÉ', 'un client content = Jacky content', '#27ae60', '#fff', 3, 1.2, 12.5, 3.3, 13.72, Math.PI, {});
     for (const [x, z, ry] of [[-19.72, 2.6, Math.PI / 2], [19.72, -11.5, -Math.PI / 2]]) sign('🧯', '', '#c0392b', '#fff', 0.6, 0.6, x, 2.2, z, ry, {});
 
     // ===== EXTÉRIEUR =====
-    const green = 0x2e8b57;
-    box(0.06, 1.0, 28.4, -20.24, 0.5, 0, green); box(0.06, 1.0, 28.4, 20.24, 0.5, 0, green); box(40.5, 1.0, 0.06, 0, 0.5, -14.24, green);
+    const green = P.outer, tr = P.trim;
+    box(0.06, 1.0, 28.4, -20.24, 0.5, 0, green); box(40.5, 1.0, 0.06, 0, 0.5, -14.24, green);
+    if (!ext) box(0.06, 1.0, 28.4, 20.24, 0.5, 0, green); else { box(0.06, 1.0, 6.2, 20.24, 0.5, 11.1, green); box(0.06, 1.0, 1.8, 20.24, 0.5, -13.1, green); box(0.06, 1.0, 20.4, 33.24, 0.5, -2, green); box(13.2, 1.0, 0.06, 26.6, 0.5, -12.24, green); box(13.2, 1.0, 0.06, 26.6, 0.5, 8.24, green); box(13.6, 0.3, 0.2, 26.6, 7.4, 8.4, tr); box(13.6, 0.3, 0.2, 26.6, 7.4, -12.4, tr); box(0.2, 0.3, 20.8, 33.5, 7.4, -2, tr); }
     box(15.2, 1.0, 0.06, -12.6, 0.5, 14.24, green); box(15.2, 1.0, 0.06, 12.6, 0.5, 14.24, green);
-    box(41.2, 0.3, 0.2, 0, 7.4, 14.4, 0xe67e22); box(41.2, 0.3, 0.2, 0, 7.4, -14.4, 0xe67e22); box(0.2, 0.3, 29, 20.5, 7.4, 0, 0xe67e22); box(0.2, 0.3, 29, -20.5, 7.4, 0, 0xe67e22);
+    box(41.2, 0.3, 0.2, 0, 7.4, 14.4, tr); box(41.2, 0.3, 0.2, 0, 7.4, -14.4, tr); box(0.2, 0.3, 29, 20.5, 7.4, 0, tr); box(0.2, 0.3, 29, -20.5, 7.4, 0, tr);
     stripes(4.5, true, -5.15, 2.25, 14.3, null, 9, { w: 0.3, d: 0.15 }); stripes(4.5, true, 5.15, 2.25, 14.3, null, 9, { w: 0.3, d: 0.15 });
     for (const [x, z] of [[-20.4, 14.4], [20.4, 14.4], [-20.4, -14.4], [20.4, -14.4]]) { cyl(0.12, 7.2, x, 3.6, z, 0x95a5a6); }
     // toit : clims, aérations, lanterneaux, et une CLÉ À MOLETTE géante
@@ -357,8 +394,24 @@
     F.box(1.8, 1.8, 1.6, w * 0.2, h + 1.1, -4.5, 0xbdc3c7);
   }
   /** Immeuble de remplissage : true si on l'a dessiné (sinon world.js pose un modèle KayKit) */
+  const RESID = ['Résidence Les Tilleuls', 'Résidence du Taraud', 'Les Hauts de la Fraiseuse', 'Résidence Le Copeau', 'Les Jardins du Mandrin', 'Résidence Pied à Coulisse'];
+  function espacil(F, f) {                                                 // V5 : immeubles Espacil (bailleur social, client de l'atelier)
+    const w = 13, d = 11, floors = 5 + Math.floor(rng() * 3), fh = 3, h = floors * fh + 0.4, zf = d / 2 - 1.5, teal = 0x13a89e;
+    F.box(w, h, d, 0, h / 2, -1.5, 0xf3efe6, { jit: 0.03 }); F.box(w + 0.1, 1.1, d + 0.1, 0, 0.55, -1.5, 0x8d969c);
+    for (let fl = 1; fl < floors; fl++) F.box(w + 0.06, 0.25, d + 0.06, 0, fl * fh, -1.5, fl % 2 ? teal : 0xd5d8dc);
+    F.box(0.8, h, 0.15, -w / 2 + 2, h / 2, zf + 0.06, teal); F.box(0.8, h, 0.15, w / 2 - 2, h / 2, zf + 0.06, 0xf39c12);
+    windows(F, w - 1, floors, fh, 0, zf + 0.02, 0); windows(F, d - 2, floors, fh, 0, w / 2 + 0.02, 1, {}); windows(F, d - 2, floors, fh, 0, w / 2 + 0.02, -1, {});
+    F.box(2, 2.4, 0.15, 0, 1.2, zf + 0.06, 0x2c3e50); F.box(3, 0.15, 1.5, 0, 2.6, zf + 0.7, teal);
+    for (let fl = 1; fl < floors; fl++) for (const x of [-w * 0.28, w * 0.28]) { if (rng() < 0.35) continue; const y = fl * fh + 0.1; F.box(2.6, 0.12, 1.1, x, y, zf + 0.55, 0xbdc3c7); F.box(2.6, 0.75, 0.05, x, y + 0.42, zf + 1.1, teal); if (rng() < 0.4) F.sh('ball', 0.6, 0.6, 0.6, x - 0.8, y + 0.4, zf + 0.55, 0x27ae60); }
+    F.box(w + 0.5, 0.5, d + 0.5, 0, h + 0.25, -1.5, 0x5d6d7e); F.box(2.4, 1.6, 2, w * 0.2, h + 1.1, -4, 0xbdc3c7);
+    const p = F.L(0, zf + 0.12), name = RESID[Math.floor(rng() * RESID.length)];
+    sign('ESPACIL', name, '#13a89e', '#ffffff', 4.2, 1.2, p.x, 3.4, p.z, F.a, { border: '#ffffff', glow: true });
+    for (let i = 0; i < 4; i++) F.box(0.8, 1.1, 0.5, -w / 2 + 1 + i * 0.95, 0.55, zf + 2.4, [0x27ae60, 0xf1c40f, 0x2c3e50, 0x95a5a6][i]);   // poubelles de tri
+  }
   D.building = f => {
-    const r = rng(); if (r < 0.32) return false;
+    const r = rng();
+    if (f.espacil) { f.style = 'espacil'; espacil(frame(f.x, f.z, f.rot), f); return true; }
+    if (r < 0.32) return false;
     const F = frame(f.x, f.z, f.rot);
     f.style = r < 0.55 ? 'maison' : r < 0.78 ? 'boutique' : 'immeuble';
     if (r < 0.55) house(F); else if (r < 0.78) shop(F); else flats(F);
@@ -408,21 +461,32 @@
   /** Sapins (à la place d'une partie des arbres ronds), fleurs, touffes d'herbe */
   D.nature = (city, pines) => {
     for (const t of pines) {
-      const k = t.k; cyl(0.25, 1.4, t.x, 0.7, t.z, 0x6d4c41);
-      for (let i = 0; i < 3; i++) B.add('cone', (2.8 - i * 0.7) * k, 1.9 * k, (2.8 - i * 0.7) * k, t.x, (1.6 + i * 1.15) * k, t.z, [0x1e5631, 0x2d6a4f, 0x245c3a][i], { jit: 0.06 });
+      const k = t.k, gy = ML.gy(t.x, t.z); cyl(0.25, 1.4, t.x, gy + 0.7, t.z, 0x6d4c41);
+      for (let i = 0; i < 3; i++) B.add('cone', (2.8 - i * 0.7) * k, 1.9 * k, (2.8 - i * 0.7) * k, t.x, gy + (1.6 + i * 1.15) * k, t.z, [0x1e5631, 0x2d6a4f, 0x245c3a][i], { jit: 0.06 });
     }
     const N = city.nodes, E = city.edges, RW = city.RW, M2 = ML.CFG.MAP;
     const free = (x, z, m) => !(x > -34 && x < 34 && z > -32 && z < 32) && !city.rects.some(o => Math.abs(o.x - x) < o.hx + m && Math.abs(o.z - z) < o.hz + m) &&
-      !E.some(e => ML.CityGen.segDist(x, z, N[e.a].x, N[e.a].z, N[e.b].x, N[e.b].z) < RW + 1.8 + m);
+      !E.some(e => ML.CityGen.segDist(x, z, N[e.a].x, N[e.a].z, N[e.b].x, N[e.b].z) < RW + 1.8 + m) && !ML.riverAt(x, z, m + 0.5);
     let n = 0;
     for (let t = 0; t < 1400 && n < 420; t++) {
       const x = M2.minX + 6 + rng() * (M2.maxX - M2.minX - 12), z = M2.minZ + 6 + rng() * (M2.maxZ - M2.minZ - 12); if (!free(x, z, 0.5)) continue; n++;
-      if (rng() < 0.18) for (let i = 0; i < 6; i++) box(0.14, 0.25, 0.14, x + (rng() - 0.5) * 1.6, 0.12, z + (rng() - 0.5) * 1.6, pick([0xe74c3c, 0xf1c40f, 0xffffff, 0xff7eb6, 0x9b59b6, 0x3498db]));
-      else { const c = pick([0x4a7f34, 0x5f9443, 0x3d6b2c, 0x6aa84f]); for (let i = 0; i < 3; i++) B.add('cone', 0.12, 0.35 + rng() * 0.3, 0.12, x + (i - 1) * 0.12, 0.2, z + (rng() - 0.5) * 0.15, c, { rz: (i - 1) * 0.35 }); }
+      const gy = ML.gy(x, z);
+      if (rng() < 0.18) for (let i = 0; i < 6; i++) { const fx = x + (rng() - 0.5) * 1.6, fz = z + (rng() - 0.5) * 1.6; box(0.14, 0.25, 0.14, fx, ML.gy(fx, fz) + 0.12, fz, pick([0xe74c3c, 0xf1c40f, 0xffffff, 0xff7eb6, 0x9b59b6, 0x3498db])); }
+      else { const c = pick([0x4a7f34, 0x5f9443, 0x3d6b2c, 0x6aa84f]); for (let i = 0; i < 3; i++) B.add('cone', 0.12, 0.35 + rng() * 0.3, 0.12, x + (i - 1) * 0.12, gy + 0.2, z + (rng() - 0.5) * 0.15, c, { rz: (i - 1) * 0.35 }); }
+    }
+    // V5 : roseaux et galets le long de la rivière
+    const RV = city.river || [];
+    for (let i = 0; i < RV.length - 1 && RV.length; i++) for (let k = 0; k < 3; k++) {
+      const t = rng(), A = RV[i], Bq = RV[i + 1], dx = Bq.x - A.x, dz = Bq.z - A.z, L = Math.hypot(dx, dz) || 1, side = rng() < 0.5 ? 1 : -1, off = city.RIV.half + 2.6 + rng() * 1.4;
+      const x = A.x + dx * t - dz / L * off * side, z = A.z + dz * t + dx / L * off * side;
+      if (x < M2.minX || x > M2.maxX || E.some(e => ML.CityGen.segDist(x, z, N[e.a].x, N[e.a].z, N[e.b].x, N[e.b].z) < RW + 3)) continue;
+      const gy = ML.gyv(x, z);
+      if (rng() < 0.6) for (let j = 0; j < 5; j++) B.add('cone', 0.1, 1.1 + rng() * 0.6, 0.1, x + (rng() - 0.5) * 0.8, gy + 0.5, z + (rng() - 0.5) * 0.8, 0x6b8e23, { rz: (rng() - 0.5) * 0.3 });
+      else B.add('ball', 0.7 + rng() * 0.6, 0.35, 0.6 + rng() * 0.5, x, gy + 0.1, z, 0xa39e93, { ry: rng() * 6 });
     }
     for (let t = 0; t < 400 && n < 470; t++) {                                     // quelques rochers
       const x = M2.minX + 6 + rng() * (M2.maxX - M2.minX - 12), z = M2.minZ + 6 + rng() * (M2.maxZ - M2.minZ - 12); if (!free(x, z, 1.5)) continue; n++;
-      B.add('ball', 1 + rng() * 1.2, 0.6 + rng() * 0.6, 1 + rng() * 1.2, x, 0.25, z, 0x8a8f94, { ry: rng() * 6, jit: 0.08 });
+      B.add('ball', 1 + rng() * 1.2, 0.6 + rng() * 0.6, 1 + rng() * 1.2, x, ML.gy(x, z) + 0.25, z, 0x8a8f94, { ry: rng() * 6, jit: 0.08 });
     }
   };
 })();

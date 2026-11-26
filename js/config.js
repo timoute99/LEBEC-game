@@ -50,7 +50,10 @@ ML.PARTS = {
           ['Bride de serrage', 'acier', 'fraiseuse', 'fraise'], ['Platine percée', 'alu', 'fraiseuse', 'foret'], ['Équerre', 'inox', 'fraiseuse', 'foret']],
   fonderie: [['Corps de vanne', 'fonte', 'fraiseuse', 'fraise'], ['Moyeu fonte', 'fonte', 'tour', 'plaquette']],
   chaudro: [['Bâti mécano-soudé', 'soude', 'fraiseuse', 'foret'], ['Embase soudée', 'soude', 'fraiseuse', 'fraise']],
-  tth: [['Arbre traité', 'acier', 'tour', 'plaquette'], ['Pignon traité', 'acier', 'fraiseuse', 'fraise']]
+  tth: [['Arbre traité', 'acier', 'tour', 'plaquette'], ['Pignon traité', 'acier', 'fraiseuse', 'fraise']],
+  // pièces propres à un client (demandes « simples »)
+  espacil: [['Gond de portail', 'acier', 'tour', 'plaquette'], ['Axe de porte de garage', 'inox', 'tour', 'plaquette'], ['Platine de boîte aux lettres', 'alu', 'fraiseuse', 'foret'],
+            ['Patte de garde-corps', 'acier', 'fraiseuse', 'fraise'], ['Fouillot de serrure', 'inox', 'fraiseuse', 'foret'], ['Galet de porte coulissante', 'alu', 'tour', 'plaquette']]
 };
 /* Cotes pour le contrôle au pied à coulisse : [désignation, nominal, tolérance] */
 ML.COTES = [['Ø extérieur', 40, 0.05], ['Longueur', 120, 0.1], ['Alésage', 25, 0.02], ['Épaisseur', 12, 0.05], ['Entraxe', 64, 0.03]];
@@ -62,10 +65,15 @@ ML.MACHINES = [
   { id: 'F1', type: 'fraiseuse', name: 'Fraiseuse CN', x: -12, z: 4 },
   { id: 'F2', type: 'fraiseuse', name: 'Fraiseuse CN', x: -4, z: 4 },
   { id: 'T3', type: 'tour', name: 'Tour CN', x: 4, z: -6, len: 4, upgrade: 'machine_T3' },
-  { id: 'F3', type: 'fraiseuse', name: 'Fraiseuse CN', x: 4, z: 4, upgrade: 'machine_F3' }
+  { id: 'F3', type: 'fraiseuse', name: 'Fraiseuse CN', x: 4, z: 4, upgrade: 'machine_F3' },
+  { id: 'T4', type: 'tour', name: 'Tour CN', x: 27, z: -6, len: 4, ext: true },              // V5 : dans l'EXTENSION (est)
+  { id: 'F4', type: 'fraiseuse', name: 'Fraiseuse CN', x: 27, z: 3.5, ext: true }
 ];
 ML.OPERATORS = ['amaury', 'marius', 'matis', 'brieuc'];
-ML.MACHINE_ORDER = ['T1', 'F1', 'T2', 'F2', 'T3', 'F3'];
+ML.MACHINE_ORDER = ['T1', 'F1', 'T2', 'F2', 'T3', 'F3', 'T4', 'F4'];
+/* V5 : l'atelier grandit avec les jours (campagne ET journées libres qui s'enchaînent).
+   Les emplacements bloqués sont gris au sol, avec « se débloque dans N jours ». */
+ML.PROGRESS = { agrandissement: 3, extension: 8, reno2: 5, reno3: 10 };
 
 /* Entreprises : taille du bâtiment, métier. La POSITION est tirée au hasard à chaque partie (citygen.js). */
 ML.COMPANIES = {
@@ -82,11 +90,13 @@ ML.COMPANIES = {
   ublo: { name: 'Ublo', sub: 'Client', kind: 'client', npc: 'ublo', w: 20, d: 16, h: 9, wall: 'beton', color: 0xfdf2e9, roof: 0xff6f61, unlockRep: 70 },
   casse: { name: 'Casse Auto Jacquot', sub: 'Attention au chien !', kind: 'casse', npc: null, w: 22, d: 18, h: 4, wall: 'tole', color: 0x7f6a55, roof: 0x4b3b2a },
   usiflash: { name: 'UsiFlash', sub: 'Concurrent (louche)', kind: 'concurrent', npc: 'kevin', w: 20, d: 14, h: 7, wall: 'tole', color: 0xa29bfe, roof: 0x6c5ce7 },
-  police: { name: 'Gendarmerie', sub: 'Brigade routière', kind: 'police', npc: null, w: 16, d: 12, h: 7, wall: 'beton', color: 0xecf0f1, roof: 0x1f3a93 },
-  concession: { name: 'Garage Pasquier', sub: 'Concessionnaire — véhicules neufs et d\'occasion', kind: 'concession', npc: 'vendeur', w: 22, d: 14, h: 7, wall: 'beton', color: 0xf5f6fa, roof: 0xc0392b },
+  police: { name: 'Gendarmerie', sub: 'Brigade routière — on entre par la porte', kind: 'police', npc: 'gendarme', w: 22, d: 16, h: 7, wall: 'beton', color: 0xecf0f1, roof: 0x1f3a93, open: true },
+  concession: { name: 'Garage Pasquier', sub: 'Concessionnaire — entrez voir le showroom !', kind: 'concession', npc: 'vendeur', w: 30, d: 18, h: 8, wall: 'beton', color: 0xf5f6fa, roof: 0xc0392b, open: true },
+  espacil: { name: 'Espacil Habitat', sub: 'Bailleur social — Client', kind: 'client', npc: 'espacil', w: 22, d: 16, h: 13, wall: 'beton', color: 0xf3efe6, roof: 0x13a89e },
   part: { name: 'Particulier', sub: 'Client au comptoir', kind: 'particulier', npc: null, virtual: true, w: 1, d: 1, h: 1, wall: 'beton', color: 0xffffff, roof: 0xe84393 }
 };
-ML.CLIENTS = ['aerotech', 'agrimeca', 'novatics', 'ublo'];
+ML.CLIENTS = ['aerotech', 'agrimeca', 'novatics', 'ublo', 'espacil'];
+for (const k in ML.COMPANIES) if (ML.COMPANIES[k].kind === 'client') ML.COMPANIES[k].open = true;   // V5 : on entre chez les clients (accueil)
 
 /* Véhicules de l'atelier (kind) */
 ML.VEHICLES = {
@@ -123,7 +133,17 @@ ML.HUMEURS = {
   lunettes: { name: 'Lebec a perdu ses lunettes', desc: 'Il ne voit les bêtises que de près.', sight: 9 },
   dos: { name: 'Lebec a mal au dos', desc: 'Il court beaucoup moins vite avec sa pelle.', run: 4.2 }
 };
-ML.WEATHER = { beau: { name: 'Grand soleil', p: 0.55 }, pluie: { name: 'Pluie (ça glisse !)', p: 0.3 }, brouillard: { name: 'Brouillard', p: 0.15 } };
+/* Météo (V5) : elle CHANGE pendant la journée. p = chance au réveil ; next = suites possibles (poids).
+   wet : la route glisse et l'atelier prend l'eau ; light : luminosité ; fog : distance du brouillard. */
+ML.WEATHER = {
+  beau: { name: 'Grand soleil', icon: '☀️', p: 0.38, light: 1, fog: 260, next: { beau: 3, nuageux: 4, vent: 2 } },
+  nuageux: { name: 'Nuageux', icon: '⛅', p: 0.22, light: 0.86, fog: 220, next: { nuageux: 2, beau: 3, pluie: 3, brouillard: 1, neige: 0.4 } },
+  vent: { name: 'Grand vent', icon: '💨', p: 0.08, light: 0.95, fog: 240, next: { beau: 3, nuageux: 3, pluie: 1 } },
+  pluie: { name: 'Pluie (ça glisse !)', icon: '🌧️', p: 0.17, light: 0.72, fog: 190, wet: 1, next: { pluie: 3, nuageux: 3, orage: 2 } },
+  orage: { name: 'ORAGE (éclairs, ça glisse beaucoup)', icon: '⛈️', p: 0.04, light: 0.55, fog: 150, wet: 1.5, next: { pluie: 3, nuageux: 2 } },
+  brouillard: { name: 'Brouillard', icon: '🌫️', p: 0.08, light: 0.85, fog: 75, next: { brouillard: 1, nuageux: 3, beau: 2 } },
+  neige: { name: 'Neige (routes glissantes)', icon: '❄️', p: 0.03, light: 0.92, fog: 140, wet: 1.3, snow: true, next: { neige: 2, nuageux: 3 } }
+};
 
 /* Événements surprise (2 à 4 tirés par journée) */
 ML.EVENTS = {
@@ -208,7 +228,8 @@ ML.ECO = {
   sub: { fonderie: 60, chaudro: 70, tth: 45 },                  // sous-traitance en direct
   subPC: { fonderie: 90, chaudro: 100 }, subDelay: [100, 140],  // brut commandé au PC (livré à l'atelier)
   coco: 70,                                                     // caisse d'outils en direct chez Outi'Pro
-  fines: { radar: 5, police: 60, ped: 30, burn: 80, audit: 40, inspect: 10, slapInsp: 30 },
+  fines: { radar: 5, police: 60, ped: 30, burn: 80, audit: 40, inspect: 10, slapInsp: 30, jail: 100 },
+  jail: { peds: 3, sec: 45, bail: 150 },                        // 3 passants renversés → la gendarmerie te poursuit ; prison 45 s (caution 150 €)
   bonus: { audit: 30, mathieu: 10, fred: 10, herve: 20 },
   rep: { ok: 2, late: 1, fail: 3, expire: 1, part: 3, partFail: 3, audit: 3 },
   stars: [100, 350, 700]                                        // bénéfice du jour pour 1, 2, 3 étoiles (× nb joueurs, machines…)
@@ -226,9 +247,12 @@ ML.CART_MAX = 40;                                               // articles max 
 ML.CATALOG = {
   T2: { cat: 'machine', name: 'Tour CN T2', price: 1100, mach: 'T2', desc: 'Un deuxième tour. Il lui faut un opérateur (RH).' },
   F2: { cat: 'machine', name: 'Fraiseuse CN F2', price: 1100, mach: 'F2', desc: 'Une deuxième fraiseuse.' },
-  agrandissement: { cat: 'atelier', name: "Agrandissement de l'atelier", price: 1400, desc: 'Deux emplacements de plus : T3 et F3.', now: true },
+  agrandissement: { cat: 'atelier', name: "Agrandissement de l'atelier", price: 1400, desc: 'Deux emplacements de plus : T3 et F3 (le sol gris dans l\'atelier).', now: true, day: ML.PROGRESS.agrandissement },
+  extension: { cat: 'atelier', name: 'Extension Est (nouveau hall)', price: 2600, desc: 'Un hall de plus à droite de l\'atelier : emplacements T4 et F4. Construit pendant la nuit.', day: ML.PROGRESS.extension },
   T3: { cat: 'machine', name: 'Tour CN T3', price: 1600, mach: 'T3', need: 'agrandissement', desc: 'Grand tour CN (après agrandissement).' },
   F3: { cat: 'machine', name: 'Fraiseuse CN F3', price: 1600, mach: 'F3', need: 'agrandissement', desc: 'Centre d\'usinage (après agrandissement).' },
+  T4: { cat: 'machine', name: 'Tour CN T4', price: 1900, mach: 'T4', need: 'extension', desc: 'Dans l\'extension Est.' },
+  F4: { cat: 'machine', name: 'Fraiseuse CN F4', price: 1900, mach: 'F4', need: 'extension', desc: 'Dans l\'extension Est.' },
   tp: { cat: 'equip', name: 'Transpalette', price: 250, veh: 'tp', desc: 'Déplace 4 caisses dans l\'atelier.' },
   fenwick: { cat: 'equip', name: 'Fenwick', price: 1200, veh: 'fenwick', desc: 'Indispensable pour les GROSSES pièces (rôle cariste).' },
   erp_auto: { cat: 'atelier', name: 'Logiciel ERP+ (acceptation auto)', price: 450, desc: 'Les demandes des clients sont acceptées toutes seules.', now: true },
@@ -259,9 +283,9 @@ ML.AI_STAFF = {
 };
 /* Concessionnaire (Garage Pasquier) */
 ML.DEALER = {
-  megane: { name: 'Méga Mégane (tunée)', price: 900, desc: 'Rapide, benne de 4 caisses, 3 places.' },
-  ducato: { name: 'Ducato', price: 1400, desc: 'Grosse benne (6 caisses), stable.' },
-  camion: { name: 'Camion plateau (poids lourd)', price: 2600, desc: 'Palettes ET caisses, rapide et stable (rôle livreur).' }
+  megane: { name: 'Méga Mégane (tunée)', price: 900, desc: 'Rapide, benne de 4 caisses, 3 places.', specs: [['Vitesse max', 'CAR'], ['Benne', '4 caisses (6 avec rehausses)'], ['Places', '3 (+2 dans la benne)'], ['Conso', 'raisonnable'], ['Bonus', 'aileron et flammes possibles']] },
+  ducato: { name: 'Ducato', price: 1400, desc: 'Grosse benne (6 caisses), stable.', specs: [['Vitesse max', 'DUCATO'], ['Benne', '6 caisses'], ['Places', '3'], ['Conso', 'moyenne'], ['Bonus', 'très stable dans les virages']] },
+  camion: { name: 'Camion plateau (poids lourd)', price: 2600, desc: 'Palettes ET caisses, rapide et stable (rôle livreur).', specs: [['Vitesse max', 'CAMION'], ['Plateau', '8 places (palette = 4)'], ['Places', '1 passager'], ['Conso', 'gourmand'], ['Permis', 'rôle 🚚 Livreur']] }
 };
 /* Pièces urgentes demandées par les particuliers */
 ML.PART_REQ = [['Axe de remorque', 'acier', 'tour', 'plaquette'], ['Bague de tracteur', 'alu', 'tour', 'plaquette'], ['Entretoise de moto', 'alu', 'tour', 'plaquette'],
@@ -359,6 +383,8 @@ ML.PEOPLE = {
   moreau: { name: 'Mme Moreau', role: 'Cliente — AgriMéca', look: { skin: 0xeec4a0, shirt: 0x27ae60, pants: 0x1e5631, hair: 0xa0522d, height: 1.68, longHair: true } },
   novatics: { name: 'Accueil Novatics', role: 'Client — Novatics', look: { skin: 0xe6b48d, shirt: 0x00a8e8, pants: 0x2d3e50, hair: 0x2a2a2a, height: 1.76 } },
   ublo: { name: 'Accueil Ublo', role: 'Client — Ublo', look: { skin: 0xf0c8a0, shirt: 0xff6f61, pants: 0x34495e, hair: 0x4a3426, height: 1.7, longHair: true } },
+  espacil: { name: 'Accueil Espacil', role: 'Client — Espacil Habitat', look: { skin: 0xf0c8a0, shirt: 0x13a89e, pants: 0x34495e, hair: 0x6b4a2b, height: 1.72, longHair: true, glasses: true } },
+  gendarme: { name: 'Adjudant Le Goff', role: 'Gendarme', look: { skin: 0xe8b98f, shirt: 0x1f3a93, pants: 0x1c2a5a, hair: 0x333333, height: 1.84, width: 1.1, cap: 0x1f3a93, mustache: true } },
   kevin: { name: 'Kévin', role: "Chef d'atelier — UsiFlash", look: { skin: 0xd9a37a, shirt: 0x6c5ce7, pants: 0x222222, hair: 0x111111, height: 1.77, cap: 0x111111 } },
   // visiteurs et événements
   jacky: { name: 'Jacky Foucher', role: 'Inspecteur Qualité', visitor: true, look: { skin: 0xe8b98f, shirt: 0xf4f4f4, pants: 0x2c3e50, hair: 0x555555, height: 1.86, tie: 0x2c3e50, glasses: true } },
@@ -403,6 +429,8 @@ ML.LINES = {
   novatics: ['Bonjour ! Vous avez notre commande ?'],
   ublo: ["Salut ! C'est pour nous ?"],
   kevin: ['Chut. On ne s\'est jamais vus.', 'Une caisse de chez Lebec ? Je prends, je prends.'],
+  espacil: ['Bonjour ! Espacil Habitat, j\'écoute.', 'On a 300 portails à réparer. Au moins.'],
+  gendarme: ['Bonjour. Papiers du véhicule ?', 'On vous a à l\'œil, à l\'atelier Lebec.'],
   jacky: ['MIP/MAP irréprochable, appui plan sur la Réf A.', 'Apportez-moi une caisse au marbre. Tout de suite.'],
   herve: ['Alors, ce stage, trouvé ? Et la convention ?', "Pas de convention, pas d'outils ! C'est le règlement."],
   fred: ["Tu as pensé à l'alternance ? Penses-y... Naval Group recrute !", 'Tu as rempli Arexis ? ARÉXIS !'],

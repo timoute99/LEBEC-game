@@ -14,7 +14,7 @@
   const U = ML.U, $ = id => document.getElementById(id);
   const eur = n => `${Math.round(n).toLocaleString('fr-FR')} €`;
   const COMP = ML.COMPANIES, STEP_ICON = { fonderie: '🔥', chaudro: '⚙️', usinage: '🛠️', tth: '♨️', livraison: '🚚' };
-  const TABS = [['cmd', '📋 Commandes'], ['shop', '🏭 Atelier'], ['sup', '🛒 Fournisseurs'], ['rh', '👷 Personnel'], ['bil', '📊 Bilan']];
+  const TABS = [['cmd', '📋 Commandes'], ['shop', '🏭 Atelier'], ['sup', '🛒 Fournisseurs'], ['rh', '👷 Personnel'], ['bil', '📊 Bilan'], ['his', '🧾 Historique']];
 
   E.isOpen = () => ML.ui.modal === 'erp';
   E.open = tab => {
@@ -31,6 +31,7 @@
       const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
       const a = b.dataset.act, G = ML.Game;
       if (a === 'tab') { E.tab = b.dataset.t; E._html = null; E.render(true); return; }
+      if (a === 'hfilter') { E.hf = b.dataset.k; E.render(true); return; }
       if (a === 'close') return E.close();
       if (a === 'arexis') { E.close(); ML.Mini.run('arexis', {}, r => { if (r === 'ok') G.intent({ a: 'use', id: 'pc', mg: 'ok' }); }); return; }
       if (a === 'part') { G.intent({ a: 'part', id: b.dataset.id, ok: +b.dataset.ok }); ML.Sfx.play('bip'); return; }
@@ -72,7 +73,7 @@
       <div class="erp-kpi"><span class="money ${S.money < 0 ? 'neg' : ''}">💶 ${eur(S.money)}</span><span>⭐ ${S.rep}/100</span><span>📅 jour ${S.co.day}</span><button class="sec tiny" data-act="close">Fermer (Échap)</button></div></div>
       ${S.evs && S.evs.fred ? '<div class="erp-alert">💼 Fred Castells attend que quelqu\'un remplisse ARÉXIS… <button data-act="arexis">Remplir ARÉXIS</button></div>' : ''}
       <div class="erp-tabs">${TABS.map(([k, n]) => `<button class="${E.tab === k ? 'on' : ''}" data-act="tab" data-t="${k}">${n}${k === 'cmd' && (S.props.length + S.parts.filter(p => p.st === 'wait').length) ? ` <i class="badge">${S.props.length + S.parts.filter(p => p.st === 'wait').length}</i>` : ''}</button>`).join('')}</div>`;
-    const body = { cmd: tabCmd, shop: tabShop, sup: tabSup, rh: tabRh, bil: tabBil }[E.tab](S);
+    const body = { cmd: tabCmd, shop: tabShop, sup: tabSup, rh: tabRh, bil: tabBil, his: tabHis }[E.tab](S);
     const html = head + `<div class="erp-body">${body}</div>`;
     if (!force && html === E._html) return;
     const sc = $('erp-card').querySelector('.erp-body'), top = sc ? sc.scrollTop : 0;
@@ -126,7 +127,9 @@
       for (const k in ML.CATALOG) {
         const it = ML.CATALOG[k]; if (it.cat !== cat) continue;
         const own = it.mach ? !!S.machines[it.mach] : it.veh ? S.owned.includes(it.veh) : (S.up[k] || 0) >= (it.max || 1);
-        const lock = it.need && !S.up[it.need], lvl = it.max > 1 ? ` (${S.up[k] || 0}/${it.max})` : '';
+        const day = S.co.day || S.day, early = it.day && day < it.day, extWait = it.mach && ML.MACHINES.find(m => m.id === it.mach).ext && S.up.extension && !S.ext;
+        const lock = (it.need && !S.up[it.need]) || early || extWait, lvl = it.max > 1 ? ` (${S.up[k] || 0}/${it.max})` : '';
+        if (early || extWait) { h += `<div class="erp-item lockd"><b>${U.esc(it.name)}</b><span class="small dim">${U.esc(it.desc || '')}</span><span class="dim">🔒 ${early ? `se débloque au jour ${it.day} (${it.day - day === 1 ? 'demain' : 'dans ' + (it.day - day) + ' jours'})` : 'l\'extension se construit cette nuit'}</span></div>`; continue; }
         h += `<div class="erp-item ${own ? 'own' : ''}"><b>${U.esc(it.name)}${lvl}</b><span class="small dim">${U.esc(it.desc || '')}</span>
           ${own && it.daily ? `<span class="ok">✔ abonné (${it.daily} €/jour)</span><button class="sec" data-act="unsub" data-k="${k}">Résilier</button>` : own ? '<span class="ok">✔ acheté</span>' : lock ? `<span class="dim">🔒 il faut : ${U.esc(ML.CATALOG[it.need].name)}</span>` : `<button data-act="buy" data-k="${k}" ${S.money < it.price ? 'disabled' : ''}>Acheter ${eur(it.price)}</button>`}</div>`;
       }
@@ -173,6 +176,25 @@
       h += `<div class="erp-item"><b>${U.esc(A.name)}</b><span class="small dim">${U.esc(A.desc)}</span><span class="small">Salaire : ${A.pay} €/jour</span><button data-act="hire" data-id="ai:${k}" ${S.money < A.hire ? 'disabled' : ''}>Embaucher (${A.hire} €)</button></div>`;
     }
     return h + '</div><p class="dim small">Les salaires sont versés chaque soir, au bilan de la journée.</p>';
+  }
+
+  /** V5 : HISTORIQUE des dépenses — qui a dépensé quoi (amendes, achats…), et les jours précédents */
+  function tabHis(S) {
+    const G = ML.Game, L = (G.ledger || []).slice().reverse(), f = E.hf || 'all';
+    const players = Object.keys(S.pl).map(pid => S.pl[pid]);
+    const cats = { amende: '🚨 Amende', achat: '🛒 Achat', invest: '🏗 Invest.', ca: '💶 Livraison', bonus: '🎁 Prime', salaires: '👷 Salaires', abos: '🐦 Abonnement' };
+    const sp = Object.values(S.spent || {});
+    let h = '<h3>👤 Dépenses par joueur aujourd\'hui</h3>';
+    h += sp.length ? `<table class="erp-tab"><tr><th></th><th>Amendes</th><th>Achats</th><th>Investissements</th><th>Total</th></tr>${sp.map(v => `<tr><td><b>${U.esc(v.name)}</b></td><td class="${v.amende ? 'red' : 'dim'}">${eur(v.amende)}</td><td>${eur(v.achat)}</td><td>${eur(v.invest)}</td><td><b>${eur(v.amende + v.achat + v.invest + v.autre)}</b></td></tr>`).join('')}</table>` : '<p class="dim">Personne n\'a encore dépensé un centime aujourd\'hui.</p>';
+    h += `<h3>🧾 Le détail (le plus récent en haut)</h3><div class="erp-filter">${[['all', 'Tout'], ['neg', 'Dépenses'], ['amende', 'Amendes']].concat(players.map(P => ['p' + P.idx, P.name])).map(([k, n]) => `<button class="mini ${f === k ? 'on' : ''}" data-act="hfilter" data-k="${k}">${U.esc(n)}</button>`).join('')}</div>`;
+    const rows = L.filter(r => f === 'all' || (f === 'neg' && r[4] < 0) || (f === 'amende' && r[2] === 'amende') || (f[0] === 'p' && r[5] === +f.slice(1))).slice(0, 120);
+    h += rows.length ? `<table class="erp-led">${rows.map(([t, who, cat, what, amt, idx]) => `<tr><td class="dim">${t}</td><td class="who">${idx >= 0 ? `<i style="background:${ML.COLORS[idx % 6].css}"></i>` : ''}${U.esc(who)}</td><td>${cats[cat] || U.esc(cat)}</td><td>${U.esc(what)}</td><td class="amt ${amt < 0 ? 'neg' : 'pos'}">${amt > 0 ? '+' : ''}${eur(amt)}</td></tr>`).join('')}</table>` : '<p class="dim">Rien pour l\'instant (le détail commence quand tu arrives dans la partie).</p>';
+    if (S.hist && S.hist.length) {
+      h += '<h3>📅 Jours précédents</h3><table class="erp-tab"><tr><th>Jour</th><th>Joueur</th><th>Amendes</th><th>Achats</th><th>Invest.</th></tr>';
+      for (const d of S.hist.slice().reverse()) for (const [n, am, ac, inv] of d.p) h += `<tr><td class="dim">jour ${d.d}</td><td>${U.esc(n)}</td><td class="${am ? 'red' : 'dim'}">${eur(am)}</td><td>${eur(ac)}</td><td>${eur(inv)}</td></tr>`;
+      h += '</table>';
+    }
+    return h;
   }
 
   function tabBil(S) {

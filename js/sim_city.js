@@ -32,7 +32,7 @@
     // passants sur les trottoirs
     peds = K.peds = [];
     const sideE = city.edges.map((e, i) => i).filter(i => i > 0 && !city.edges[i].ring && city.edges[i].len > 20);
-    for (let i = 0; i < 18 && sideE.length; i++) { const e = rng.pick(sideE); peds.push({ e, d: rng() * city.edges[e].len, dir: rng() < 0.5 ? 1 : -1, side: rng() < 0.5 ? 1 : -1, sp: 1 + rng() * 0.7, down: 0, look: i }); }
+    for (let i = 0; i < 28 && sideE.length; i++) { const e = rng.pick(sideE); peds.push({ e, d: rng() * city.edges[e].len, dir: rng() < 0.5 ? 1 : -1, side: rng() < 0.5 ? 1 : -1, sp: 1 + rng() * 0.7, down: 0, look: i }); }
     // circulation
     tr = K.tr = [];
     const E = city.edges, long = E.map((e, i) => i).filter(i => i > 0 && E[i].len > 30);
@@ -97,14 +97,42 @@
         if (opts.length) { const k = rng.pick(opts); p.e = k; p.dir = city.edges[k].a === q.end ? 1 : -1; p.d = 2; } else { p.dir = -p.dir; p.d = 2; p.side = -p.side; }
       }
       for (const c of S.cars) if (c.dr && Math.abs(c.s || 0) > 4 && Math.hypot(c.x - q.x, c.z - q.z) < 1.9) {
-        p.down = 4; K.fine(ML.ECO.fines.ped); K.ev({ e: 'ped', i: peds.indexOf(p) });
-        K.all(`🚶 ${S.pl[c.dr] ? S.pl[c.dr].name : '?'} a renversé un passant ! Amende : −${ML.ECO.fines.ped} €. Il se relève en râlant.`, 'warn'); K.sfx('punch', q.x, q.z);
+        const J = ML.ECO.jail, n = S.pedHits[c.dr] = (S.pedHits[c.dr] || 0) + 1;
+        p.down = 4; K.fine(ML.ECO.fines.ped, 'Passant renversé', c.dr); K.ev({ e: 'ped', i: peds.indexOf(p) });
+        K.all(`🚶 ${S.pl[c.dr] ? S.pl[c.dr].name : '?'} a renversé un passant ! Amende : −${ML.ECO.fines.ped} €${n < J.peds ? ` (${n}/${J.peds} : attention à la gendarmerie)` : ''}. Il se relève en râlant.`, 'warn'); K.sfx('punch', q.x, q.z);
+        if (n >= J.peds) K.wanted(c.dr);
       }
     }
   }
 
   /* ---------- Radars & gendarmerie ---------- */
+  /** V5 : trop de passants renversés → la gendarmerie part de la brigade et te poursuit, où que tu sois */
+  K.wanted = pid => {
+    const L = ML.LOC.comp.police, P = S.pl[pid]; if (!L || !P || P.jail > S.rt) return;
+    if (pol && pol.pid === pid) { pol.jail = true; pol.t = 0; return; }
+    if (pol) return;                                                   // une seule voiture : elle s'occupera de toi après
+    const tp = K.pose[pid] || { x: L.dock.x, z: L.dock.z };
+    pol = K.pol = { x: L.dock.x, z: L.dock.z, h: Math.atan2(tp.x - L.dock.x, tp.z - L.dock.z), pid, ci: P.car !== null ? P.car : -1, t: 0, stuck: 0, jail: true };
+    K.big('🚨 GENDARMERIE : ON TE RECHERCHE !', '#3498db', pid); K.all(`🚨 ${P.name} a renversé trop de passants : la GENDARMERIE le·la recherche ! (garde à vue à la clé)`, 'warn'); K.sfx('siren', L.dock.x, L.dock.z);
+  };
+  /** Garde à vue : on enferme le joueur dans une cellule de la gendarmerie */
+  K.jail = pid => {
+    const P = S.pl[pid], J = ML.ECO.jail, cells = ML.LOC.jail || []; if (!P || !cells.length) return;
+    if (P.car !== null) { const c = S.cars[P.car]; if (c) { c.dr = null; c.s = 0; } P.car = null; }
+    if (P.ride != null) { const r = S.cars[P.ride]; if (r) r.pass = r.pass.filter(x => x.pid !== pid); P.ride = null; }
+    const used = Object.values(S.pl).filter(q => q.jail > S.rt).length, cell = cells[used % cells.length];
+    P.jail = S.rt + J.sec; S.pedHits[pid] = 0;
+    K.fine(ML.ECO.fines.jail, 'Garde à vue (passants renversés)', pid);
+    K.ev({ e: 'jail', to: pid, x: cell.x, z: cell.z, yaw: cell.yaw, t: J.sec }); K.sfx('jail');
+    K.all(`🚔 ${P.name} part en GARDE À VUE à la gendarmerie pour ${J.sec} s (−${ML.ECO.fines.jail} €). Un collègue peut payer la caution (${J.bail} €) à l'accueil.`, 'warn');
+    Sim.dirty = true;
+  };
+  K.free = (pid, by) => {
+    const P = S.pl[pid], o = ML.LOC.jailOut; if (!P || !P.jail) return;
+    P.jail = 0; K.ev({ e: 'free', to: pid, x: o.x, z: o.z, bail: by ? S.pl[by].name : null }); Sim.dirty = true;
+  };
   function lawStep(dt) {
+    for (const pid in S.pl) if (S.pl[pid].jail && S.pl[pid].jail < S.rt) K.free(pid);
     const limit = S.rule === 'speed30' ? 8.4 : C.SPEED_LIMIT;
     S.cars.forEach((c, ci) => {
       if (!c.dr || !S.pl[c.dr] || c.kind === 'tp') return;
@@ -113,7 +141,7 @@
         const key = c.dr + ':' + ri;
         const lim = city.radars[ri] && city.radars[ri].ring && S.rule !== 'speed30' ? 25 : limit;
         if (sp > lim && Math.hypot(r.x - c.x, r.z - c.z) < 15 && (K.radarCd[key] || 0) < S.rt) {
-          K.radarCd[key] = S.rt + 5; K.fine(ML.ECO.fines.radar);
+          K.radarCd[key] = S.rt + 5; K.fine(ML.ECO.fines.radar, `Flashé·e à ${kmh} km/h`, c.dr);
           K.ev({ e: 'flash', to: c.dr, r: ri, kmh }); K.all(`📸 ${name} flashé·e à ${kmh} km/h ! (−${ML.ECO.fines.radar} €)`, 'warn');
           if (kmh >= 90) K.stat(c.dr, 'flash90');
         }
@@ -128,11 +156,12 @@
     });
     if (!pol) return;
     pol.t += dt;
+    const Pw = S.pl[pol.pid]; if (pol.jail && Pw && Pw.car !== null) pol.ci = Pw.car;   // il change de voiture : on suit
     const c = S.cars[pol.ci], tgt = c && c.dr === pol.pid ? c : null, tp = K.pose[pol.pid];
     const tx = tgt ? tgt.x : tp ? tp.x : pol.x, tz = tgt ? tgt.z : tp ? tp.z : pol.z;
     const dx = tx - pol.x, dz = tz - pol.z, d = Math.hypot(dx, dz);
     pol.h = U.lerpAngle(pol.h, Math.atan2(dx, dz), Math.min(1, dt * 3));
-    const sp = Math.min(23, d * 2), ox = pol.x, oz = pol.z;
+    const sp = Math.min(pol.jail ? 27 : 23, d * 2), ox = pol.x, oz = pol.z;
     pol.x += Math.sin(pol.h) * sp * dt; pol.z += Math.cos(pol.h) * sp * dt;
     const q = { x: pol.x, z: pol.z }; U.resolveCircle(q, 1.1); pol.x = q.x; pol.z = q.z;
     if (Math.hypot(pol.x - ox, pol.z - oz) < sp * dt * 0.3 && d > 6) pol.stuck += dt; else pol.stuck = 0;
@@ -142,12 +171,13 @@
     }
     const name = S.pl[pol.pid] ? S.pl[pol.pid].name : '?';
     if (d < 4.5 && (!tgt || Math.abs(tgt.s || 0) < 4)) {
-      K.fine(ML.ECO.fines.police);
+      if (pol.jail) { const id = pol.pid; pol = K.pol = null; K.ev({ e: 'arrest', to: id }); K.big('🚨 ARRÊTÉ·E !', '#3498db', id); K.jail(id); return; }
+      K.fine(ML.ECO.fines.police, 'Arrêté·e par la gendarmerie', pol.pid);
       if (tgt) tgt.frozen = S.rt + 6;
       K.ev({ e: 'arrest', to: pol.pid }); K.big('🚨 ARRÊTÉ·E !', '#3498db', pol.pid); K.all(`🚨 ${name} s'est fait arrêter : amende de ${ML.ECO.fines.police} € et 6 s de contrôle.`, 'warn');
       pol = K.pol = null; Sim.dirty = true; return;
     }
-    if (d > 120 || pol.t > 40 || !S.pl[pol.pid]) {
+    if ((pol.jail ? pol.t > 100 : d > 120 || pol.t > 40) || !S.pl[pol.pid]) {
       if (S.pl[pol.pid]) { K.stat(pol.pid, 'police_out'); K.all(`😎 ${name} a semé la gendarmerie !`, 'good'); }
       pol = K.pol = null;
     }
@@ -218,6 +248,12 @@
         const c = S.cars[P.car]; if (!c || !ML.LOC.pump || Math.hypot(ML.LOC.pump.x - c.x, ML.LOC.pump.z - c.z) > 9) return true;
         c.fuel = 100; K.ev({ e: 'fuel', car: P.car, f: 100 }); K.note(pid, '⛽ Le plein est fait ! (Dédé met ça sur le compte de Lebec)', 'good');
         return true;
+      }
+      case 'bail': {                                                  // V5 : payer la caution d'un collègue (accueil de la gendarmerie)
+        const n = K.npcs.gendarme, T2 = S.pl[m.id]; if (!n || !n.active || !K.near(ps, n.x, n.z, 7) || !T2 || !(T2.jail > S.rt)) return true;
+        if (!K.spend(pid, ML.ECO.jail.bail, 'amende', `Caution de ${T2.name}`)) { K.say(n, 'Pas d\'argent, pas de caution.'); return true; }
+        K.say(n, ML.line('gendarme', 'caution', 'Caution payée. Qu\'on ne vous y reprenne pas.')); K.free(m.id, pid);
+        K.all(`💶 ${P.name} a payé la caution de ${T2.name} (${ML.ECO.jail.bail} €).`, 'info'); return true;
       }
       case 'dry': K.stat(pid, 'dry'); K.all(`⛽ ${P.name} est en PANNE SÈCHE ! Un jerrican (station Total-Lebec) et E sur la voiture.`, 'warn'); return true;
     }

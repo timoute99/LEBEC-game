@@ -38,7 +38,7 @@
   /* ---------- Ping « viens ici » ---------- */
   F.ping = (x, z, name, color) => {
     if (!F.root) return;
-    const g = new THREE.Group(); g.position.set(x, 0, z);
+    const g = new THREE.Group(); g.position.set(x, ML.gy(x, z), z);
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 40, 10, 1, true), new THREE.MeshBasicMaterial({ color: color || 0xffd257, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, fog: false }));
     beam.position.y = 20; beam.renderOrder = 3; g.add(beam);
     const ring = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.5, 24), new THREE.MeshBasicMaterial({ color: color || 0xffd257, side: THREE.DoubleSide, transparent: true, opacity: 0.9, fog: false }));
@@ -121,16 +121,16 @@
     if (!F.root) return;
     if (f.dog) {
       if (!F.dog) F.dog = buildDog();
-      const d = F.dog.userData; d.t.set(f.dog[0], 0, f.dog[1]); d.h = f.dog[2]; d.st = f.dog[3];
+      const d = F.dog.userData; d.t.set(f.dog[0], ML.gy(f.dog[0], f.dog[1]), f.dog[1]); d.h = f.dog[2]; d.st = f.dog[3];
       if (!d.seen) { F.dog.position.copy(d.t); d.seen = true; }
     }
     if (f.ps) {
       while (F.peds.length < f.ps.length) {
         const i = F.peds.length, r = ML.U.rng(i * 7919 + 13);
-        const v = ML.People.build({ skin: r.pick(ML.SKINS), shirt: Math.floor(r() * 0xffffff), pants: r.pick([0x2c3e50, 0x34495e, 0x555555, 0x1f4e9a]), hair: r.pick(ML.HAIRS), height: r.range(1.55, 1.9), width: r.range(0.9, 1.2), longHair: r() < 0.4 }, { name: '' });
+        const v = ML.People.build({ skin: r.pick(ML.SKINS), shirt: Math.floor(r() * 0xffffff), pants: r.pick([0x2c3e50, 0x34495e, 0x555555, 0x1f4e9a]), hair: r.pick(ML.HAIRS), height: r.range(1.55, 1.9), width: r.range(0.9, 1.2), longHair: r() < 0.4 }, { name: '', bare: true });
         F.peds.push(v);
       }
-      f.ps.forEach(([x, z, h, down], i) => { const v = F.peds[i]; v.target.set(x, 0, z); v.tYaw = h; v.down = down; if (!v.seen) { v.pos.copy(v.target); v.seen = true; } });
+      f.ps.forEach(([x, z, h, down], i) => { const v = F.peds[i]; v.target.set(x, ML.gy(x, z), z); v.tYaw = h; v.down = down; if (!v.seen) { v.pos.copy(v.target); v.seen = true; } });
     }
     if (!f.pg) return;
     if (!F.pigeon) F.pigeon = buildPigeon();
@@ -164,13 +164,16 @@
       D.position.lerp(d.t, k); D.rotation.y = ML.U.lerpAngle(D.rotation.y, d.h, k);
       const mv = Math.hypot(D.position.x - ox, D.position.z - oz) / Math.max(dt, 1e-3);
       d.legs.forEach((l, i) => { l.rotation.x = mv > 0.5 ? Math.sin(t * 18 + i * 1.6) * 0.6 : 0; });
-      D.rotation.z = d.st === 0 ? 1.4 : 0; D.position.y = d.st === 0 ? -0.2 : 0;
+      D.rotation.z = d.st === 0 ? 1.4 : 0; D.position.y = d.t.y + (d.st === 0 ? -0.2 : 0);
       const lt = d.st === 0 ? '💤' : d.st === 2 ? '🐕 GRRR !' : '🐕'; if (d.lt !== lt) { d.lab.setText(lt); d.lt = lt; }
     }
+    const cp = ML.camera.position;
     for (const v of F.peds) {
       if (!v.seen) continue;
+      v.group.visible = Math.abs(v.pos.x - cp.x) < 80 && Math.abs(v.pos.z - cp.z) < 80;        // V5 : de loin, on ne dessine pas les passants
+      if (!v.group.visible) { v.pos.lerp(v.target, Math.min(1, dt * 12)); continue; }
       ML.People.animate(v, dt, null);
-      v.group.rotation.x = v.down ? -1.45 : 0; if (v.down) v.group.position.y = 0.25;
+      v.group.rotation.x = v.down ? -1.45 : 0; if (v.down) v.group.position.y = v.pos.y + 0.25;
     }
   };
 })();

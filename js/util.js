@@ -54,6 +54,9 @@
     return m;
   };
 
+  /* ---------- Sol (V5) : hauteur et rivière, remplacés par world.js quand la ville est construite ---------- */
+  ML.gy = () => 0; ML.gyv = () => 0; ML.riverAt = () => false; ML.riverPush = () => false;
+
   /* ---------- Collisions ---------- */
   U.addCollider = (minX, maxX, minZ, maxZ, tag) => { const c = { minX, maxX, minZ, maxZ, tag }; ML.colliders.push(c); return c; };
   U.boxCollider = (cx, cz, w, d, tag) => U.addCollider(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, tag);
@@ -72,10 +75,14 @@
         if (m === l) p.x = c.minX - r; else if (m === rr) p.x = c.maxX + r; else if (m === t) p.z = c.minZ - r; else p.z = c.maxZ + r;
       }
     }
+    if (ML.riverPush(p, r)) hit = true;                               // pas de baignade dans la rivière (sauf par les ponts)
     return hit;
   };
-  U.inCollider = (x, z, pad) => { pad = pad || 0; for (const c of ML.colliders) if (x > c.minX - pad && x < c.maxX + pad && z > c.minZ - pad && z < c.maxZ + pad) return true; return false; };
-  U.inWorkshop = p => p.x > -20 && p.x < 20 && p.z > -14 && p.z < 14;
+  U.inCollider = (x, z, pad) => { pad = pad || 0; for (const c of ML.colliders) if (x > c.minX - pad && x < c.maxX + pad && z > c.minZ - pad && z < c.maxZ + pad) return true; return ML.riverAt(x, z, pad); };
+  /** Dans l'atelier ? (le hall principal, + l'extension Est quand elle est construite) */
+  U.inWorkshop = p => (p.x > -20 && p.x < 20 && p.z > -14 && p.z < 14) || (!!(ML.World && ML.World.ext) && p.x >= 20 && p.x < 33 && p.z > -12 && p.z < 8);
+  /** Dans un bâtiment où l'on entre (clients, garage, gendarmerie) ? */
+  U.indoors = p => U.inWorkshop(p) || !!(ML.World && ML.World.interiors && ML.World.interiors.some(b => p.x > b.minX && p.x < b.maxX && p.z > b.minZ && p.z < b.maxZ));
 
   /* ---------- Étiquettes flottantes (sprite, canvas de taille fixe) ---------- */
   U.label = (text, opt) => {

@@ -8,7 +8,9 @@
      rejoignent une autre rue (boucle) ou forment un LOTISSEMENT en boucle ;
    - les ENTREPRISES au fond des impasses (on doit aller les chercher) ;
    - immeubles, voitures garées, lampadaires, radars, feux, arbres,
-     cachettes, perchoirs du pigeon, NOMS DE RUES.
+     cachettes, perchoirs du pigeon, NOMS DE RUES ;
+   - V5 : une RIVIÈRE qui traverse la ville (les routes la franchissent
+     par des ponts, rien n'est construit dedans), des immeubles ESPACIL.
    Données pures : la construction 3D est dans world.js.
    ===================================================================== */
 (function () {
@@ -20,6 +22,7 @@
     return Math.hypot(px - ax - t * dx, pz - az - t * dz);
   };
   CG.segDist = segDist;
+  CG.RIVER = { half: 7, node: 24, angle: 0.8 };   // demi-largeur d'eau, distance mini d'un carrefour, angle mini de franchissement
   function cross(a, b, c, d) {
     const o = (p, q, r) => Math.sign((q.x - p.x) * (r.z - p.z) - (q.z - p.z) * (r.x - p.x));
     if (a === c || a === d || b === c || b === d) return false;
@@ -41,12 +44,34 @@
     const addNode = (x, z) => { N.push({ x, z }); return N.length - 1; };
     const deg = i => E.filter(e => e.a === i || e.b === i).length;
     const len = e => Math.hypot(N[e.b].x - N[e.a].x, N[e.b].z - N[e.a].z);
+    /* ---------- Rivière (polyligne) ---------- */
+    let RV = null;                                  // points de la rivière (null tant qu'elle n'existe pas)
+    const rDist = (x, z) => { if (!RV) return 999; let m = 999; for (let i = 0; i < RV.length - 1; i++) { const d = segDist(x, z, RV[i].x, RV[i].z, RV[i + 1].x, RV[i + 1].z); if (d < m) m = d; } return m; };
+    const RIV = CG.RIVER;
+    /** Une route peut-elle franchir la rivière ici ? (franchissement net, carrefours loin de l'eau) */
+    function riverOk(pa, pb) {
+      if (!RV) return true;
+      if (rDist(pa.x, pa.z) < RIV.node || rDist(pb.x, pb.z) < RIV.node) return false;
+      let n = 0;
+      for (let i = 0; i < RV.length - 1; i++) {
+        const A = RV[i], B = RV[i + 1];
+        if (!cross(pa, pb, A, B)) continue;
+        const ux = pb.x - pa.x, uz = pb.z - pa.z, vx = B.x - A.x, vz = B.z - A.z;
+        const c = Math.abs(ux * vx + uz * vz) / (Math.hypot(ux, uz) * Math.hypot(vx, vz));
+        if (Math.acos(Math.min(1, c)) < RIV.angle) return false;
+        n++;
+      }
+      if (n > 1) return false;
+      if (!n) { const L = Math.hypot(pb.x - pa.x, pb.z - pa.z); for (let t = 0; t <= 1.0001; t += 3 / L) if (rDist(pa.x + (pb.x - pa.x) * t, pa.z + (pb.z - pa.z) * t) < RIV.half + 5) return false; }
+      return true;
+    }
 
     /** La route [a→b] est-elle possible ? (pas de croisement, pas trop près d'une autre route ou d'un carrefour) */
     function clear(pa, pb, ia, ib, gap, skip) {
       gap = gap === undefined ? 15 : gap;
       const L = Math.hypot(pb.x - pa.x, pb.z - pa.z);
       if (L < 18) return false;
+      if (!riverOk(pa, pb)) return false;
       for (let t = 0; t <= 1.0001; t += 3 / L) { const x = pa.x + (pb.x - pa.x) * t, z = pa.z + (pb.z - pa.z) * t; if (inAtelier(x, z, 3) || !inMap(x, z, 8)) return false; if (city.rects.some(o => Math.abs(o.x - x) < o.hx + RW + 2 && Math.abs(o.z - z) < o.hz + RW + 2)) return false; }
       for (const e of E) {
         if (cross(pa, pb, N[e.a], N[e.b])) return false;
@@ -117,6 +142,29 @@
       }
     }
 
+    /* ---------- 3 bis. La rivière : traverse la carte d'ouest en est, loin des carrefours ---------- */
+    {
+      let best = null, bs = -1e9;
+      for (let k = 0; k < 120; k++) {
+        const z0 = r.range(150, 262), A = r.range(10, 26), Lw = r.range(140, 230), ph = r() * 6.283, A2 = r.range(3, 8), L2 = r.range(45, 75), pts = [];
+        for (let x = M.minX - 70; x <= M.maxX + 70; x += 10) pts.push({ x, z: z0 + A * Math.sin(x / Lw * 6.283 + ph) + A2 * Math.sin(x / L2 * 6.283 + ph * 2) });
+        RV = pts; let sc = 0;
+        for (const n of N) sc += Math.min(0, rDist(n.x, n.z) - RIV.node - 4) * 10;
+        for (const e of E) {
+          const pa = N[e.a], pb = N[e.b];
+          for (let i = 0; i < pts.length - 1; i++) {
+            if (!cross(pa, pb, pts[i], pts[i + 1])) continue;
+            const ux = pb.x - pa.x, uz = pb.z - pa.z, vx = pts[i + 1].x - pts[i].x, vz = pts[i + 1].z - pts[i].z;
+            const ang = Math.acos(Math.min(1, Math.abs(ux * vx + uz * vz) / (Math.hypot(ux, uz) * Math.hypot(vx, vz))));
+            sc += Math.min(0, ang - RIV.angle - 0.1) * 60;
+          }
+        }
+        if (sc > bs) { bs = sc; best = pts; }
+        if (sc >= 0) break;
+      }
+      RV = city.river = best;
+    }
+
     /* ---------- 4. Rues secondaires : impasses, boucles, lotissements ---------- */
     function grow(ei, forceImpasse) {
       const e = E[ei]; if (!e || ei === 0 || e.len < 40) return -1;
@@ -170,6 +218,7 @@
       const R = { x, z, hx, hz, rot };
       if (x - hx < M.minX + 4 || x + hx > M.maxX - 4 || z - hz < M.minZ + 4 || z + hz > M.maxZ - 4) return null;
       if (inAtelier(x, z, Math.max(hx, hz))) return null;
+      if (rDist(x, z) < RIV.half + 6 + Math.hypot(hx, hz)) return null;
       if (rects.some(o => Math.abs(o.x - x) < o.hx + hx + margin && Math.abs(o.z - z) < o.hz + hz + margin)) return null;
       for (const e of E) {
         const A = N[e.a], B = N[e.b], steps = Math.ceil(e.len / 3);
@@ -243,7 +292,7 @@
       if (city.fillers.length >= 70) break;
       if (r() < 0.3) continue;
       const R = fitFacing(c.px, c.pz, c.nx, c.nz, 15, 15, 3, 3); if (!R) continue;
-      rects.push(R); city.fillers.push({ x: R.x, z: R.z, rot: R.rot, model: r.pick(blds) });
+      rects.push(R); city.fillers.push({ x: R.x, z: R.z, rot: R.rot, model: r.pick(blds), espacil: Math.hypot(R.x, R.z) > 70 && city.fillers.filter(f => f.espacil).length < 6 && r() < 0.22 });
       if (r() < 0.2) city.perches.push({ x: R.x, y: 13, z: R.z });
     }
     /* ---------- 7. Mobilier urbain ---------- */
@@ -251,13 +300,13 @@
       const A = N[e.a], B = N[e.b], dx = (B.x - A.x) / e.len, dz = (B.z - A.z) / e.len, yaw = Math.atan2(dx, dz);
       for (let t = 12, s = 1; t < e.len - 12; t += 26, s = -s) {
         const x = A.x + dx * t - dz * s * (RW + 1.3), z = A.z + dz * t + dx * s * (RW + 1.3);
-        if (!rects.some(o => Math.abs(o.x - x) < o.hx + 1 && Math.abs(o.z - z) < o.hz + 1)) city.lamps.push({ x, z, ry: Math.atan2(-dx * s, -dz * s), nx: dz * s, nz: -dx * s });
+        if (!rects.some(o => Math.abs(o.x - x) < o.hx + 1 && Math.abs(o.z - z) < o.hz + 1) && rDist(x, z) > RIV.half + 5) city.lamps.push({ x, z, ry: Math.atan2(-dx * s, -dz * s), nx: dz * s, nz: -dx * s });
       }
       if (ei === 0 || e.ring) return;
       for (let t = 16; t < e.len - 16; t += 11) for (const s of [-1, 1]) {
         if (r() > 0.18) continue;
         const x = A.x + dx * t - dz * s * (RW + 2), z = A.z + dz * t + dx * s * (RW + 2);
-        if (rects.some(o => Math.abs(o.x - x) < o.hx + 3 && Math.abs(o.z - z) < o.hz + 3)) continue;
+        if (rects.some(o => Math.abs(o.x - x) < o.hx + 3 && Math.abs(o.z - z) < o.hz + 3) || rDist(x, z) < RIV.half + 6) continue;
         city.parked.push({ x, z, ry: yaw + (s > 0 ? 0 : Math.PI), model: r.pick(['city_car_hatchback', 'city_car_sedan', 'city_car_stationwagon', 'city_car_taxi']) });
       }
     });
@@ -265,11 +314,14 @@
     const byLen = E.map((e, i) => [e.len, i]).filter(x => x[1] > 0).sort((a, b) => b[0] - a[0]);
     byLen.filter(x => !E[x[1]].ring).slice(0, 2).concat(byLen.filter(x => E[x[1]].ring).slice(0, 1)).forEach(([L, i]) => {
       const e = E[i], A = N[e.a], B = N[e.b], dx = (B.x - A.x) / L, dz = (B.z - A.z) / L;
-      city.radars.push({ x: (A.x + B.x) / 2 - dz * (RW + 1.6), z: (A.z + B.z) / 2 + dx * (RW + 1.6), edge: i, ring: !!e.ring });
+      for (const t of [0.5, 0.3, 0.7, 0.2, 0.8]) {
+        const x = A.x + (B.x - A.x) * t - dz * (RW + 1.6), z = A.z + (B.z - A.z) * t + dx * (RW + 1.6);
+        if (rDist(x, z) > RIV.half + 8) { city.radars.push({ x, z, edge: i, ring: !!e.ring }); break; }
+      }
     });
     N.forEach((n, i) => { if (deg(i) >= 3 && city.lights.length < 8 && !n.cul) city.lights.push(i); });
     /* ---------- 8. Nature, cachettes ---------- */
-    const free = (x, z, m) => !inAtelier(x, z, 4) && !nearRoad(x, z, m) && !rects.some(o => Math.abs(o.x - x) < o.hx + m && Math.abs(o.z - z) < o.hz + m);
+    const free = (x, z, m) => !inAtelier(x, z, 4) && !nearRoad(x, z, m) && !rects.some(o => Math.abs(o.x - x) < o.hx + m && Math.abs(o.z - z) < o.hz + m) && rDist(x, z) > RIV.half + 3 + m;
     for (let t = 0; t < 2500 && city.trees.length < 170; t++) { const x = r.range(M.minX + 4, M.maxX - 4), z = r.range(M.minZ + 4, M.maxZ - 4); if (free(x, z, 3)) city.trees.push({ x, z, k: r.range(0.85, 1.5), c: Math.floor(r() * 4) }); }
     for (let t = 0; t < 1000 && city.bushes.length < 60; t++) { const x = r.range(M.minX + 4, M.maxX - 4), z = r.range(M.minZ + 4, M.maxZ - 4); if (free(x, z, 1.5)) city.bushes.push({ x, z, s: r.range(4, 7), ry: r() * 6 }); }
     for (let t = 0; t < 600 && city.hides.length < 22; t++) {
@@ -283,6 +335,20 @@
       const e = es.reduce((m, x) => (x.len > m.len ? x : m)), A = N[e.a], B = N[e.b];
       return { name: s.name, x: (A.x + B.x) / 2, z: (A.z + B.z) / 2, a: Math.atan2(B.z - A.z, B.x - A.x) };
     }).filter(Boolean);
+    /* ---------- 9. Ponts : chaque route qui franchit la rivière ---------- */
+    city.bridges = [];
+    if (RV) E.forEach((e, ei) => {
+      const A = N[e.a], B = N[e.b];
+      for (let i = 0; i < RV.length - 1; i++) {
+        const P = RV[i], Q = RV[i + 1]; if (!cross(A, B, P, Q)) continue;
+        const ux = (B.x - A.x) / e.len, uz = (B.z - A.z) / e.len, vx = Q.x - P.x, vz = Q.z - P.z, vl = Math.hypot(vx, vz);
+        const den = ux * vz - uz * vx; if (Math.abs(den) < 1e-6) continue;
+        const t = ((P.x - A.x) * vz - (P.z - A.z) * vx) / den;          // distance le long de la route jusqu'à l'eau
+        const sin = Math.abs(den) / vl, L = Math.min(e.len - 4, (RIV.half + 6) * 2 / Math.max(0.35, sin));
+        city.bridges.push({ e: ei, x: A.x + ux * t, z: A.z + uz * t, ux, uz, len: L, ring: !!e.ring, name: e.name });
+      }
+    });
+    city.riverDist = rDist; city.RIV = RIV;
     city.RW = RW;
     return city;
   };

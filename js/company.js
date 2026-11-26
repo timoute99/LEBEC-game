@@ -40,10 +40,46 @@
     for (const k in ML.AI_STAFF) if (d.ai && d.ai[k]) E.ai[k] = true;
     for (const k in ML.CATALOG) if (d.up && d.up[k] && !ML.CATALOG[k].mach && !ML.CATALOG[k].veh) E.up[k] = num(d.up[k], 1, 1, ML.CATALOG[k].max || 1);
     for (const k in ML.CFG.START_STOCK) E.stock[k] = num(d.stock && d.stock[k], F.stock[k] || 0, 0, 999);
+    E.mess = Co.cleanMess(d.mess);
+    E.hist = Array.isArray(d.hist) ? d.hist.slice(-7).map(h => ({ d: num(h && h.d, 1, 1, 9999), p: (Array.isArray(h && h.p) ? h.p : []).slice(0, 8).map(r => [String(r[0] || '?').replace(/[<>&"`]/g, '').slice(0, 16)].concat([1, 2, 3, 4].map(i => num(r[i], 0, 0, 1e7)))) })) : [];
     return E;
   };
+  /** V5 : ce qui reste d'un jour à l'autre (commandes, bazar…) — on ne garde que des valeurs sûres */
+  Co.cleanMess = m => {
+    if (!m || typeof m !== 'object') return null;
+    const fin = v => Number.isFinite(+v) ? +v : 0, small = o => (o && typeof o === 'object' && !Array.isArray(o) && JSON.stringify(o).length < 400 ? o : {});
+    const T = ML.Items.TYPES, STEPS = ['fonderie', 'chaudro', 'usinage', 'tth', 'livraison'], C = ML.COMPANIES;
+    const out = {
+      it: (Array.isArray(m.it) ? m.it : []).slice(0, 150).filter(r => Array.isArray(r) && T[r[0]]).map(r => [r[0], small(r[1]), fin(r[2]), fin(r[3]), fin(r[4])]),
+      beds: {}, mach: {}, pud: (Array.isArray(m.pud) ? m.pud : []).slice(0, 8).map(r => [fin(r[0]), fin(r[1]), Math.min(3, Math.max(0.5, fin(r[2])))]),
+      ord: (Array.isArray(m.ord) ? m.ord : []).slice(0, 14).filter(o => o && C[o.client] && Array.isArray(o.steps) && o.steps.every(x => STEPS.includes(x))).map(o => ({
+        id: Math.max(1, Math.round(fin(o.id))), client: o.client, part: String(o.part || 'Pièce').slice(0, 40), mat: ML.MATERIALS[o.mat] ? o.mat : 'acier', mtype: ML.MTYPE[o.mtype] ? o.mtype : 'tour',
+        tool: ML.TOOLS[o.tool] ? o.tool : 'plaquette', steps: o.steps.slice(0, 4), si: Math.max(0, Math.min(o.steps.length - 1, Math.round(fin(o.si)))), size: ['s', 'm', 'l'].includes(o.size) ? o.size : 'm',
+        src: o.src === 'fonderie' || o.src === 'chaudro' ? o.src : null, dur: Math.max(60, Math.min(2000, fin(o.dur))), price: Math.max(0, Math.min(1e5, Math.round(fin(o.price)))), left: Math.max(0, Math.min(2000, fin(o.left))), plan: /^[TF][1-4]$/.test(o.plan) ? o.plan : null, q: !!o.q })),
+      jobs: (Array.isArray(m.jobs) ? m.jobs : []).slice(0, 8).filter(j => Array.isArray(j) && /^[TF][1-4]$/.test(j[0]) && ML.TOOLS[j[2]]).map(j => [j[0], Math.round(fin(j[1])), j[2], j[3] ? 1 : 0, Math.max(0, fin(j[4])), Math.max(1, fin(j[5])), j[6] ? 1 : 0]),
+      deliv: (Array.isArray(m.deliv) ? m.deliv : []).slice(0, 20).filter(d => d && typeof d === 'object').map(d => {
+        const o = { eta: Math.max(5, Math.min(600, fin(d.eta))), from: C[d.from] ? d.from : 'aciers', name: String(d.name || 'Livraison').slice(0, 60) };
+        if (ML.SUPPLY[d.k]) { o.k = d.k; o.q = Math.max(1, Math.min(40, Math.round(fin(d.q)))); }
+        if (d.cart && typeof d.cart === 'object') { o.cart = {}; for (const k in d.cart) if (ML.SUPPLY[k]) o.cart[k] = Math.max(0, Math.min(40, Math.round(fin(d.cart[k])))); }
+        if (d.oid) { o.oid = Math.round(fin(d.oid)); o.sub = d.sub === 'fonderie' ? 'fonderie' : 'chaudro'; }
+        return o;
+      }),
+      subs: (Array.isArray(m.subs) ? m.subs : []).slice(0, 20).filter(j => j && ['fonderie', 'chaudro', 'tth'].includes(j.k)).map(j => {
+        const o = { k: j.k, oid: Math.round(fin(j.oid)), end: Math.max(5, Math.min(600, fin(j.end))) };
+        if (j.k === 'tth') { o.nc = !!j.nc; o.mes = Array.isArray(j.mes) ? j.mes.slice(0, 4) : undefined; o.type = j.type === 'piece' ? 'piece' : 'caisse'; }
+        return o;
+      })
+    };
+    if (m.beds && typeof m.beds === 'object') for (const k in m.beds) if (ML.VEHICLES[k] && Array.isArray(m.beds[k])) out.beds[k] = m.beds[k].slice(0, 8).filter(r => Array.isArray(r) && T[r[0]]).map(r => [r[0], small(r[1])]);
+    if (m.mach && typeof m.mach === 'object') for (const k in m.mach) if (/^[TF][1-4]$/.test(k) && Array.isArray(m.mach[k])) out.mach[k] = [Math.max(0, Math.min(100, fin(m.mach[k][0]))), m.mach[k][1] ? 1 : 0, m.mach[k][2] ? 1 : 0, Math.max(0, Math.min(100, fin(m.mach[k][3])))];
+    return out;
+  };
   /** Fusionne l'état de fin de journée (ou d'autosauvegarde) dans l'entreprise */
-  Co.merge = (E, snap) => Co.clean(Object.assign({}, E, snap || {}));
+  Co.merge = (E, snap) => {
+    const m = Object.assign({}, E, snap || {});
+    if (snap && snap.histDay) { m.hist = (E.hist || []).filter(h => h.d !== snap.histDay.d).concat([snap.histDay]).slice(-7); delete m.histDay; }
+    return Co.clean(m);
+  };
   /** L'inspecteur peut-il venir ? (atelier prêt, ou jour limite) */
   Co.inspReady = E => !E.won && !E.insp && E.day >= (E.inspNext || 0) &&
     ((E.mach.length >= ML.CAMPAIGN.inspMach && E.rep >= ML.CAMPAIGN.inspRep) || E.day >= ML.CAMPAIGN.inspLate);

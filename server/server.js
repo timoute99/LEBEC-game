@@ -93,7 +93,7 @@ function verify(token) {
 const ID = /^[a-z0-9_]{1,32}$/;
 
 /* ======================= Sauvegardes de campagne ======================= */
-const MAX_SAVES = 3000, SAVE_MAX_LEN = 16000;
+const MAX_SAVES = 3000, SAVE_MAX_LEN = 60000;          // V5 : la sauvegarde garde aussi les commandes en cours et le bazar
 const CODE_L = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newSaveCode() { for (;;) { let c = ''; for (let i = 0; i < 6; i++) c += CODE_L[crypto.randomInt(CODE_L.length)]; if (!SAVES.data[c]) return c; } }
 function campOp(m) {

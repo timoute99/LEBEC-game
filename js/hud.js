@@ -11,11 +11,21 @@
 
   H.init = () => {
     H.el = {};
-    for (const id of ['hud', 'props', 'clock', 'score', 'sat', 'finds', 'tickets', 'team', 'prompt', 'notifs', 'subtitle', 'big', 'flash', 'inventory', 'stamina', 'drive', 'pause', 'help', 'end', 'endcard', 'hostlost', 'minimap', 'toasts', 'evbar', 'daycard', 'raceboard', 'vote', 'secret', 'hp', 'hpbox', 'rolebadge', 'ko', 'bigmap', 'gps'])
+    for (const id of ['wx', 'jail', 'hud', 'props', 'clock', 'score', 'sat', 'finds', 'tickets', 'team', 'prompt', 'notifs', 'subtitle', 'big', 'flash', 'inventory', 'stamina', 'drive', 'pause', 'help', 'end', 'endcard', 'hostlost', 'minimap', 'toasts', 'evbar', 'daycard', 'raceboard', 'vote', 'secret', 'hp', 'hpbox', 'rolebadge', 'ko', 'bigmap', 'gps'])
       H.el[id] = $(id);
     H.el.inventory.innerHTML = [0, 1, 2].map(i => `<div class="slot"><span class="k">${i + 1}</span><span class="ic"></span><span class="nm"></span></div>`).join('');
     H.slots = [...H.el.inventory.querySelectorAll('.slot')];
-    H.el.pause.onclick = () => ML.Input.lock();
+    // V5 : menu Pause (Échap) — reprendre, changer de pseudo / de perso, menu principal
+    H.el.pause.onclick = e => {
+      const b = e.target.closest('[data-pz]');
+      if (!b) { if (!e.target.closest('.pausecard')) ML.Input.lock(); return; }
+      const a = b.dataset.pz, G = ML.Game;
+      if (a === 'resume') ML.Input.lock();
+      if (a === 'rename') { const v = $('pz-name').value.trim(); if (v) { G.rename(v); H.toast('✏ Pseudo changé : ' + v); } }
+      if (a === 'perso') ML.Lobby.inGameProfile();
+      if (a === 'menu') { if (confirm(G.solo ? 'Quitter la partie et revenir au menu principal ? (en campagne, l\'atelier est sauvegardé toutes les minutes)' : G.isHost ? 'Quitter la partie ? Un autre joueur reprendra l\'atelier.' : 'Quitter la partie et revenir au menu principal ?')) ML.Lobby.leaveGame(); }
+    };
+    H.el.pause.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'pz-name') { e.preventDefault(); $('pz-name').nextElementSibling.click(); } });
   };
 
   H.startGame = () => {
@@ -26,6 +36,17 @@
   H.stopGame = () => { for (const k of ['hud', 'end', 'help', 'pause', 'hostlost', 'vote', 'daycard']) H.el[k].classList.add('hidden'); };
   H.showPause = (b, soft) => {
     if (!H.el) return;
+    if (b && !soft) {                                                           // V5 : vrai menu pause
+      H._soft = false; H.el.pause.classList.remove('soft');
+      const G = ML.Game, me = G.S && G.S.pl[G.me], nm = me ? me.name : (G.players[G.me] || {}).name || '';
+      H.el.pause.innerHTML = `<div class="card pausecard"><h2>⏸ Pause</h2>
+        <button class="go" data-pz="resume">▶ Reprendre</button>
+        <div class="pz-row"><input id="pz-name" maxlength="16" value="${U.esc(nm)}" placeholder="Pseudo"><button class="sec" data-pz="rename">✏ Changer de pseudo</button></div>
+        <button class="sec" data-pz="perso">👕 Changer mon perso (tenue, chapeau…)</button>
+        <button class="sec" data-pz="menu">🏠 Menu principal</button>
+        <p class="dim small">${G.solo ? 'Le jeu continue de tourner en fond.' : 'En multijoueur, la partie continue pour les autres !'}</p></div>`;
+      H.el.pause.classList.toggle('hidden', false); return;
+    }
     if (b && soft !== H._soft) { H._soft = !!soft; H.el.pause.classList.toggle('soft', !!soft); H.el.pause.innerHTML = soft ? '<div class="resume">🖱 Clique pour reprendre la main</div>' : '<div class="card"><h2>Pause</h2><p>Clique pour reprendre.</p><p class="dim">En multijoueur, la partie continue pour les autres !</p></div>'; }
     H.el.pause.classList.toggle('hidden', !b);
   };
@@ -35,7 +56,7 @@
     const Hm = ML.HUMEURS[S.humeur], W = ML.WEATHER[S.weather];
     const mode = S.campaign ? (S.mode === 'inspection' ? `🎓 ${S.co.name} — INSPECTION de l'Éducation Nationale` : `${S.co.name} — jour ${S.co.day}`) : ({ coop: 'Journée libre', inspection: "INSPECTION de l'Éducation Nationale", course: 'Course de Mégane' }[S.mode] || S.mode);
     const Dd = ML.DIFFS[S.diff] || ML.DIFFS.normal;
-    H.el.daycard.innerHTML = `<div class="dc-mode">${U.esc(mode)} · ${Dd.icon} ${U.esc(Dd.name)}</div><div class="dc-h">😤 ${U.esc(Hm.name)}</div><div class="dim">${U.esc(Hm.desc)}</div><div class="dc-w">${S.weather === 'pluie' ? '🌧' : S.weather === 'brouillard' ? '🌫' : '☀️'} ${U.esc(W.name)}</div>` +
+    H.el.daycard.innerHTML = `<div class="dc-mode">${U.esc(mode)} · ${Dd.icon} ${U.esc(Dd.name)}</div><div class="dc-h">😤 ${U.esc(Hm.name)}</div><div class="dim">${U.esc(Hm.desc)}</div><div class="dc-w">${W.icon} ${U.esc(W.name)} <span class="dim">(la météo change pendant la journée)</span></div>` +
       (S.mode === 'inspection' ? '<div class="dc-x">Respecte ses règles absurdes (elles changent !). 5 infractions = échec.</div>' : S.mode === 'course' ? '<div class="dc-x">5 manches : le premier arrivé EN VOITURE devant l\'entreprise indiquée gagne.</div>' : '') +
       (S.traitorMode ? '<div class="dc-x">🕵 Un traître se cache parmi vous…</div>' : '') +
       (S.mode !== 'course' ? `<div class="dc-x">💶 ${S.money.toLocaleString('fr-FR')} € en caisse · les demandes des clients arrivent au 💻 PC de gestion (bureau)</div>` : '');
@@ -91,6 +112,10 @@
     });
     H.renderTickets(S); H.renderTeam(S); H.renderEvents(S); H.renderRace(S);
     const gt = ML.GPS.target ? `📍 Repère : ${Math.round(ML.GPS.dist)} m` : ''; if (gt !== H._gps) { H.el.gps.textContent = gt; H.el.gps.classList.toggle('hidden', !gt); H._gps = gt; }
+    // V5 : météo + garde à vue
+    const W = ML.WEATHER[S.weather], wt = W ? `${W.icon} ${W.name}` : ''; if (wt !== H._wx) { H.el.wx.textContent = wt; H._wx = wt; }
+    const jl = G.jailUntil ? Math.ceil((G.jailUntil - performance.now()) / 1000) : 0, jt = jl > 0 ? `🚔 GARDE À VUE : ${jl} s` : '';
+    if (jt !== H._jail) { H.el.jail.textContent = jt; H.el.jail.classList.toggle('hidden', !jt); H._jail = jt; }
     H.drawMap(S);
   };
 
@@ -197,6 +222,8 @@
     if (r.race) more += `<h3>🏁 Classement</h3><table>${r.race.map(([id, n, p], i) => `<tr><td>${['🥇', '🥈', '🥉'][i] || i + 1 + 'e'} ${U.esc(n)}</td><td><b>${p}</b> pts</td></tr>`).join('')}</table>`;
     if (r.inspection) more += `<h3>🎓 Inspection : ${r.inspection.pass ? '<span class="ok">AVIS FAVORABLE</span>' : '<span class="ko">AVIS DÉFAVORABLE</span>'}</h3><p class="dim">${r.inspection.viol} infraction(s) · il fallait ≤ 4 et au moins ${eur(r.need[0])} de bénéfice.</p>`;
     if (r.traitor) more += `<h3>🕵 Le traître était… <b>${U.esc(r.traitor.name)}</b> !</h3><p>${r.traitor.caught ? "Démasqué·e par l'équipe : bravo !" : "Il/elle s'en sort sans être démasqué·e…"} <span class="dim">(bilan du traître : ${r.traitor.usi} caisse(s) livrée(s) chez UsiFlash, ${r.traitor.cuts} coupure(s) de courant, ${r.traitor.fails} ticket(s) raté(s) dans la journée)</span></p>`;
+    const sp = Object.values(r.spent || {}).filter(v => v.amende + v.achat + v.invest + v.autre > 0);
+    if (sp.length && r.mode !== 'course') more += `<h3>🧾 Qui a dépensé quoi aujourd'hui</h3><table class="spent"><tr><th></th><th>Amendes</th><th>Achats</th><th>Invest.</th><th>Total</th></tr>${sp.sort((a, b) => (b.amende + b.achat + b.invest + b.autre) - (a.amende + a.achat + a.invest + a.autre)).map(v => `<tr><td>${U.esc(v.name)}</td><td class="${v.amende ? 'ko' : 'dim'}">${eur(v.amende)}</td><td>${eur(v.achat)}</td><td>${eur(v.invest)}</td><td><b>${eur(v.amende + v.achat + v.invest + v.autre)}</b></td></tr>`).join('')}</table><p class="dim small">Le détail heure par heure est au 💻 PC, onglet 🧾 Historique.</p>`;
     if (extra.coins !== undefined) more += `<p class="coins">🪙 +${extra.coins} jetons pour ton profil (total ${ML.Account.prof.coins})</p>`;
     if (extra.camp) more += extra.camp;
     let btns;
@@ -246,7 +273,13 @@
       x.lineCap = 'round';
       for (const e of city.edges) { const A = city.nodes[e.a], B = city.nodes[e.b]; x.strokeStyle = e.ring ? '#c9ccd1' : '#2b2f36'; x.lineWidth = city.RW * 2 * s; x.beginPath(); x.moveTo(X(A.x), Z(A.z)); x.lineTo(X(B.x), Z(B.z)); x.stroke(); }
       for (const n of city.nodes) if (n.cul) { x.fillStyle = '#2b2f36'; x.beginPath(); x.arc(X(n.x), Z(n.z), (city.RW + 3.5) * s, 0, 7); x.fill(); }
-      for (const r of ML.mapRects) if (!r.line && !r.comp) { x.fillStyle = r.c; x.fillRect(X(r.x - r.w / 2), Z(r.z - r.d / 2), r.w * s, r.d * s); }
+      // V5 : relief (ombrage) et rivière
+      const T2 = ML.World.hgt;
+      if (T2) for (let j = 0; j < T2.nz; j += 2) for (let i = 0; i < T2.nx; i += 2) { const h = T2.hv[j * T2.nx + i]; if (h > 1.5) { x.fillStyle = `rgba(255,255,220,${Math.min(0.28, h / 40)})`; x.fillRect(X(T2.x0 + i * T2.S), Z(T2.z0 + j * T2.S), 2 * T2.S * s + 1, 2 * T2.S * s + 1); } }
+      for (const r of ML.mapRects) if (r.river) { x.strokeStyle = '#3d86c6'; x.lineWidth = 2 * 9.7 * s; x.lineJoin = x.lineCap = 'round'; x.beginPath(); r.river.forEach((q, i) => (i ? x.lineTo(X(q.x), Z(q.z)) : x.moveTo(X(q.x), Z(q.z)))); x.stroke(); }
+      for (const e of city.edges) { const A = city.nodes[e.a], B = city.nodes[e.b]; x.strokeStyle = e.ring ? '#c9ccd1' : '#2b2f36'; x.lineWidth = city.RW * 2 * s; x.beginPath(); x.moveTo(X(A.x), Z(A.z)); x.lineTo(X(B.x), Z(B.z)); x.stroke(); }
+      for (const b of city.bridges || []) { x.fillStyle = '#e8e2d0'; x.save(); x.translate(X(b.x), Z(b.z)); x.rotate(Math.atan2(b.uz, b.ux)); x.fillRect(-b.len * s / 2, -(city.RW + 2) * s, b.len * s, (city.RW + 2) * 2 * s); x.restore(); }
+      for (const r of ML.mapRects) if (!r.line && !r.comp && !r.river) { x.fillStyle = r.c; x.fillRect(X(r.x - r.w / 2), Z(r.z - r.d / 2), r.w * s, r.d * s); if (r.name === 'Espacil') { x.fillStyle = '#fff'; x.font = `bold ${Math.max(8, 2.6 * s)}px Arial`; x.textAlign = 'center'; x.fillText('Espacil', X(r.x), Z(r.z)); } }
       x.font = `${Math.max(9, 3.2 * s)}px Arial`; x.textAlign = 'center'; x.textBaseline = 'middle';
       for (const l of city.labels || []) {
         x.save(); x.translate(X(l.x), Z(l.z)); let a = l.a; if (a > Math.PI / 2) a -= Math.PI; if (a < -Math.PI / 2) a += Math.PI; x.rotate(a);
@@ -273,7 +306,8 @@
     ML.Cars.list.forEach((car, i) => { const sc = S.cars[i]; if (sc) dot(car.pos.x, car.pos.z, '#' + new THREE.Color(sc.color).getHexString(), 5, sc.kind === 'megane' ? 'Mégane' : sc.kind === 'camion' ? 'Camion' : sc.kind === 'fenwick' ? 'Fenwick' : ''); });
     if (ML.Cars.police && ML.Cars.police.visible) dot(ML.Cars.police.position.x, ML.Cars.police.position.z, '#2255ff', 6, '🚨');
     if (ML.Fx.dog) dot(ML.Fx.dog.position.x, ML.Fx.dog.position.z, '#8d6e63', 4, '🐕');
-    for (const p of ML.Fx.pings) dot(p.g.position.x, p.g.position.z, '#ffd257', 7, '📍');
+    const blink = Math.floor(performance.now() / 260) % 2;                // V5 : repères ROUGES clignotants, bien visibles
+    for (const p of ML.Fx.pings) { c.strokeStyle = '#fff'; c.lineWidth = 3; c.fillStyle = blink ? '#ff2d2d' : '#ffffff'; c.beginPath(); c.arc(X(p.g.position.x), Z(p.g.position.z), 9 + (blink ? 3 : 0), 0, 7); c.fill(); c.stroke(); dot(p.g.position.x, p.g.position.z, blink ? '#ffffff' : '#ff2d2d', 3, '📍 viens ici'); }
     for (const pid in S.pl) {
       const P = S.pl[pid], col = ML.COLORS[P.idx % 6].css, me = pid === G.me;
       const pos = me ? (G.p.car !== null ? ML.Cars.list[G.p.car].pos : G.p.pos) : G.avatars[pid] && G.avatars[pid].seen ? G.avatars[pid].pos : null;
@@ -290,10 +324,11 @@
   H.buildMap = () => {
     const c = document.createElement('canvas'); c.width = MAP.W; c.height = MAP.Hh; const x = c.getContext('2d');
     x.fillStyle = '#3f5f35'; x.fillRect(0, 0, MAP.W, MAP.Hh);
+    for (const r of ML.mapRects) if (r.river) { x.strokeStyle = '#3d86c6'; x.lineWidth = 6; x.lineCap = x.lineJoin = 'round'; x.beginPath(); r.river.forEach((q, i) => (i ? x.lineTo(mx(q.x), mz(q.z)) : x.moveTo(mx(q.x), mz(q.z)))); x.stroke(); }
     x.strokeStyle = '#2b2f36'; x.lineWidth = 3.2; x.lineCap = 'round';
     for (const r of ML.mapRects) if (r.line) { x.beginPath(); x.moveTo(mx(r.line[0]), mz(r.line[1])); x.lineTo(mx(r.line[2]), mz(r.line[3])); x.stroke(); }
     const kx = MAP.W / (MAPC.maxX - MAPC.minX), kz = MAP.Hh / (MAPC.maxZ - MAPC.minZ);
-    for (const r of ML.mapRects) if (!r.line) { x.fillStyle = r.c; x.fillRect(mx(r.x - r.w / 2), mz(r.z - r.d / 2), Math.max(1, r.w * kx), Math.max(1, r.d * kz)); }
+    for (const r of ML.mapRects) if (!r.line && !r.river) { x.fillStyle = r.c; x.fillRect(mx(r.x - r.w / 2), mz(r.z - r.d / 2), Math.max(1, r.w * kx), Math.max(1, r.d * kz)); }
     x.font = 'bold 8px Arial'; x.textAlign = 'center';
     for (const k in ML.LOC.comp) { const L = ML.LOC.comp[k], n = ML.COMPANIES[k].name.split(' ')[0] === 'Boulangerie' ? 'Boulang.' : ML.COMPANIES[k].name.split(' ')[0]; x.fillStyle = '#000'; x.fillText(n, mx(L.x) + 1, mz(L.z) + 3); x.fillStyle = '#fff'; x.fillText(n, mx(L.x), mz(L.z) + 2); }
     x.fillStyle = '#ffd257'; x.fillText('ATELIER', mx(0), mz(0) + 3);
@@ -310,7 +345,8 @@
     if (ML.Cars.police && ML.Cars.police.visible) dot(ML.Cars.police.position.x, ML.Cars.police.position.z, Math.floor(performance.now() / 200) % 2 ? '#2255ff' : '#ff2222', 3.2);
     ML.Cars.list.forEach((c, i) => { const sc = S.cars[i]; dot(c.pos.x, c.pos.z, sc ? '#' + new THREE.Color(sc.color).getHexString() : '#fff', sc && sc.kind === 'tp' ? 2 : 3); });
     for (const id in G.itemViews) { const iv = G.itemViews[id]; if (iv.type === 'find' || U.inWorkshop(iv.mesh.position)) continue; dot(iv.mesh.position.x, iv.mesh.position.z, '#7fd3ff', 1.8); }
-    for (const p of ML.Fx.pings) dot(p.g.position.x, p.g.position.z, '#ffd257', 3.5);
+    const bl = Math.floor(performance.now() / 260) % 2;
+    for (const p of ML.Fx.pings) { dot(p.g.position.x, p.g.position.z, '#ffffff', bl ? 6 : 4.5); dot(p.g.position.x, p.g.position.z, '#ff2d2d', bl ? 4.5 : 3.2); }
     const L = G.npcViews.lebec; if (L && L.seen) dot(L.pos.x, L.pos.z, L.st === 'c' ? '#ff0000' : '#2c5aa0', 2.5);
     for (const pid in S.pl) {
       const c = ML.COLORS[S.pl[pid].idx % 6].css;

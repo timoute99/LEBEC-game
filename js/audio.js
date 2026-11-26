@@ -49,6 +49,8 @@
     siren: v => { tone(700, 0.3, 'square', 0.07 * v); setTimeout(() => tone(950, 0.3, 'square', 0.07 * v), 300); },
     flash: v => { noise(0.05, 0.4 * v, 8000); tone(2000, 0.08, 'sine', 0.1 * v); },
     emote: v => tone(880, 0.08, 'triangle', 0.08 * v, 1320),
+    thunder: v => { noise(1.6, 0.55 * v, 180); setTimeout(() => noise(1.1, 0.35 * v, 120), 350); },
+    jail: v => { tone(140, 0.4, 'square', 0.18 * v, 90); setTimeout(() => tone(110, 0.5, 'square', 0.16 * v, 70), 300); },
     horn_base: v => { tone(410, 0.35, 'square', 0.15 * v); tone(520, 0.35, 'square', 0.12 * v); },
     horn_canard: v => { tone(620, 0.12, 'sawtooth', 0.15 * v, 330); setTimeout(() => tone(600, 0.16, 'sawtooth', 0.15 * v, 300), 150); },
     horn_cucaracha: v => [392, 392, 392, 523, 659, 0, 392, 392, 392, 523, 659].forEach((f, i) => f && setTimeout(() => tone(f, 0.11, 'square', 0.1 * v), i * 120)),

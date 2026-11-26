@@ -94,6 +94,8 @@
         const k = String(m.k), it = ML.CATALOG[k]; if (!it) return;
         if (isCatOwned(k)) return K.note(pid, `${it.name} : déjà acheté.`, 'warn');
         if (it.need && !S.up[it.need]) return K.note(pid, `Il faut d'abord : ${ML.CATALOG[it.need].name}.`, 'warn');
+        if (it.day && (S.co.day || S.day) < it.day) return K.note(pid, `${it.name} : se débloque au jour ${it.day}.`, 'warn');
+        if (it.mach && ML.MACHINES.find(x => x.id === it.mach).ext && !S.ext) return K.note(pid, `${it.name} : l'extension sera construite cette nuit, achète la machine demain !`, 'warn');
         if (!K.spend(pid, it.price, 'invest', it.name)) return;
         if (it.mach) {
           S.machines[it.mach] = { status: 'idle', job: null, op: null, wear: 0, broken: false, plan: null, bin: true, chips: 0 };
@@ -237,7 +239,7 @@
     for (const it of T.items) {
       const o = K.isPart(it) || it.type === 'palette' ? S.orders.find(x => x.id === it.d.oid) : null;
       if (o && K.stage(o) === 'livraison') { K.deliver(null, null, 0, Object.assign({}, it, { d: Object.assign({}, it.d, { npc: 0.9 }) }), o.client, npcs[COMP[o.client].npc]); del++; continue; }
-      if (o && K.stage(o) === 'tth' && !o.q && S.money >= ECO.sub.tth) { K.money(-ECO.sub.tth, 'achat'); o.q = true; S.subs.tth.push({ oid: o.id, end: S.rt + C.SUB_SEC, nc: !!it.d.nc, mes: it.d.mes, type: it.type }); tth++; continue; }
+      if (o && K.stage(o) === 'tth' && !o.q && S.money >= ECO.sub.tth) { K.money(-ECO.sub.tth, 'achat', { who: 'Jojo', what: `Traitement thermique #${o.id}` }); o.q = true; S.subs.tth.push({ oid: o.id, end: S.rt + C.SUB_SEC, nc: !!it.d.nc, mes: it.d.mes, type: it.type }); tth++; continue; }
       if (it.type === 'matiere') { if (it.d.mat) S.stock[it.d.mat] += it.d.q; else { S.stock.plaquette += 2; S.stock.fraise += 2; S.stock.foret += 2; } back++; continue; }
       const [x, z] = K.receptionSpot(); K.spawnItem(it, x, 0, z); back++;
     }
@@ -293,7 +295,7 @@
       case 'part': partDecide(pid, m); return true;
       case 'buycar': {
         const k = String(m.k), D = ML.DEALER[k], n = npcs.vendeur; if (!D || !n || !n.active) return true;
-        if (!K.near(ps, n.x, n.z, 9)) return true;
+        if (!K.near(ps, n.x, n.z, 9) && !K.near(ps, n.x, n.z, 26)) return true;           // V5 : on achète aussi depuis le showroom
         if (S.owned.includes(k)) { K.say(n, 'Vous l\'avez déjà, celle-là !'); return true; }
         if (!K.spend(pid, D.price, 'invest', D.name)) { K.say(n, 'Revenez avec des sous, jeune homme.'); return true; }
         S.owned.push(k); const L = ML.LOC.comp.concession, h = Math.atan2(L.tan.x, L.tan.z);

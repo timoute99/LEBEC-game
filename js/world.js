@@ -1,38 +1,165 @@
 /* =====================================================================
    world.js — Construction 3D du monde à partir de la ville générée
    (citygen.js). Le monde est RECONSTRUIT à chaque partie (nouvelle
-   graine) : World.build(seed, upgrades, machines). Tout est rangé dans
-   World.root pour pouvoir le supprimer d'un coup. Une machine achetée
+   graine) : World.build(seed, upgrades, machines, { day }). Tout est rangé
+   dans World.root pour pouvoir le supprimer d'un coup. Une machine achetée
    en cours de journée est ajoutée à la volée (World.syncMachines).
+   V5 : relief + rivière (ML.gy = hauteur du sol), ponts, bâtiments où l'on
+   ENTRE (clients, garage, gendarmerie), atelier qui évolue avec les jours.
    ===================================================================== */
 (function () {
   const W = ML.World = { targets: [], machines: {}, root: null };
   const U = ML.U, T = ML.Tex, A = ML.Assets;
   let root, rng;
 
-  W.build = (seed, upgrades, mach) => {
+  W.build = (seed, upgrades, mach, opts) => {
     if (W.root) { ML.scene.remove(W.root); }
     root = W.root = new THREE.Group(); ML.scene.add(root);
     ML.colliders.length = 0; W.targets = []; W.machines = {}; W.radars = []; W.lights = []; W.lampHeads = null;
-    ML.mapRects = []; W.up = upgrades || {}; W.owned = mach || ML.MACHINES.map(m => m.id); W.partCars = [];
+    ML.mapRects = []; W.up = upgrades || {}; W.owned = mach || ML.MACHINES.filter(m => !m.ext).map(m => m.id); W.partCars = [];
+    W.day = (opts && opts.day) || 1; W.ext = !!W.up.extension; W.staff = []; W.interiors = []; W.show = {}; W.reels = [];
+    W.reno = W.day >= ML.PROGRESS.reno3 ? 3 : W.day >= ML.PROGRESS.reno2 ? 2 : 1;      // l'atelier se refait une beauté avec les jours
     rng = U.rng(seed ^ 0x5bd1e995);
     ML.Decor.begin(seed, root);                                     // détails graphiques fusionnés (decor.js)
     const city = W.city = ML.CityGen.generate(seed);
     ML.LOC = { comp: city.companies, hides: city.hides.slice(), perches: city.perches, radars: city.radars };
-    W.ground(city); W.atelier(); W.furniture(); ML.Decor.atelier(); W.machinesBuild();
+    W.terrain(city); W.ground(city); W.atelier(); W.furniture(); ML.Decor.atelier(W); W.machinesBuild();
     for (const k in city.companies) W.company(k, ML.COMPANIES[k], city.companies[k]);
     W.decor(city); W.bounds();
     ML.Decor.end();
-    ML.LOC.hides = ML.LOC.hides.filter(h => !U.inCollider(h.x, h.z, 0.5));
+    ML.LOC.hides = ML.LOC.hides.filter(h => !U.inCollider(h.x, h.z, 0.5) && !ML.riverAt(h.x, h.z, 1));
   };
   const add = o => { root.add(o); return o; };
   const plane = (w, d, mat, x, z, y) => U.plane(w, d, mat, x, z, y, root);
 
+  /* ---------- Relief et rivière (V5) ----------
+     Une grille de hauteurs (pas de 2 m) : collines dans les espaces verts,
+     plat sur les routes, les bâtiments et l'atelier, lit creusé pour la
+     rivière. ML.gy(x, z) = hauteur où l'on marche (0 sur les routes et les
+     ponts). ML.riverAt / riverPush : on ne marche pas (ni ne roule) dans l'eau. */
+  W.terrain = city => {
+    const M = ML.CFG.MAP, S = 2, pad = 56, x0 = M.minX - pad, z0 = M.minZ - pad, RW = city.RW, RIV = city.RIV;
+    const nx = Math.round((M.maxX - M.minX + 2 * pad) / S) + 1, nz = Math.round((M.maxZ - M.minZ + 2 * pad) / S) + 1, n = nx * nz;
+    const dR = new Float32Array(n).fill(99), dB = new Float32Array(n).fill(99), dW = new Float32Array(n).fill(99), seg = ML.CityGen.segDist;
+    const box = (ax, az, bx, bz, reach) => [Math.max(0, Math.floor((Math.min(ax, bx) - reach - x0) / S)), Math.min(nx - 1, Math.ceil((Math.max(ax, bx) + reach - x0) / S)),
+      Math.max(0, Math.floor((Math.min(az, bz) - reach - z0) / S)), Math.min(nz - 1, Math.ceil((Math.max(az, bz) + reach - z0) / S))];
+    const stampSeg = (arr, ax, az, bx, bz, reach, off) => {
+      const [i0, i1, j0, j1] = box(ax, az, bx, bz, reach);
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const k = j * nx + i, d = seg(x0 + i * S, z0 + j * S, ax, az, bx, bz) - (off || 0); if (d < arr[k]) arr[k] = d; }
+    };
+    const stampRect = (arr, cx, cz, hx, hz, reach) => {
+      const [i0, i1, j0, j1] = box(cx - hx, cz - hz, cx + hx, cz + hz, reach);
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const k = j * nx + i, d = Math.hypot(Math.max(0, Math.abs(x0 + i * S - cx) - hx), Math.max(0, Math.abs(z0 + j * S - cz) - hz)); if (d < arr[k]) arr[k] = d; }
+    };
+    const N = city.nodes;
+    for (const e of city.edges) stampSeg(dR, N[e.a].x, N[e.a].z, N[e.b].x, N[e.b].z, 32);
+    for (const nd of N) stampSeg(dR, nd.x, nd.z, nd.x, nd.z, 32, nd.cul ? 3.5 : 0.4);
+    for (const o of city.rects) stampRect(dB, o.x, o.z, o.hx, o.hz, 32);
+    stampRect(dB, 0, 6, 36, 28, 32);                                   // atelier, parkings, quai, extension
+    const RV = city.river || [];
+    for (let i = 0; i < RV.length - 1; i++) stampSeg(dW, RV[i].x, RV[i].z, RV[i + 1].x, RV[i + 1].z, 40);
+    // bruit lisse (même relief chez tous : il dépend de la graine de la ville)
+    const sd = (city.nodes.length * 7919 + Math.round(city.nodes[1].x * 1000)) | 0;
+    const hash = (i, j, s2) => { let t = (i * 374761393 + j * 668265263 + s2 * 1442695041) | 0; t = Math.imul(t ^ (t >>> 13), 1274126177); return ((t ^ (t >>> 16)) >>> 0) / 4294967296; };
+    const vn = (x, z, sc, s2) => {
+      const gx = Math.floor(x / sc), gz = Math.floor(z / sc), fx = x / sc - gx, fz = z / sc - gz, sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
+      const a = hash(gx, gz, s2), b = hash(gx + 1, gz, s2), c = hash(gx, gz + 1, s2), d = hash(gx + 1, gz + 1, s2);
+      return (a + (b - a) * sx) + ((c + (d - c) * sx) - (a + (b - a) * sx)) * sz;
+    };
+    const sm = t => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+    const hv = new Float32Array(n), hw = new Float32Array(n), wet = new Uint8Array(n), col = new Float32Array(n * 3);
+    const WATER = RIV.half + 2.7;                                       // bord de l'eau (au niveau de la surface, y = -0.9)
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const k = j * nx + i, x = x0 + i * S, z = z0 + j * S;
+      let hill = 0.62 * vn(x, z, 74, sd) + 0.38 * vn(x, z, 31, sd + 17);
+      hill = Math.pow(Math.max(0, (hill - 0.36) / 0.64), 1.35) * 11;
+      const out = Math.max(0, M.minX + 10 - x, x - (M.maxX - 10), M.minZ + 6 - z, z - (M.maxZ - 10));
+      hill += Math.min(18, out * 0.5);                                   // les bords de la carte remontent (on ne voit pas le bout du monde)
+      const mask = Math.min(sm((dR[k] - (RW + 4)) / 16), sm((dB[k] - 3) / 14), sm((dW[k] - (RIV.half + 6)) / 14));
+      let h = hill * mask;
+      const w = dW[k];
+      if (w < RIV.half + 4.6) h = Math.min(h, w < RIV.half ? -2.6 : -2.6 * (1 - sm((w - RIV.half) / 4.6)));
+      const road = dR[k] < RW + 2.3;
+      hv[k] = h; hw[k] = road ? 0 : h; wet[k] = !road && w < WATER ? 1 : 0;
+      // couleur : herbe plus claire en haut des collines, berges sableuses, lit vaseux
+      let r = 0.92 + Math.min(0.12, h * 0.012), g = 0.95 + Math.min(0.1, h * 0.01), b = 0.9;
+      if (w < RIV.half + 5.5) { const t = 1 - sm((w - RIV.half + 1) / 6.5); r = r + (1.0 - r) * t; g = g + (0.86 - g) * t; b = b + (0.6 - b) * t; }
+      if (h < -1.2) { r = 0.55; g = 0.55; b = 0.45; }
+      col[k * 3] = Math.min(1, r); col[k * 3 + 1] = Math.min(1, g); col[k * 3 + 2] = Math.min(1, b);
+    }
+    const T2 = W.hgt = { x0, z0, S, nx, nz, hv, hw, wet };
+    const samp = (arr, x, z) => {
+      const fx = (x - x0) / S, fz = (z - z0) / S; if (fx < 0 || fz < 0 || fx >= nx - 1 || fz >= nz - 1) return 0;
+      const i = Math.floor(fx), j = Math.floor(fz), tx = fx - i, tz = fz - j, k = j * nx + i;
+      return (arr[k] * (1 - tx) + arr[k + 1] * tx) * (1 - tz) + (arr[k + nx] * (1 - tx) + arr[k + nx + 1] * tx) * tz;
+    };
+    ML.gy = (x, z) => samp(hw, x, z);                                  // hauteur du sol où l'on marche / roule
+    ML.gyv = (x, z) => samp(hv, x, z);                                 // hauteur « visuelle » (sous les ponts : le lit)
+    ML.riverAt = (x, z, pad) => {
+      const fx = Math.round((x - x0) / S), fz = Math.round((z - z0) / S); if (fx < 0 || fz < 0 || fx >= nx || fz >= nz) return false;
+      const k = fz * nx + fx; if (wet[k]) return true;
+      if (!pad || dW[k] > WATER + pad + 2 || dR[k] < RW + 2.3) return false;
+      return city.riverDist(x, z) < WATER + pad;
+    };
+    ML.riverPush = (p, r) => {                                         // repousse hors de l'eau (sauf sur les ponts)
+      const fx = Math.round((p.x - x0) / S), fz = Math.round((p.z - z0) / S); if (fx < 0 || fz < 0 || fx >= nx || fz >= nz) return false;
+      const k = fz * nx + fx; if (dR[k] < RW + 2.3 || dW[k] > WATER + r + 2.5) return false;
+      let best = null, bd = 1e9;
+      for (let i = 0; i < RV.length - 1; i++) {
+        const A = RV[i], B = RV[i + 1], dx = B.x - A.x, dz = B.z - A.z, L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((p.x - A.x) * dx + (p.z - A.z) * dz) / L));
+        const qx = A.x + t * dx, qz = A.z + t * dz, d = Math.hypot(p.x - qx, p.z - qz); if (d < bd) { bd = d; best = { qx, qz }; }
+      }
+      const need = WATER + r; if (!best || bd >= need) return false;
+      const ux = bd > 1e-3 ? (p.x - best.qx) / bd : 0, uz = bd > 1e-3 ? (p.z - best.qz) / bd : 1;
+      p.x = best.qx + ux * need; p.z = best.qz + uz * need; return true;
+    };
+    // --- maillage du sol ---
+    const pos = new Float32Array(n * 3), uv = new Float32Array(n * 2), idx = new Uint32Array((nx - 1) * (nz - 1) * 6);
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; pos[k * 3] = x0 + i * S; pos[k * 3 + 1] = hv[k]; pos[k * 3 + 2] = z0 + j * S; uv[k * 2] = (x0 + i * S) / 7; uv[k * 2 + 1] = (z0 + j * S) / 7; }
+    let q = 0; for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1; idx[q++] = a; idx[q++] = c; idx[q++] = b; idx[q++] = b; idx[q++] = c; idx[q++] = d; }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1)); geo.computeVertexNormals(); geo.computeBoundingSphere();
+    W.grassMat = W.grassMat || new THREE.MeshLambertMaterial({ map: T.tex('herbe', 1, 1), vertexColors: true });
+    const ground = new THREE.Mesh(geo, W.grassMat); ground.receiveShadow = true; add(ground);
+    // --- l'eau : un ruban qui suit la rivière (texture qui défile) ---
+    if (RV.length > 1) {
+      if (!W.waterTex) {
+        const c = document.createElement('canvas'); c.width = 128; c.height = 128; const x = c.getContext('2d');
+        x.fillStyle = '#3d86c6'; x.fillRect(0, 0, 128, 128);
+        for (let i = 0; i < 46; i++) { x.fillStyle = `rgba(255,255,255,${0.08 + Math.random() * 0.18})`; x.fillRect(Math.random() * 128, Math.random() * 128, 10 + Math.random() * 26, 2); }
+        W.waterTex = new THREE.CanvasTexture(c); W.waterTex.wrapS = W.waterTex.wrapT = THREE.RepeatWrapping;
+      }
+      const v = [], u = [], ii = [], HW = WATER + 1.2; let acc = 0;
+      RV.forEach((P, k) => {
+        const A = RV[Math.max(0, k - 1)], B = RV[Math.min(RV.length - 1, k + 1)], dx = B.x - A.x, dz = B.z - A.z, L = Math.hypot(dx, dz) || 1, ox = -dz / L * HW, oz = dx / L * HW;
+        if (k) acc += Math.hypot(P.x - RV[k - 1].x, P.z - RV[k - 1].z);
+        v.push(P.x + ox, -0.9, P.z + oz, P.x - ox, -0.9, P.z - oz); u.push(acc / 18, 0, acc / 18, 1.4);
+        if (k) { const a = (k - 1) * 2; ii.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+      });
+      const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); wg.setAttribute('uv', new THREE.Float32BufferAttribute(u, 2)); wg.setIndex(ii); wg.computeVertexNormals();
+      const wm = new THREE.Mesh(wg, new THREE.MeshLambertMaterial({ map: W.waterTex, color: 0x8fb8d8, transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+      wm.receiveShadow = true; add(wm);
+      ML.mapRects.push({ river: RV });
+    }
+    // --- ponts : tablier, parapets (collisions), piles ---
+    for (const b of city.bridges || []) {
+      const ry = Math.atan2(b.ux, b.uz), lx = b.uz, lz = -b.ux, half = RW + 2.05;
+      const deck = U.box(half * 2 + 0.3, 1.1, b.len, T.mat('beton', 2, 4, 0xb9b4aa), b.x, -0.56, b.z, root); deck.rotation.y = ry;
+      for (const s2 of [-1, 1]) {
+        const px = b.x + lx * half * s2, pz = b.z + lz * half * s2;
+        const pp = U.box(0.35, 1.0, b.len, 0xd8d2c4, px, 0.5, pz, root); pp.rotation.y = ry;
+        const tp = U.box(0.5, 0.12, b.len + 0.2, 0x8d8a82, px, 1.04, pz, root); tp.rotation.y = ry;
+        for (let t = -b.len / 2 + 0.6; t <= b.len / 2 - 0.6; t += 1.1) U.boxCollider(px + b.ux * t, pz + b.uz * t, 0.7, 0.7, 'parapet');
+      }
+      for (const t of [-b.len * 0.22, b.len * 0.22]) { const c = U.cyl(0.9, 1.1, 3.2, 0x9e9a90, b.x + b.ux * t, -2.2, b.z + b.uz * t, root, 10); c.castShadow = false; }
+      const lab = U.label('🌉 Pont de la Rivière', { size: 0.45, color: '#dff3ff', bg: 'rgba(25,60,100,0.75)' }); lab.position.set(b.x + lx * (half + 0.4), 2.2, b.z + lz * (half + 0.4)); add(lab);
+    }
+  };
+
   /* ---------- Sol et routes ---------- */
   W.ground = city => {
     const M = ML.CFG.MAP;
-    const g = new THREE.Mesh(new THREE.PlaneGeometry(M.maxX - M.minX + 60, M.maxZ - M.minZ + 60), T.mat('herbe', 70, 76));
-    g.rotation.x = -Math.PI / 2; g.position.set((M.minX + M.maxX) / 2, 0, (M.minZ + M.maxZ) / 2); g.receiveShadow = true; add(g);
+    // le sol (herbe + relief + rivière) est construit par W.terrain
     const N = city.nodes, RW = city.RW, asph = T.mat('asphalte', 1, 1), walk = T.mat('beton', 1, 1, 0xd0d0d0);
     const dashes = [];
     city.edges.forEach((e, i) => {
@@ -58,18 +185,57 @@
     t = t || 0.4; const w = Math.abs(x2 - x1) || t, d = Math.abs(z2 - z1) || t;
     U.box(w, h, d, mat, (x1 + x2) / 2, h / 2, (z1 + z2) / 2, root); U.boxCollider((x1 + x2) / 2, (z1 + z2) / 2, w, d, 'wall');
   }
+  /** Couleurs de l'atelier selon sa rénovation (jour 5 : rafraîchi, jour 10 : flambant neuf) */
+  W.PAL = {
+    1: { wall: 0xc9d1d8, floor: 0xffffff, band: 0x24457a, roof: 0x7f8c8d, dado: 0x2f6f8f, trim: 0xe67e22, outer: 0x2e8b57, lane: 0x7f9c8a },
+    2: { wall: 0xdde7df, floor: 0xd9ead9, band: 0x1e8449, roof: 0x6f8f7f, dado: 0x1e8449, trim: 0xf1c40f, outer: 0x1e8449, lane: 0x5f8f6f },
+    3: { wall: 0xeee8dc, floor: 0xd2dceb, band: 0x1a2340, roof: 0x55606e, dado: 0x1a2340, trim: 0xffd257, outer: 0x1a2340, lane: 0x4f6f9f }
+  };
+  /** Texte peint au sol (zones bloquées, emplacements) */
+  W.floorText = (text, sub, w, h, x, z, opt) => {
+    opt = opt || {};
+    const c = document.createElement('canvas'); c.width = 512; c.height = Math.round(512 * h / w); const g2 = c.getContext('2d');
+    g2.fillStyle = opt.bg || 'rgba(0,0,0,0)'; g2.fillRect(0, 0, c.width, c.height);
+    if (opt.hatch) { g2.strokeStyle = opt.hatch; g2.lineWidth = 6; for (let i = -c.height; i < c.width; i += 34) { g2.beginPath(); g2.moveTo(i, c.height); g2.lineTo(i + c.height, 0); g2.stroke(); } }
+    if (opt.border) { g2.strokeStyle = opt.border; g2.lineWidth = 14; g2.strokeRect(7, 7, c.width - 14, c.height - 14); }
+    g2.fillStyle = opt.color || '#fff'; g2.textAlign = 'center'; g2.textBaseline = 'middle';
+    const lines = String(text).split('\n'); let fs = Math.min(c.height / (lines.length + (sub ? 1.2 : 0.4)), 80);
+    g2.font = `bold ${fs}px Arial`; while (lines.some(l => g2.measureText(l).width > c.width - 50) && fs > 12) { fs -= 2; g2.font = `bold ${fs}px Arial`; }
+    lines.forEach((l, i) => g2.fillText(l, c.width / 2, c.height / 2 - (sub ? fs * 0.5 : 0) + (i - (lines.length - 1) / 2) * fs * 1.1));
+    if (sub) { g2.font = `${Math.round(fs * 0.55)}px Arial`; g2.fillText(sub, c.width / 2, c.height / 2 + fs * (lines.length * 0.55 + 0.2)); }
+    const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: t, transparent: true, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; m.rotation.z = opt.rot || 0; m.position.set(x, opt.y || 0.05, z); m.receiveShadow = true; add(m); return m;
+  };
+  const inDays = d => { const n = d - W.day; return n <= 0 ? null : n === 1 ? 'demain' : `dans ${n} jours`; };
   W.atelier = () => {
+    const P = W.pal = W.PAL[W.reno];
     ML.mapRects.push({ x: 0, z: 0, w: 40, d: 28, c: '#a2a8ad', name: 'ATELIER' });
-    plane(40, 28, T.mat('sol', 10, 7), 0, 0, 0.03);
-    const wm = T.mat('bardage', 6, 1.5, 0xc9d1d8);
-    wall(-20.2, -14, 20.2, -14, 7, wm); wall(-20, -14, -20, 14, 7, wm); wall(20, -14, 20, 14, 7, wm);
+    plane(40, 28, T.mat('sol', 10, 7, P.floor), 0, 0, 0.03);
+    const wm = T.mat('bardage', 6, 1.5, P.wall);
+    wall(-20.2, -14, 20.2, -14, 7, wm); wall(-20, -14, -20, 14, 7, wm);
+    if (W.ext) { wall(20, -14, 20, -2.3, 7, wm); wall(20, 4.6, 20, 14, 7, wm); U.box(0.4, 2.4, 6.9, wm, 20, 5.8, 1.15, root); }   // passage vers l'extension
+    else wall(20, -14, 20, 14, 7, wm);
     wall(-20.2, 14, -5, 14, 7, wm); wall(5, 14, 20.2, 14, 7, wm);
     U.box(10, 2.5, 0.4, wm, 0, 5.75, 14, root);
     U.cyl(0.45, 0.45, 10, 0x7f8c8d, 0, 4.3, 14.15, root).rotation.z = Math.PI / 2;
-    U.box(40.8, 0.3, 28.8, T.mat('tole', 8, 6, 0x7f8c8d), 0, 7.15, 0, root);
-    U.box(40.9, 0.8, 0.1, 0x24457a, 0, 6.3, 14.25, root);
+    U.box(40.8, 0.3, 28.8, T.mat('tole', 8, 6, P.roof), 0, 7.15, 0, root);
+    U.box(40.9, 0.8, 0.1, P.band, 0, 6.3, 14.25, root);
     W.neonMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xdddddd });
     for (let x = -14; x <= 14; x += 7) for (const z of [-8, 0, 8]) U.box(2.6, 0.08, 0.3, W.neonMat, x, 6.9, z, root, false);
+    if (W.reno >= 2) { const l = U.label(W.reno >= 3 ? '✨ ATELIER FLAMBANT NEUF (jour 10) ✨' : '🎨 ATELIER RÉNOVÉ (jour 5)', { size: 0.45, color: '#ffd257', bg: 'rgba(26,35,64,0.85)' }); l.position.set(-4, 6.1, -13.2); add(l); }
+    // --- zones bloquées / emplacements libres (sol gris + texte) ---
+    const agr = !!W.up.agrandissement, dA = inDays(ML.PROGRESS.agrandissement);
+    if (!agr) W.floorText(dA ? `🔒 AGRANDISSEMENT\nse débloque ${dA}` : '🔓 AGRANDISSEMENT\ndisponible au PC', dA ? 'emplacements T3 et F3' : `${ML.CATALOG.agrandissement.price} € — onglet Atelier`, 7.2, 16, 4, -1, { bg: 'rgba(120,124,130,0.92)', hatch: 'rgba(80,84,90,0.9)', color: dA ? '#ffffff' : '#ffd257', border: '#f1c40f', y: 0.045 });
+    else for (const id of ['T3', 'F3']) if (!W.owned.includes(id)) { const d = ML.MACHINES.find(m => m.id === id); W.floorText(`EMPLACEMENT ${id}`, `${ML.MTYPE[d.type]} — à acheter au PC`, 3.6, 1.6, d.x, d.z + (d.type === 'tour' ? 2.4 : -2.6), { bg: 'rgba(40,40,40,0.55)', color: '#ffd257' }); }
+    // --- extension Est (après achat : construite pendant la nuit) ---
+    if (W.ext) W.extension(P, wm);
+    else {
+      const dE = inDays(ML.PROGRESS.extension);
+      plane(12.6, 20, T.mat('beton', 3, 5, 0x9da3a8), 26.7, -2, 0.028);
+      W.floorText(dE ? `🔒 EXTENSION EST\nse débloque ${dE}` : '🔓 EXTENSION EST\ndisponible au PC', dE ? 'un hall de plus : T4 + F4' : `${ML.CATALOG.extension.price} € — construite la nuit`, 11, 18, 26.7, -2, { bg: 'rgba(110,114,120,0.85)', hatch: 'rgba(70,74,80,0.85)', color: dE ? '#fff' : '#ffd257', border: '#f1c40f', y: 0.06, rot: Math.PI / 2 });
+      for (const [x, z] of [[20.6, -12], [32.8, -12], [32.8, 7.9], [20.6, 7.9]]) { U.cyl(0.08, 0.08, 1.1, 0xe67e22, x, 0.55, z, root); U.box(0.25, 0.25, 0.25, 0xffffff, x, 1.15, z, root); }
+    }
     W.inLights = [new THREE.PointLight(0xfff4e0, 0.35, 34), new THREE.PointLight(0xfff4e0, 0.25, 30)];
     W.inLights[0].position.set(-6, 6, 0); W.inLights[1].position.set(10, 6, 0); W.inLights.forEach(add);
     plane(36, 0.14, 0xf1c40f, -2, -3.5, 0.04); plane(36, 0.14, 0xf1c40f, -2, 1.4, 0.04);
@@ -87,12 +253,15 @@
       parkSlots: [{ x: -21, z: 23, h: 0 }, { x: -25, z: 23, h: 0 }, { x: -29, z: 23, h: 0 }],
       aiSpots: { tony: { x: 16.5, z: 16, yaw: Math.PI }, jojo: { x: 15.5, z: 9.5, yaw: -Math.PI / 2 } },
       hooks: [{ type: 'extincteur', x: -19.2, y: 0, z: 2.6 }, { type: 'extincteur', x: 19.2, y: 0, z: -11.5 }, { type: 'cle', x: -19.2, y: 0.95, z: 4.6 },
-              { type: 'cle', x: -19.2, y: 0.95, z: 5.4 }, { type: 'soufflette', x: -19.2, y: 0.95, z: 6.3 }, { type: 'soufflette', x: -19.2, y: 0.95, z: 7.1 }],
+              { type: 'cle', x: -19.2, y: 0.95, z: 5.4 }, { type: 'soufflette', x: -19.2, y: 0.95, z: 6.3, h: 0 }, { type: 'soufflette', x: -19.2, y: 0.95, z: 7.1, h: 1 }],
+      reels: [{ x: -19.45, y: 2.15, z: 6.3 }, { x: -19.45, y: 2.15, z: 7.1 }],            // enrouleurs d'air comprimé (la soufflette y est attachée)
+      hoseLen: W.ext ? 58 : 46,                                       // longueur du tuyau (on ne sort pas de l'atelier avec)
       doorIn: { x: 0, z: 12 },
       bigZone: { minX: 18, maxX: 30, minZ: 15.5, maxZ: 19 },         // quai gros colis (palettes)
       fenSpawn: { x: 22, z: 23, h: Math.PI }, camSpawn: { x: 28, z: 25, h: 0 },
       benne: { x: -13, z: 19.5 }
     });
+    if (W.ext) ML.LOC.patrol.push({ x: 26, z: -1.2 }, { x: 30, z: -1.2 });
     // quai gros colis (à droite de la porte) + benne à copeaux (à gauche)
     plane(18, 13, T.mat('beton', 4, 3, 0xbfbfbf), 24, 21, 0.026); plane(12, 3.5, 0xe67e22, 24, 17.2, 0.04);
     const l3 = U.label('QUAI GROS COLIS : palettes (fenwick → camion)', { size: 0.45, color: '#ffd9a8' }); l3.position.set(24, 3, 17.2); add(l3);
@@ -100,6 +269,19 @@
       U.box(4, 1.6, 2.2, 0x1e7d4a, 0, 0.8, 0, g); U.box(4.2, 0.12, 2.4, 0x145c36, 0, 1.62, 0, g); U.box(3.6, 0.3, 1.8, 0xb0b7bf, 0, 1.5, 0, g);
       U.boxCollider(-13, 19.5, 4, 2.2, 'benne'); W.targets.push({ id: 'benne', x: -13, y: 1.4, z: 19.5, r: 3.4 });
       const l = U.label('BENNE À COPEAUX', { size: 0.4, color: '#b6ffcb' }); l.position.set(0, 2.5, 0); g.add(l); }
+  };
+
+  /** Extension Est : hall de 13 × 20 m, ouvert sur l'atelier (passage dans l'allée centrale) */
+  W.extension = (P, wm) => {
+    plane(13, 20, T.mat('sol', 3, 5, P.floor), 26.5, -2, 0.03);
+    wall(20, -12, 33.2, -12, 7, wm); wall(20, 8, 33.2, 8, 7, wm); wall(33, -12, 33, 8, 7, wm);
+    U.box(13.6, 0.3, 20.6, T.mat('tole', 3, 5, P.roof), 26.5, 7.15, -2, root);
+    U.box(13.4, 0.8, 0.1, P.band, 26.5, 6.3, 8.25, root);
+    for (const z of [-7, 0, 5]) U.box(2.6, 0.08, 0.3, W.neonMat, 26.5, 6.9, z, root, false);
+    const l = U.label('EXTENSION EST', { size: 0.5, color: '#ffd257', bg: 'rgba(26,35,64,0.85)' }); l.position.set(26.5, 5.6, -11.6); add(l);
+    W.inLights.push(new THREE.PointLight(0xfff4e0, 0.25, 24)); W.inLights[W.inLights.length - 1].position.set(26.5, 6, -2); add(W.inLights[W.inLights.length - 1]);
+    for (const id of ['T4', 'F4']) if (!W.owned.includes(id)) { const d = ML.MACHINES.find(m => m.id === id); W.floorText(`EMPLACEMENT ${id}`, `${ML.MTYPE[d.type]} — à acheter au PC`, 3.6, 1.6, d.x, d.z + (d.type === 'tour' ? 2.4 : -2.6), { bg: 'rgba(40,40,40,0.55)', color: '#ffd257' }); }
+    ML.mapRects.push({ x: 26.5, z: -2, w: 13, d: 20, c: '#a2a8ad' });
   };
 
   W.furniture = () => {
@@ -110,7 +292,14 @@
       for (const dx of [-1.2, 1.2]) U.box(0.1, 2.2, 0.8, 0x2c3e50, dx, 1.1, 0, g);
       for (const y of [0.5, 1.2, 1.9]) U.box(2.5, 0.06, 0.8, 0xe67e22, 0, y, 0, g);
       W.rackBars[m] = [];
-      for (let i = 0; i < 9; i++) { const b = U.cyl(0.07, 0.07, 2.1, ML.MATERIALS[m].color, 0, 0.6 + Math.floor(i / 3) * 0.7, -0.25 + (i % 3) * 0.25, g); b.rotation.z = Math.PI / 2; W.rackBars[m].push(b); }
+      const paint = { acier: 0x2e6fd6, alu: 0x27ae60, inox: 0xe74c3c }[m];                // code couleur peint au bout des barres
+      for (let i = 0; i < 9; i++) {
+        const b = U.cyl(0.07, 0.07, 2.1, ML.MATERIALS[m].color, 0, 0.6 + Math.floor(i / 3) * 0.7, -0.25 + (i % 3) * 0.25, g); b.rotation.z = Math.PI / 2; W.rackBars[m].push(b);
+        for (const y of [-1.06, 1.06]) U.cyl(0.072, 0.072, 0.03, paint, 0, y, 0, b, 8);
+        U.box(0.012, 0.18, 0.06, 0xffffff, 0.072, 0.62, 0, b, false);                      // étiquette
+      }
+      const grade = U.label({ acier: 'S235 · acier', alu: '2017A · alu', inox: '304L · inox' }[m], { size: 0.22, color: '#111', bg: 'rgba(255,255,255,0.9)' }); grade.position.set(0, 0.25, 0.45); g.add(grade);
+      for (const dx of [-1.2, 1.2]) for (let y = 0.2; y < 2.1; y += 0.18) U.box(0.105, 0.05, 0.05, 0xf1c40f, dx, y, 0.39, g, false);
       const l = U.label('', { size: 0.36 }); l.position.set(0, 2.7, 0.3); g.add(l); W.rackLabels[m] = l;
       U.boxCollider(x, z, 2.6, 0.9, 'rack'); W.targets.push({ id: 'rack:' + m, x, y: 1.2, z: z + 0.6, r: 2.8 });
     }
@@ -236,6 +425,15 @@
     for (const L of W.lights) { const g = W.lightGreen(L.node, 0, rt || 0); L.red.material = g ? W.lightOff : W.lightRed; L.green.material = g ? W.lightGreenMat : W.lightOff; }
     // radars : flash
     for (const r of W.radars) { r.flash = Math.max(0, (r.flash || 0) - dt); r.lamp.material = r.flash > 0 ? W.flashOn : W.flashOff; }
+    // showroom : « VENDU » sur les véhicules déjà achetés
+    for (const k in W.show) { const t2 = (S.owned || []).includes(k) ? '✔ DÉJÀ À VOUS' : ''; if (W.show[k].label._t !== t2) { W.show[k].label._t = t2; W.show[k].label.setText(t2); } }
+  };
+  /** Chaque image : l'eau de la rivière coule */
+  W.tick = dt => {
+    if (W.waterTex) W.waterTex.offset.x -= dt * 0.045;
+    // figurants et voitures du showroom : on ne les dessine que de près (sinon des centaines d'appels de dessin)
+    W.cullT = (W.cullT || 0) - dt; if (W.cullT > 0) return; W.cullT = 0.4;
+    const c = ML.camera.position; for (const v of W.staff) v.group.visible = Math.abs(v.group.position.x - c.x) < 55 && Math.abs(v.group.position.z - c.z) < 55;
   };
   /** Le feu du carrefour n est-il vert pour la route d'indice pair (p=0) / impair (p=1) ? */
   W.lightGreen = (node, p, rt) => ((Math.floor((rt + node * 3.7) / 9) % 2) === 0) === (p === 0);
@@ -257,11 +455,14 @@
   W.company = (key, C, P) => {
     const g = add(new THREE.Group()); g.position.set(P.x, 0, P.z); g.rotation.y = P.rot * Math.PI / 2;
     const tex = { tole: T.mat('tole', C.w / 3, 2, C.color), brique: T.mat('brique', C.w / 5, C.h / 4, C.color), beton: T.mat('beton', C.w / 5, C.h / 4, C.color) }[C.wall];
-    U.box(C.w, C.h, C.d, tex, 0, C.h / 2, 0, g); U.box(C.w + 0.8, 0.5, C.d + 0.8, C.roof, 0, C.h + 0.25, 0, g); U.box(C.w + 0.2, 0.6, C.d + 0.2, 0x555555, 0, 0.3, 0, g);
-    U.addCollider(P.x - P.hx, P.x + P.hx, P.z - P.hz, P.z + P.hz, 'building');
+    if (C.open) W.shell(key, C, P, g, tex);                         // V5 : on entre (accueil, showroom, gendarmerie)
+    else {
+      U.box(C.w, C.h, C.d, tex, 0, C.h / 2, 0, g); U.box(C.w + 0.8, 0.5, C.d + 0.8, C.roof, 0, C.h + 0.25, 0, g); U.box(C.w + 0.2, 0.6, C.d + 0.2, 0x555555, 0, 0.3, 0, g);
+      U.addCollider(P.x - P.hx, P.x + P.hx, P.z - P.hz, P.z + P.hz, 'building');
+    }
     ML.mapRects.push({ x: P.x, z: P.z, w: P.hx * 2, d: P.hz * 2, c: '#' + new THREE.Color(C.roof).getHexString(), name: C.name.split(' ')[0] === 'Boulangerie' ? 'Boulangerie' : C.name.split(' ')[0], comp: key });
     const fz = C.d / 2 + 0.06;
-    U.box(6, 4.6, 0.12, T.mat('tole', 3, 1, 0x95a5a6), -C.w / 2 + 5, 2.3, fz, g); U.box(1.2, 2.2, 0.12, 0x5d4037, C.w / 2 - 3, 1.1, fz, g);
+    U.box(6, 4.6, 0.12, T.mat('tole', 3, 1, 0x95a5a6), -C.w / 2 + 5, 2.3, fz, g); if (!C.open) U.box(1.2, 2.2, 0.12, 0x5d4037, C.w / 2 - 3, 1.1, fz, g);
     for (let x = -C.w / 2 + 10; x < C.w / 2 - 4.5; x += 2.6) U.box(1.6, 1.2, 0.08, U.mat(0x9fd3ff, 0x1d3b50), x, C.h * 0.55, fz, g, false);
     const st = signTexture(C.name, C.sub || '', '#' + new THREE.Color(C.roof).getHexString());
     const dark = U.mat(0x333333), sign = new THREE.Mesh(new THREE.BoxGeometry(Math.min(C.w * 0.8, 18), 2.6, 0.3), [dark, dark, dark, dark, new THREE.MeshLambertMaterial({ map: st }), new THREE.MeshLambertMaterial({ map: st })]);
@@ -298,11 +499,164 @@
           U.boxCollider(P.x + lx * ca + lz * sa, P.z - lx * sa + lz * ca, P.rot % 2 ? 4.2 : 1.8, P.rot % 2 ? 1.8 : 4.2, 'vitrine');
         });
         for (let i = 0; i < 7; i++) U.box(0.5, 0.5, 0.05, [0xe74c3c, 0xf1c40f, 0x3498db][i % 3], -C.w / 2 + 2 + i * 3, C.h + 0.6, C.d / 2 + 0.3, g).rotation.z = Math.PI / 4;
-        const l = U.label('🚗 VÉHICULES : parlez à Bernard', { size: 0.45, color: '#fff', bg: 'rgba(192,57,43,0.9)' }); l.position.set(3, 3.4, C.d / 2 + 1); g.add(l);
+        const l = U.label('🚗 SHOWROOM : entrez, E sur un véhicule', { size: 0.45, color: '#fff', bg: 'rgba(192,57,43,0.9)' }); l.position.set(C.w / 2 - 3, 3.6, C.d / 2 + 1); g.add(l);
         break;
       }
     }
     ML.Decor.company(key, C, P);
+  };
+
+  /* ---------- V5 : bâtiments où l'on ENTRE ----------
+     Murs séparés (avec collisions), porte d'entrée à droite de la façade,
+     plafond, sol, éclairage, mobilier, employés. Le PNJ de l'entreprise
+     attend derrière l'accueil (sa position est déplacée à l'intérieur). */
+  const DOOR = 2.8;
+  function frameOf(P) {
+    const a = P.rot * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
+    const L = (lx, lz) => ({ x: P.x + lx * ca + lz * sa, z: P.z - lx * sa + lz * ca });
+    const col = (lx, lz, w, d, tag) => { const p = L(lx, lz), sw = P.rot % 2 ? d : w, sd = P.rot % 2 ? w : d; U.boxCollider(p.x, p.z, sw, sd, tag || 'building'); };
+    return { a, L, col };
+  }
+  W.shell = (key, C, P, g, tex) => {
+    const t = 0.35, hw = C.w / 2, hd = C.d / 2, h = C.h, dx = hw - 3, d0 = dx - DOOR / 2, d1 = dx + DOOR / 2, Fr = frameOf(P), F = ML.Decor.frame(P.x, P.z, P.rot);
+    const inner = { client: 0xf4f1ea, concession: 0xffffff, police: 0xe8eef5 }[C.kind] || 0xf0f0f0;
+    const wl = (lx, lz, w, d) => { U.box(w, h, d, tex, lx, h / 2, lz, g); Fr.col(lx, lz, w, d); };
+    wl(0, -hd + t / 2, C.w, t); wl(-hw + t / 2, 0, t, C.d); wl(hw - t / 2, 0, t, C.d);
+    wl((-hw + d0) / 2, hd - t / 2, d0 + hw, t); wl((d1 + hw) / 2, hd - t / 2, hw - d1, t);
+    U.box(DOOR, h - 3, t, tex, dx, 3 + (h - 3) / 2, hd - t / 2, g);                                   // linteau
+    const roof = U.box(C.w + 0.8, 0.5, C.d + 0.8, C.roof, 0, h + 0.25, 0, g); roof.castShadow = false;
+    U.box(C.w - 2 * t, 0.06, C.d - 2 * t, C.kind === 'concession' ? 0xf2f2f2 : C.kind === 'police' ? 0x9aa7b4 : 0xc8b9a6, 0, 0.03, 0, g).castShadow = false;
+    W.ceilMat = W.ceilMat || new THREE.MeshLambertMaterial({ color: 0xf2f2f2, emissive: 0x9a9a9a });
+    U.box(C.w - 2 * t, 0.1, C.d - 2 * t, W.ceilMat, 0, h - 0.06, 0, g).castShadow = false;            // plafond (éclairé)
+    // peinture intérieure (sinon on voit la tôle / la brique dedans)
+    // (le petit décor va dans le « lot » fusionné de decor.js : très peu d'appels de dessin)
+    for (const [lx, lz, w, d] of [[0, -hd + t + 0.02, C.w - 2 * t, 0.04], [-hw + t + 0.02, 0, 0.04, C.d - 2 * t], [hw - t - 0.02, 0, 0.04, C.d - 2 * t], [(-hw + t + d0) / 2, hd - t - 0.02, d0 + hw - t, 0.04], [(d1 + hw - t) / 2, hd - t - 0.02, hw - t - d1, 0.04]])
+      F.box(w, h - 0.2, d, lx, (h - 0.2) / 2, lz, inner);
+    // encadrement de porte + portes vitrées ouvertes
+    for (const s2 of [-1, 1]) F.box(0.18, 3, 0.5, dx + s2 * (DOOR / 2 + 0.05), 1.5, hd - 0.1, 0x2c3e50);
+    F.box(DOOR + 0.4, 0.2, 0.5, dx, 3.05, hd - 0.1, 0x2c3e50);
+    for (const s2 of [-1, 1]) F.glass(DOOR / 2 - 0.1, 2.8, 0.06, dx + s2 * (DOOR / 2 + 0.55), 1.45, hd + 0.6, 0xcfe8ff, { ry: s2 * 1.25 });
+    F.box(2.6, 0.02, 1.6, dx, 0.062, hd + 0.9, 0x444444);                                               // paillasson
+    for (let x = -hw + 3; x <= hw - 3; x += 5) for (let z = -hd + 3; z <= hd - 3; z += 5) F.box(1.6, 0.06, 0.6, x, h - 0.13, z, 0xfffbe8);
+    W.interiors.push({ minX: P.x - P.hx + 0.3, maxX: P.x + P.hx - 0.3, minZ: P.z - P.hz + 0.3, maxZ: P.z + P.hz - 0.3, key });
+    if (C.kind === 'client') W.inClient(key, C, P, F, Fr);
+    else if (C.kind === 'concession') W.inShowroom(key, C, P, F, Fr, g);
+    else if (C.kind === 'police') W.inGendarmerie(key, C, P, F, Fr);
+  };
+  /** Employé de décor (assis à son bureau ou debout) */
+  W.addStaff = (Fr, lx, lz, ry, look, seated) => {
+    const v = ML.People.build(look, { name: '', bare: true }); root.add(v.group);
+    const p = Fr.L(lx, lz); v.group.position.set(p.x, seated ? -0.4 : 0, p.z); v.group.rotation.y = Fr.a + ry;
+    if (seated) { v.legL.rotation.x = v.legR.rotation.x = -1.45; v.armL.rotation.x = v.armR.rotation.x = -1.1; }
+    v.label.visible = false; v.bubble.visible = false; W.staff.push(v); return v;
+  };
+  const randLook = r => ({ skin: r.pick(ML.SKINS), shirt: r.pick([0xffffff, 0x2c3e50, 0x95a5a6, 0x3498db, 0xe84393, 0x16a085, 0xf39c12, 0x8e44ad]), pants: r.pick([0x2c3e50, 0x34495e, 0x555555, 0x1f4e9a]), hair: r.pick(ML.HAIRS), height: r.range(1.6, 1.88), width: r.range(0.9, 1.15), longHair: r() < 0.45, glasses: r() < 0.3 });
+  function desk(F, x, z, col, screen) {
+    F.box(1.8, 0.07, 0.85, x, 0.75, z, col); for (const s2 of [-0.82, 0.82]) F.box(0.06, 0.75, 0.75, x + s2, 0.37, z, 0x555555);
+    if (screen !== false) { F.box(0.62, 0.4, 0.05, x, 1.08, z - 0.25, 0x222222); F.glass(0.56, 0.33, 0.02, x, 1.08, z - 0.22, 0x7fc8ff); F.box(0.08, 0.2, 0.08, x, 0.86, z - 0.27, 0x333333); F.box(0.45, 0.02, 0.15, x, 0.79, z + 0.05, 0x2c3e50); }
+    F.box(0.5, 0.08, 0.5, x, 0.46, z + 0.75, 0x2c3e50); F.box(0.5, 0.55, 0.07, x, 0.75, z + 1.0, 0x2c3e50); F.sh('cyl', 0.06, 0.42, 0.06, x, 0.21, z + 0.75, 0x777777);
+    F.col(x, z, 1.8, 0.85);
+  }
+  W.inClient = (key, C, P, F, Fr) => {
+    const hw = C.w / 2, hd = C.d / 2, dx = hw - 3, r = U.rng(key.length * 977 + Math.round(P.x)), roof = C.roof;
+    // accueil, face à la porte
+    F.box(3.6, 1.05, 0.8, dx, 0.53, hd - 4.4, 0xf5f5f5); F.box(3.8, 0.08, 1.0, dx, 1.08, hd - 4.4, roof); F.box(3.6, 0.25, 0.05, dx, 0.8, hd - 3.98, roof);
+    F.col(dx, hd - 4.4, 3.6, 0.8);
+    const sp = Fr.L(dx, hd - 3.97); ML.Decor.sign(C.name, 'accueil', '#' + new THREE.Color(roof).getHexString(), '#fff', 2.4, 0.5, sp.x, 0.62, sp.z, Fr.a, {});
+    F.box(0.7, 0.45, 0.06, dx - 1.1, 1.35, hd - 4.6, 0x222222); F.glass(0.64, 0.38, 0.02, dx - 1.1, 1.35, hd - 4.56, 0x7fc8ff);
+    P.npc = Object.assign(Fr.L(dx, hd - 5.3), { yaw: Fr.a });                   // le contact client attend ici
+    // logo au mur du fond
+    const lg = Fr.L(0, -hd + 0.45); ML.Decor.sign(C.name, { aerotech: 'aéronautique · qualité zéro défaut', agrimeca: 'machines agricoles', novatics: 'start-up disruptive (on ne sait pas de quoi)', ublo: 'la petite boîte qui monte', espacil: 'bailleur social · 22 000 logements' }[key] || '', '#' + new THREE.Color(roof).getHexString(), '#fff', 7, 1.8, lg.x, Math.min(C.h - 1.6, 3.6), lg.z, Fr.a, { glow: true, border: '#fff' });
+    // salle d'attente (à gauche de la porte)
+    const wx = dx - 6;
+    for (let i = 0; i < 3; i++) { F.box(0.6, 0.45, 0.6, wx - 1.4 + i * 0.75, 0.23, hd - 1.2, 0x2c3e50); F.box(0.6, 0.5, 0.1, wx - 1.4 + i * 0.75, 0.7, hd - 0.92, 0x2c3e50); }
+    F.box(1.1, 0.35, 0.6, wx + 1.3, 0.18, hd - 1.6, 0x8d6e63); F.box(0.3, 0.02, 0.22, wx + 1.2, 0.37, hd - 1.6, 0xffffff);
+    F.sh('cyl', 0.3, 0.5, 0.3, wx + 2.6, 0.25, hd - 1.0, 0x8d6e63); F.sh('ball', 0.9, 1.2, 0.9, wx + 2.6, 1.05, hd - 1.0, 0x27ae60);
+    F.col(wx - 0.65, hd - 1.1, 2.4, 0.7);
+    // open space : bureaux + employés
+    const rows = C.d >= 16 ? [-hd + 2.5, -hd + 6] : [-hd + 2.5];
+    let n = 0;
+    for (const z of rows) for (let x = -hw + 2.6; x <= hw - 7.5; x += 4.2) {
+      desk(F, x, z, r.pick([0xecf0f1, 0xd7ccc8, 0xbdc3c7]));
+      if (n < 4 && r() < 0.75) { W.addStaff(Fr, x, z + 0.78, Math.PI, randLook(r), true); n++; }
+    }
+    // la touche de chaque entreprise
+    const midX = -hw + C.w * 0.35, cz = rows.length > 1 ? -hd + 9 : -hd + 5.5;
+    if (key === 'aerotech') {                                                      // maquette d'avion suspendue
+      const y = C.h - 2.2; F.sh('cyl', 0.5, 5, 0.5, midX, y, cz, 0xecf0f1, { rx: Math.PI / 2 }); F.sh('cone', 0.5, 1, 0.5, midX, y, cz + 3, 0xecf0f1, { rx: Math.PI / 2 });
+      F.box(6, 0.1, 1.2, midX, y, cz + 0.3, 0xbdc3c7); F.box(2.2, 0.08, 0.7, midX, y + 0.1, cz - 2.2, 0xbdc3c7); F.box(0.08, 1.1, 0.7, midX, y + 0.5, cz - 2.2, 0x0984e3);
+      for (const s2 of [-1, 1]) F.sh('cyl', 0.01, C.h - y, 0.01, midX + s2 * 2, y + (C.h - y) / 2, cz, 0x333333);
+    } else if (key === 'agrimeca') {                                               // roue de tracteur + petit tracteur exposé
+      F.sh('cyl', 2.4, 0.7, 2.4, midX, 1.2, cz, 0x222222, { rz: Math.PI / 2 }); F.sh('cyl', 1.2, 0.72, 1.2, midX, 1.2, cz, 0xf1c40f, { rz: Math.PI / 2 }); F.col(midX, cz, 0.8, 2.4);
+      F.box(1.4, 0.8, 2.2, midX + 3, 0.9, cz, 0x27ae60); F.box(1.0, 0.9, 0.9, midX + 3, 1.7, cz - 0.4, 0x27ae60); for (const s2 of [-1, 1]) { F.sh('cyl', 1.3, 0.4, 1.3, midX + 3 + s2 * 0.85, 0.65, cz - 0.6, 0x222222, { rz: Math.PI / 2 }); F.sh('cyl', 0.8, 0.3, 0.8, midX + 3 + s2 * 0.8, 0.4, cz + 0.8, 0x222222, { rz: Math.PI / 2 }); } F.col(midX + 3, cz, 2.2, 2.6);
+    } else if (key === 'novatics') {                                               // baby-foot, poufs, néon
+      F.box(1.4, 0.85, 0.8, midX, 0.45, cz, 0x27ae60); for (let i = 0; i < 4; i++) F.sh('cyl', 0.03, 1.6, 0.03, midX - 0.5 + i * 0.33, 0.85, cz, 0xbdc3c7, { rx: Math.PI / 2 }); F.col(midX, cz, 1.4, 0.8);
+      for (let i = 0; i < 3; i++) F.sh('ball', 1.0, 0.7, 1.0, midX + 2.5 + i * 1.3, 0.35, cz + (i % 2) * 0.8, [0xff6f61, 0xf1c40f, 0x00a8e8][i]);
+      const ns = Fr.L(midX + 3, -hd + 0.45); ML.Decor.sign('INNOVATION', '#disruption #synergie', '#2d3e50', '#00e5ff', 4, 1, ns.x, C.h - 2.5, ns.z, Fr.a, { glow: true });
+    } else if (key === 'ublo') {                                                   // bar à café + plantes
+      F.box(3, 1.05, 0.7, midX, 0.53, cz, 0x8d6e63); F.box(3.2, 0.08, 0.9, midX, 1.08, cz, 0xff6f61); F.box(0.45, 0.6, 0.45, midX - 1, 1.42, cz, 0x2c3e50); F.col(midX, cz, 3, 0.7);
+      for (let i = 0; i < 3; i++) { F.sh('cyl', 0.3, 0.5, 0.3, midX + 3 + i * 1.2, 0.25, cz, 0xffffff); F.sh('ball', 0.8, 1.3, 0.8, midX + 3 + i * 1.2, 1.1, cz, 0x2e8b57); }
+    } else if (key === 'espacil') {                                                // tableau de clés + maquette de résidence
+      F.box(2.6, 1.6, 0.08, midX, 1.6, -hd + 0.45, 0x8d6e63); for (let i = 0; i < 24; i++) F.box(0.06, 0.18, 0.02, midX - 1.1 + (i % 8) * 0.31, 1.15 + Math.floor(i / 8) * 0.45, -hd + 0.5, [0xf1c40f, 0x95a5a6, 0x13a89e][i % 3]);
+      F.box(2.2, 0.8, 1.6, midX + 3.5, 0.4, cz, 0xffffff); F.col(midX + 3.5, cz, 2.2, 1.6);
+      for (let i = 0; i < 4; i++) { const hh = 0.5 + (i % 3) * 0.25; F.box(0.45, hh, 0.45, midX + 2.9 + (i % 2) * 0.9, 0.8 + hh / 2, cz - 0.4 + Math.floor(i / 2) * 0.8, 0xf3efe6); F.box(0.47, 0.06, 0.47, midX + 2.9 + (i % 2) * 0.9, 0.82 + hh, cz - 0.4 + Math.floor(i / 2) * 0.8, 0x13a89e); }
+      const ps = Fr.L(dx - 6, -hd + 0.45); ML.Decor.sign('LOGEMENTS\nDISPONIBLES', 'demandez à l\'accueil', '#13a89e', '#fff', 3, 1.6, ps.x, 2.2, ps.z, Fr.a, { border: '#fff' });
+    }
+  };
+  W.inShowroom = (key, C, P, F, Fr, g) => {
+    const hw = C.w / 2, hd = C.d / 2, dx = hw - 3;
+    // bureau de Bernard
+    F.box(2.4, 0.78, 1.0, dx - 4.5, 0.39, 2.4, 0x5d4037); F.box(2.5, 0.06, 1.1, dx - 4.5, 0.8, 2.4, 0x3e2723); F.box(0.6, 0.4, 0.05, dx - 4.5, 1.05, 2.1, 0x222222); F.col(dx - 4.5, 2.4, 2.4, 1.0);
+    for (const s2 of [-0.6, 0.6]) { F.box(0.5, 0.45, 0.5, dx - 4.5 + s2, 0.23, 3.5, 0xc0392b); F.box(0.5, 0.45, 0.08, dx - 4.5 + s2, 0.65, 3.75, 0xc0392b); }
+    P.npc = Object.assign(Fr.L(dx - 4.5, 1.4), { yaw: Fr.a });
+    const ad = Fr.L(0, -hd + 0.45); ML.Decor.sign('GARAGE PASQUIER', 'occasions garanties*  (*garanties d\'avoir 4 roues)', '#c0392b', '#fff', 9, 1.8, ad.x, 4.6, ad.z, Fr.a, { glow: true, border: '#fff' });
+    // véhicules exposés sur podium
+    const spots = { megane: { x: -hw + 5, z: -1.5, ry: 0.55, r: 3.1 }, ducato: { x: -hw + 12.5, z: -2, ry: 0.35, r: 3.4 }, camion: { x: 4.5, z: -hd + 3.6, ry: Math.PI / 2, r: 0 } };
+    for (const k in spots) {
+      const s2 = spots[k], D = ML.DEALER[k], V = ML.VEHICLES[k];
+      if (s2.r) { F.sh('cyl', s2.r * 2, 0.16, s2.r * 2, s2.x, 0.08, s2.z, 0xdfe6e9); F.sh('cyl', s2.r * 2 - 0.2, 0.02, s2.r * 2 - 0.2, s2.x, 0.17, s2.z, 0xb2bec3); }
+      else { F.box(9.4, 0.16, 3.4, s2.x, 0.08, s2.z, 0xdfe6e9); }
+      const m = ML.Cars.model(k, V.color); const wp = Fr.L(s2.x, s2.z); m.position.set(wp.x, 0.17, wp.z); m.rotation.y = Fr.a + s2.ry; root.add(m); W.staff.push({ group: m });
+      const bw = k === 'camion' ? 9 : 2.4, bd = k === 'camion' ? 2.8 : 4.8, ca = Math.abs(Math.cos(s2.ry)), sa = Math.abs(Math.sin(s2.ry));
+      Fr.col(s2.x, s2.z, bw * ca + bd * sa, bw * sa + bd * ca, 'vitrine');
+      // panneau de caractéristiques (face à l'entrée)
+      const spec = (D.specs || []).map(([a2, b2]) => `${a2} : ${b2 === 'CAR' || b2 === 'DUCATO' || b2 === 'CAMION' ? Math.round(ML.CFG[b2].max * 3.6) + ' km/h' : b2}`);
+      const pz = s2.r ? s2.z + s2.r + 0.6 : s2.z + 2.3, px = s2.r ? s2.x : s2.x - 2.5;
+      F.box(0.08, 1.1, 0.08, px, 0.55, pz, 0x7f8c8d); F.box(0.7, 0.04, 0.4, px, 0.02, pz, 0x7f8c8d);
+      const sp = Fr.L(px, pz + 0.05); const pan = ML.Decor.sign(`${D.name}\n${D.price.toLocaleString('fr-FR')} €`, spec.join('  ·  '), '#1a2340', '#ffd257', 2.4, 1.3, sp.x, 1.55, sp.z, Fr.a, { border: '#ffd257', glow: true });
+      W.show[k] = { pan, label: null };
+      const tp = Fr.L(px, pz + 1.0); W.targets.push({ id: 'show:' + k, x: tp.x, y: 1.2, z: tp.z, r: 3.2 });
+      const sold = U.label('', { size: 0.5, color: '#3ecf6e', bg: 'rgba(0,0,0,0.75)' }); sold.position.set(sp.x, 2.6, sp.z); add(sold); W.show[k].label = sold;
+    }
+    // plantes, déco
+    for (const [x, z] of [[-hw + 1.2, hd - 1.2], [hw - 1.2, -hd + 1.2], [-hw + 1.2, -hd + 1.2]]) { F.sh('cyl', 0.35, 0.55, 0.35, x, 0.28, z, 0xffffff); F.sh('ball', 1, 1.5, 1, x, 1.2, z, 0x27ae60); }
+    for (let i = 0; i < 9; i++) F.box(0.5, 0.5, 0.04, -hw + 2 + i * 3, C.h - 0.6, hd - 0.5, [0xe74c3c, 0xf1c40f, 0x3498db][i % 3], { rz: Math.PI / 4 });
+  };
+  W.inGendarmerie = (key, C, P, F, Fr) => {
+    const hw = C.w / 2, hd = C.d / 2, dx = hw - 3;
+    // accueil (comptoir + vitre)
+    F.box(4, 1.1, 0.8, dx, 0.55, hd - 4.4, 0x1f3a93); F.box(4.2, 0.08, 1.0, dx, 1.12, hd - 4.4, 0xecf0f1); F.glass(4, 0.9, 0.05, dx, 1.6, hd - 4.7, 0xcfe8ff);
+    F.col(dx, hd - 4.4, 4, 0.8);
+    P.npc = Object.assign(Fr.L(dx, hd - 5.4), { yaw: Fr.a });
+    const sg = Fr.L(dx, hd - 3.97); ML.Decor.sign('ACCUEIL', 'caution · plaintes · objets trouvés', '#1f3a93', '#fff', 2.6, 0.5, sg.x, 0.62, sg.z, Fr.a, {});
+    // banc d'attente, bureau, affiches
+    F.box(3, 0.45, 0.5, -1, 0.23, hd - 0.8, 0x7f8c8d); F.col(-1, hd - 0.8, 3, 0.5);
+    desk(F, -hw + 3, 1.5, 0xbdc3c7); W.addStaff(Fr, -hw + 3, 2.28, Math.PI, { skin: 0xf0c8a0, shirt: 0x1f3a93, pants: 0x1c2a5a, hair: 0x3b2a1a, height: 1.76, cap: 0x1f3a93 }, true);
+    const p1 = Fr.L(-hw + 0.45, 1.5); ML.Decor.sign('AVIS DE RECHERCHE', 'conducteur de Mégane jaune · très rapide', '#f5e6c8', '#2c3e50', 2.2, 1.5, p1.x, 2.2, p1.z, Fr.a + Math.PI / 2, { border: '#2c3e50' });
+    const p2 = Fr.L(1.5, hd - 0.45); ML.Decor.sign('PIÉTONS = PRIORITÉ', '3 renversés = garde à vue', '#c0392b', '#fff', 2.6, 1.2, p2.x, 2.4, p2.z, Fr.a + Math.PI, {});
+    // cellules (garde à vue) contre le mur du fond
+    const cz0 = -hd + 0.35, cz1 = -hd + 4.4, cells = [-hw + 3, -hw + 7.6], cw = 4.4;
+    ML.LOC.jail = []; ML.LOC.jailOut = Fr.L(dx, hd + 3);
+    for (const cx of cells) {
+      for (const s2 of [-1, 1]) { F.box(0.2, 3, cz1 - cz0, cx + s2 * cw / 2, 1.5, (cz0 + cz1) / 2, 0xbdc3c7); Fr.col(cx + s2 * cw / 2, (cz0 + cz1) / 2, 0.2, cz1 - cz0, 'cellule'); }
+      for (let x = cx - cw / 2 + 0.15; x <= cx + cw / 2 - 0.1; x += 0.22) F.sh('cyl', 0.04, 3, 0.04, x, 1.5, cz1, 0x555555);
+      F.box(cw, 0.12, 0.12, cx, 2.95, cz1, 0x555555); F.box(cw, 0.12, 0.12, cx, 1.2, cz1, 0x555555);
+      Fr.col(cx, cz1, cw, 0.3, 'barreaux');
+      F.box(1.9, 0.45, 0.8, cx - 1, 0.23, cz0 + 0.5, 0x7f8c8d); F.box(1.8, 0.12, 0.7, cx - 1, 0.5, cz0 + 0.5, 0xc0392b);       // banc-lit
+      F.sh('cyl', 0.25, 0.45, 0.25, cx + 1.6, 0.23, cz0 + 0.5, 0xecf0f1);
+      ML.LOC.jail.push(Object.assign(Fr.L(cx + 0.3, (cz0 + cz1) / 2 + 0.4), { yaw: Fr.a }));
+    }
+    const ct = Fr.L((cells[0] + cells[1]) / 2, cz1 + 0.3); ML.Decor.sign('GARDE À VUE', 'ne pas nourrir les détenus', '#2c3e50', '#fff', 3, 0.7, ct.x, 3.4, ct.z, Fr.a, {});
   };
 
   /* ---------- Décor de ville ---------- */
@@ -319,7 +673,7 @@
         const b = place(f.model, 7.5, f.x, f.z, f.rot * Math.PI / 2, false);
         if (!b) U.box(14, 12, 14, T.mat('brique', 3, 3, 0xf6e58d), f.x, 6, f.z, root);
       }
-      U.boxCollider(f.x, f.z, 15, 15, 'city'); ML.mapRects.push({ x: f.x, z: f.z, w: 15, d: 15, c: '#8e7f74' });
+      U.boxCollider(f.x, f.z, 15, 15, 'city'); ML.mapRects.push({ x: f.x, z: f.z, w: 15, d: 15, c: f.espacil ? '#13a89e' : '#8e7f74', name: f.espacil ? 'Espacil' : undefined });
     }
     for (const c of city.parked) place(c.model, 4.6, c.x, c.z, c.ry, 'small', 0.33);
     const heads = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.12, 0.3), new THREE.MeshLambertMaterial({ color: 0xfff3c4, emissive: 0x000000 }), city.lamps.length);
@@ -340,8 +694,16 @@
     }
     // feux tricolores
     W.lightRed = U.mat(0xff2222, 0xff0000); W.lightGreenMat = U.mat(0x22ff44, 0x00cc22); W.lightOff = U.mat(0x222222);
+    const N2 = city.nodes, sd2 = ML.CityGen.segDist;
     for (const ni of city.lights) {
-      const n = city.nodes[ni], x = n.x + city.RW + 1.2, z = n.z + city.RW + 1.2;
+      const n = N2[ni];
+      // V5 : le feu se pose sur le coin de trottoir le plus éloigné des chaussées (plus jamais au milieu de la route)
+      let x = n.x + city.RW + 1.2, z = n.z + city.RW + 1.2, best = -1;
+      for (let k = 0; k < 16; k++) {
+        const a = k / 16 * Math.PI * 2, px = n.x + Math.cos(a) * (city.RW + 2.2) * 1.15, pz = n.z + Math.sin(a) * (city.RW + 2.2) * 1.15;
+        let m = 99; for (const e of city.edges) m = Math.min(m, sd2(px, pz, N2[e.a].x, N2[e.a].z, N2[e.b].x, N2[e.b].z));
+        if (m > best) { best = m; x = px; z = pz; }
+      }
       U.box(0.15, 3.6, 0.15, 0x333333, x, 1.8, z, root); U.box(0.4, 0.9, 0.35, 0x222222, x, 3.6, z, root);
       const red = U.box(0.22, 0.22, 0.4, W.lightRed, x, 3.85, z, root, false), green = U.box(0.22, 0.22, 0.4, W.lightGreenMat, x, 3.35, z, root, false);
       U.boxCollider(x, z, 0.4, 0.4, 'feu'); W.lights.push({ node: ni, red, green });
@@ -354,15 +716,16 @@
     const cols = [0x2d6a4f, 0x40916c, 0x52b788, 0x588157].map(c => new THREE.Color(c));
     trunks.castShadow = leaves.castShadow = true;
     round.forEach((t, i) => {
-      o.position.set(t.x, 1.1, t.z); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); o.updateMatrix(); trunks.setMatrixAt(i, o.matrix);
+      const gy = ML.gy(t.x, t.z);
+      o.position.set(t.x, gy + 1.1, t.z); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); o.updateMatrix(); trunks.setMatrixAt(i, o.matrix);
       for (let k = 0; k < 3; k++) {
-        const s = t.k - k * 0.22; o.position.set(t.x + (k - 1) * 0.3, 2.4 + k * 1.05 * t.k, t.z + (1 - k) * 0.25); o.scale.set(s, s, s); o.rotation.set(0, k, 0); o.updateMatrix();
+        const s = t.k - k * 0.22; o.position.set(t.x + (k - 1) * 0.3, gy + 2.4 + k * 1.05 * t.k, t.z + (1 - k) * 0.25); o.scale.set(s, s, s); o.rotation.set(0, k, 0); o.updateMatrix();
         leaves.setMatrixAt(i * 3 + k, o.matrix); leaves.setColorAt(i * 3 + k, cols[t.c]);
       }
       U.boxCollider(t.x, t.z, 0.6, 0.6, 'tree');
     });
     add(trunks); add(leaves);
-    for (const b of city.bushes) place('city_bush', b.s, b.x, b.z, b.ry, false);
+    for (const b of city.bushes) place('city_bush', b.s, b.x, b.z, b.ry, false, ML.gy(b.x, b.z));
     ML.Decor.streets(city); ML.Decor.nature(city, pines);
   };
 

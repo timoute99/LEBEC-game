@@ -77,7 +77,10 @@
     $('go-guide').onclick = () => { L.screen('scr-guide'); $('guide-tips').innerHTML = ML.TIPS.map(t => `<li>${U.esc(t)}</li>`).join(''); };
     for (const b of L.el.querySelectorAll('.back')) b.onclick = () => L.showHome();
     $('btn-profile-h').onclick = () => L.showProfile(); $('btn-profile-r').onclick = () => L.showProfile();
-    $('btn-prof-back').onclick = () => { if (L.cur === 'scr-room' && N.room) { L.showRoom(); } else L.screen(L.cur || 'scr-home'); };
+    $('btn-prof-back').onclick = () => {
+      if (L.ingame) { L.ingame = false; L.el.classList.remove('ingame'); L.hide(); ML.ui.modal = null; ML.Game.sendLook(); ML.Input.lock(); ML.HUD.toast('👕 Perso mis à jour !'); return; }
+      if (L.cur === 'scr-room' && N.room) { L.showRoom(); } else L.screen(L.cur || 'scr-home');
+    };
     // solo
     $('btn-solo').onclick = () => { const n = L.name('h'); if (!n) return; const game = L.gameCfg('h'); if (!game) return; ML.Sfx.init(); ML.Game.start({ solo: true, seed: Date.now() >>> 0, me: 'solo', host: 'solo', players: [{ id: 'solo', name: n, idx: 0 }], game }); };
     // multi
@@ -143,10 +146,16 @@
       L.sendRole(); if (room.host === N.id) L.sendCfg();
     });
     N.on('start', m => {
+      // V5 : on rejoint une partie EN COURS → d'abord le salon (rôle, perso), puis le bouton « Jouer »
+      if (m.late && !ML.Game.on) { L.pendingStart = m; L.showRoom(); ML.HUD.toast('🔨 Partie en cours : choisis ton rôle, puis JOUER !'); return; }
+      L.pendingStart = null; L.startFrom(m);
+    });
+    L.startFrom = m => {
       const r = m.room; ML.Sfx.init();
       ML.Game.start({ seed: m.seed, me: N.id, host: r.host, players: r.players.map(p => ({ id: p.id, name: p.name, idx: p.idx })), game: m.cfg || { mode: 'coop' }, late: !!m.late });
       if (m.late) ML.HUD.toast('Tu rejoins la partie en cours !');
-    });
+    };
+    $('btn-join-play').onclick = () => { const m = L.pendingStart; if (!m) return; if (!L.name('r')) return; L.pendingStart = null; L.sendRole(); L.startFrom(Object.assign({}, m, { room: N.room || m.room })); };
     N.on('host', async id => {
       const G = ML.Game;
       if (G.on && !G.solo && id !== G.host) {
@@ -328,10 +337,19 @@
     const host = r.host === N.id;
     $('btn-start').classList.toggle('hidden', !host); $('room-opts').classList.toggle('hidden', !host);
     $('room-wait').classList.toggle('hidden', host);
-    $('room-wait').textContent = r.state === 'game' ? 'Partie en cours… (tu vas la rejoindre)' : "En attente que l'hôte choisisse le mode et lance la journée…";
+    $('room-wait').textContent = r.state === 'game' ? (L.pendingStart ? '' : 'Partie en cours… (tu vas la rejoindre)') : "En attente que l'hôte choisisse le mode et lance la journée…";
+    $('room-join').classList.toggle('hidden', !L.pendingStart);
     L.renderModes(); L.renderRoles(true); L.renderHostCfg();
   };
   L.backToRoom = () => { if (N.room) L.showRoom(); else L.showHome(); };
+  /** V5 : en pleine partie (menu Pause) — changer de perso, ou revenir au menu principal */
+  L.inGameProfile = () => { L.ingame = true; ML.ui.modal = 'profile'; ML.Input.unlock(); ML.HUD.showPause(false); L.el.classList.add('ingame'); L.show(); L.screen('scr-profile'); L.renderProfile(); };
+  L.leaveGame = () => {
+    const G = ML.Game;
+    if (G.game && G.game.campaign && G.isHost && ML.Sim.S && !G.ended) ML.Camp.autosave(ML.Sim.companySnap());
+    if (G.solo) { G.stop(); L.showHome(); return; }
+    N.send({ t: 'leave' }); G.stop(); L.pendingStart = null; L.showHome();
+  };
 
   /** Fin de journée : rejouer (hôte ou solo) */
   L.replay = () => {

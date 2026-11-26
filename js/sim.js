@@ -19,8 +19,10 @@
   Sim.init = cfg => {
     rng = K.rng = U.rng(cfg.seed);
     const g = cfg.game || {}, E = g.E || ML.Company.fresh('', g.mode === 'course' ? 0 : ML.ECO.freeMoney), up = Object.assign({}, E.up);
-    const humeurs = Object.keys(ML.HUMEURS), wr = rng();
-    const weather = wr < ML.WEATHER.beau.p ? 'beau' : wr < ML.WEATHER.beau.p + ML.WEATHER.pluie.p ? 'pluie' : 'brouillard';
+    const humeurs = Object.keys(ML.HUMEURS);
+    const wpick = tab => { let t = 0; for (const k in tab) t += tab[k]; let r = rng() * t; for (const k in tab) { r -= tab[k]; if (r <= 0) return k; } return 'beau'; };
+    K.wpick = wpick;
+    const weather = g.weather || wpick(Object.fromEntries(Object.keys(ML.WEATHER).map(k => [k, ML.WEATHER[k].p])));
     S = Sim.S = K.S = {
       rt: 0, mode: g.mode || 'coop', day: g.day || 1, score: 0, sat: 70, served: 0, failed: 0, over: false, n: cfg.players.length,
       stock: {}, orders: [], machines: {}, pl: {}, cars: [], items: [], subs: { fonderie: [], chaudro: [], tth: [] },
@@ -31,7 +33,9 @@
       // --- économie V4 ---
       money: Math.round(E.money), rep: E.rep, rep0: E.rep, staff: E.staff.slice(), ai: Object.assign({}, E.ai), owned: E.veh.slice(),
       props: [], deliv: [], parts: [], today: { ca: 0, achat: 0, invest: 0, amende: 0, bonus: 0, salaires: 0 }, nParts: 0,
-      campaign: !!g.campaign, co: { name: E.name || '', code: E.code || null, day: E.day || 1, won: !!E.won, insp: E.insp || null, mach: E.mach.length, rep: E.rep }
+      campaign: !!g.campaign, co: { name: E.name || '', code: E.code || null, day: E.day || 1, won: !!E.won, insp: E.insp || null, mach: E.mach.length, rep: E.rep },
+      // --- V5 ---
+      wxNext: 70 + rng() * 70, spent: {}, hist: (E.hist || []).slice(-7), pedHits: {}, ext: !!up.extension
     };
     K.H = ML.HUMEURS[S.humeur]; S.diff = ML.DIFFS[g.diff] ? g.diff : 'normal';
     // stock : celui de l'entreprise
@@ -65,11 +69,12 @@
     if (up.frigo) npcs.matis.hunger = -999;
     // trouvailles
     const kinds = shuffle(Object.keys(ML.FINDS)).slice(0, 6), spots = shuffle(ML.LOC.hides).slice(0, kinds.length);
-    spots.forEach((h, i) => K.spawnItem({ type: 'find', d: { k: kinds[i] } }, h.x, 0, h.z));
+    spots.forEach((h, i) => K.spawnItem({ type: 'find', d: { k: kinds[i] } }, h.x, ML.gy(h.x, h.z), h.z));
     S.finds.total = spots.length;
     // équipements sur leurs crochets
-    for (const h of ML.LOC.hooks) K.spawnItem({ type: h.type, d: {} }, h.x, h.y, h.z);
+    for (const h of ML.LOC.hooks) K.spawnItem({ type: h.type, d: h.h !== undefined ? { h: h.h } : {} }, h.x, h.y, h.z);
     for (const m of Sim.mods) if (m.init) m.init(cfg);
+    if (E.mess && S.mode !== 'course') K.restore(E.mess);                // V5 : tout est resté comme la veille (commandes, bazar…)
     if (S.humeur === 'bonne_humeur') S.buffs.matis = 120;
   };
   function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -93,14 +98,22 @@
   };
 
   /* ======================= Argent & réputation ======================= */
-  K.money = (d, cat) => { d = Math.round(d); S.money += d; if (cat) S.today[cat] = (S.today[cat] || 0) + Math.abs(d); Sim.dirty = true; };
+  /* V5 : HISTORIQUE — chaque mouvement d'argent est noté (qui, quoi, combien). Les clients le reçoivent
+     par l'événement « led » ; les totaux par joueur (S.spent) sont dans l'état. */
+  K.clock = () => { const m = Math.round(C.DAY_START + S.rt * (C.DAY_END - C.DAY_START) / C.SHIFT_SEC); return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`; };
+  K.led = (d, cat, info) => {
+    info = info || {}; const pid = info.pid && S.pl[info.pid] ? info.pid : null, who = pid ? S.pl[pid].name : (info.who || 'Atelier');
+    ev.push({ e: 'led', l: [K.clock(), who, cat || '', String(info.what || '').slice(0, 70), d, pid ? S.pl[pid].idx : -1] });
+    if (d < 0) { const k = pid || '_', sp = S.spent[k] = S.spent[k] || { name: who, amende: 0, achat: 0, invest: 0, autre: 0 }; const c2 = ['amende', 'achat', 'invest'].includes(cat) ? cat : 'autre'; sp[c2] += -d; sp.name = who; }
+  };
+  K.money = (d, cat, info) => { d = Math.round(d); S.money += d; if (cat) S.today[cat] = (S.today[cat] || 0) + Math.abs(d); if (d) K.led(d, cat, info); Sim.dirty = true; };
   K.spend = (pid, amt, cat, what) => {
     amt = Math.round(amt);
     if (S.money < amt) { if (pid) note(pid, `💸 Pas assez d'argent${what ? ' pour ' + what : ''} : il faut ${amt} €, la caisse en a ${S.money} €.`, 'warn'); return false; }
-    K.money(-amt, cat || 'achat'); return true;
+    K.money(-amt, cat || 'achat', { pid, what }); return true;
   };
-  K.fine = (amt, why) => { K.money(-amt, 'amende'); return `−${amt} €`; };
-  K.bonus = amt => { K.money(amt, 'bonus'); return `+${amt} €`; };
+  K.fine = (amt, why, pid) => { K.money(-amt, 'amende', { pid, what: why || 'Amende' }); return `−${amt} €`; };
+  K.bonus = (amt, why, pid) => { K.money(amt, 'bonus', { pid, what: why || 'Prime' }); return `+${amt} €`; };
   K.repAdd = d => { S.rep = U.clamp(Math.round(S.rep + d), 0, 100); Sim.dirty = true; };
   K.eur = n => `${Math.round(n).toLocaleString('fr-FR')} €`;
 
@@ -122,6 +135,8 @@
     S.items.push(o); Sim.dirty = true; return o;
   };
   K.strip = o => ({ type: o.type, d: o.d });
+  /** Remet une soufflette sur son crochet (le tuyau la ramène) */
+  K.hookBack = it => { const h = ML.LOC.hooks.find(x => x.type === 'soufflette' && x.h === ((it.d || {}).h || 0)) || ML.LOC.hooks.find(x => x.type === 'soufflette'); if (h) K.spawnItem({ type: 'soufflette', d: { h: h.h || 0 } }, h.x, h.y, h.z); };
   K.removeItem = o => { const i = S.items.indexOf(o); if (i >= 0) S.items.splice(i, 1); Sim.dirty = true; };
   K.foot = P => P.car === null && P.ride == null;
   K.isPart = it => !!it && (it.type === 'caisse' || it.type === 'piece');
@@ -197,11 +212,13 @@
     if (lv >= 0.12 || S.day >= 2) kinds.push('tth');
     if (lv >= 0.28 || S.day >= 3) kinds.push('fonderie', 'chaudro');
     const kind = S.nOrders <= 2 ? 'plain' : rng.pick(kinds);
-    const list = ML.PARTS[kind].filter(x => types.has(x[2])); if (!list.length) return;
-    const [part, mat, mtype, tool] = rng.pick(list);
-    const steps = kind === 'plain' ? ['usinage', 'livraison'] : kind === 'tth' ? ['usinage', 'tth', 'livraison'] : [kind, 'usinage', 'livraison'];
     const cls = K.clients(); if (!cls.length) return;
     const client = rng.pick(cls), cl = ML.LOC.comp[client], far = Math.hypot(cl.x, cl.z) > 200;
+    // V5 : certains clients ont leurs propres pièces (Espacil : gonds, platines de boîtes aux lettres…)
+    const own = kind === 'plain' && ML.PARTS[client] ? ML.PARTS[client].filter(x => types.has(x[2])) : [];
+    const list = own.length ? own : ML.PARTS[kind].filter(x => types.has(x[2])); if (!list.length) return;
+    const [part, mat, mtype, tool] = rng.pick(list);
+    const steps = kind === 'plain' ? ['usinage', 'livraison'] : kind === 'tth' ? ['usinage', 'tth', 'livraison'] : [kind, 'usinage', 'livraison'];
     const big = S.owned.includes('fenwick') && S.owned.includes('camion');
     const sr = rng(); let size = kind === 'plain' ? (sr < 0.3 ? 's' : sr < 0.78 ? 'm' : 'l') : kind === 'chaudro' ? (sr < 0.5 ? 'm' : 'l') : kind === 'tth' ? (sr < 0.5 ? 's' : 'm') : 'm';
     if (size === 'l' && !big) size = 'm';
@@ -274,7 +291,7 @@
     S.orders.splice(S.orders.indexOf(o), 1);
     const frac = Math.max(0, (o.dl - S.rt) / o.dur);
     const pay = Math.round(((o.price || 100) * (0.75 + 0.35 * frac) + (held.d.ctl ? ML.ECO.order.ctl : 0)) * (held.d.npc || 1));
-    K.money(pay, 'ca'); S.served++; S.sat = Math.min(100, S.sat + (S.up.plantes ? 7 : 5));
+    K.money(pay, 'ca', { pid, what: `#${o.id} livrée à ${comp === 'part' ? ML.PEOPLE[o.who].name : COMP[comp].name}` }); S.served++; S.sat = Math.min(100, S.sat + (S.up.plantes ? 7 : 5));
     K.repAdd(comp === 'part' ? ML.ECO.rep.part : frac > 0.25 ? ML.ECO.rep.ok : ML.ECO.rep.late);
     if (n) say(n, ML.line(n.id, 'merci', ML.LINES[n.id] || ['Merci !']));
     big(`+${K.eur(pay)} · #${o.id} livrée à ${comp === 'part' ? ML.PEOPLE[o.who].name : COMP[comp].name} !`, '#3ecf6e'); sfx('cash');
@@ -285,6 +302,7 @@
   Sim.setPose = (pid, p) => {
     pose[pid] = Object.assign(pose[pid] || {}, p);
     const P = S && S.pl[pid];
+    if (P && P.late !== undefined && !P.entered) { P.entered = true; P.late = S.rt; }   // il a cliqué sur « Jouer » au salon
     if (P && p.car && S.cars[p.car.i] && S.cars[p.car.i].dr === pid) {
       const c = S.cars[p.car.i]; c.x = p.car.x; c.z = p.car.z; c.h = p.car.h; c.s = p.car.s;
       if (isFinite(p.car.f)) c.fuel = U.clamp(p.car.f, 0, 100);
@@ -311,11 +329,12 @@
         const o = K.spawnItem(held, ps.x, (ps.y || 0) + 1.5, ps.z, v); o.thr = pid; sfx('whoosh', ps.x, ps.z);
       } break;
       case 'hit': hit(pid, ps, String(m.id || '')); break;
+      case 'rename': Sim.rename(pid, m.name); break;
       case 'eliott': {
         const n = npcs.eliott; if (!n.active || !near(ps, n.x, n.z, 7)) return;
         let succ = U.clamp(m.succ | 0, 0, 3); const mat = ['acier', 'alu', 'inox'].includes(m.mat) ? m.mat : 'acier', pr = ML.SUPPLY[mat].price * 3;
         succ = Math.min(succ, Math.max(0, Math.floor(S.money / pr)));
-        if (succ) K.money(-pr * succ, 'achat');
+        if (succ) K.money(-pr * succ, 'achat', { pid, what: `${succ} caisse${succ > 1 ? 's' : ''} ${ML.MATERIALS[mat].label} chez Eliott` });
         for (let i = 0; i < succ; i++) { const [x, z] = K.dockSpot('aciers'); K.spawnItem({ type: 'matiere', d: { mat, q: 3 } }, x, 0, z); }
         say(n, succ ? `Ok-${succ}-caisse${succ > 1 ? 's' : ''}-${pr * succ}-euros-sur-le-quai-salut !` : m.succ ? "Pas-d'sous-pas-d'barres-désolé !" : "Bon-t'as-rien-suivi-reviens-plus-tard !");
         break;
@@ -509,7 +528,7 @@
     S.finds.got++; S.finds.log.push(k);
     switch (k) {
       case 'pelle_or': S.anger = 0; S.buffs.calm = S.rt + 120; if (S.chase) { S.chase = null; npcs.lebec.state = 'patrol'; } break;
-      case 'pied_coulisse': K.bonus(120); break;
+      case 'pied_coulisse': K.bonus(120, 'Pied à coulisse revendu', pid); break;
       case 'croissant': S.buffs.croissant = S.rt + 60; break;
       case 'plaquettes': S.stock.plaquette += 4; break;
       case 'barres': S.stock.alu += 2; S.stock.inox += 2; break;
@@ -678,7 +697,8 @@
         if (o.thr) for (const id in npcs) { const n = npcs[id]; if (n.active && Math.hypot(o.x - n.x, o.z - n.z) < 0.6 && o.y < 2) { K.npcHit(n, o.thr); o.thr = null; o.vx *= -0.2; o.vz *= -0.2; o.vy = 1.5; break; } }
         if (o.thr) for (const pid in pose) { if (pid === o.thr || !S.pl[pid] || !K.foot(S.pl[pid])) continue; const p = pose[pid]; if (Math.hypot(o.x - p.x, o.z - p.z) < 0.55 && o.y < 2) { K.playerHit(pid, o.thr, 1.2); o.thr = null; o.vx *= -0.2; o.vz *= -0.2; break; } }
       }
-      if (o.y <= 0) { o.y = 0; if (Math.abs(o.vy) > 2.5) o.vy *= -0.3; else o.vy = 0; o.vx *= 0.55; o.vz *= 0.55; if (o.vx * o.vx + o.vz * o.vz + o.vy * o.vy < 0.05) { o.rest = true; o.thr = null; Sim.dirty = true; } }
+      const fl = ML.gy(o.x, o.z);
+      if (o.y <= fl) { o.y = fl; if (Math.abs(o.vy) > 2.5) o.vy *= -0.3; else o.vy = 0; o.vx *= 0.55; o.vz *= 0.55; if (o.vx * o.vx + o.vz * o.vz + o.vy * o.vy < 0.05) { o.rest = true; o.thr = null; Sim.dirty = true; } }
     }
   }
 
@@ -729,6 +749,23 @@
     for (const id in npcs) updateNpc(npcs[id], dt);
     updateItems(dt);
     for (const pid in S.pl) if (S.pl[pid].stun && S.pl[pid].stun < S.rt) S.pl[pid].stun = 0;
+    // V5 : la météo change pendant la journée
+    if (S.rt > S.wxNext && S.mode !== 'course') {
+      const W0 = ML.WEATHER[S.weather] || ML.WEATHER.beau, nx = K.wpick(W0.next); S.wxNext = S.rt + 70 + rng() * 80;
+      if (nx !== S.weather) { S.weather = nx; ev.push({ e: 'wx', w: nx }); Sim.dirty = true; if (ML.WEATHER[nx].wet && !S.up.isolation && K.addPuddle) K.addPuddle(-8 + rng() * 16, 16 + rng() * 6); }
+    }
+    // V5 : les soufflettes sont reliées à l'air comprimé : impossible de sortir de l'atelier avec
+    for (const pid in S.pl) {
+      const P = S.pl[pid], ps = pose[pid]; if (!ps) continue;
+      P.inv.forEach((it, i) => {
+        if (!it || it.type !== 'soufflette') return;
+        const R = ML.LOC.reels[(it.d || {}).h || 0] || ML.LOC.reels[0], far = Math.hypot(ps.x - R.x, ps.z - R.z) > ML.LOC.hoseLen;
+        if ((P.car === null && P.ride == null && U.inWorkshop(ps) && !far)) return;
+        P.inv[i] = null; K.hookBack(it); Sim.dirty = true;
+        note(pid, '🌀 Le tuyau d\'air est au bout : la soufflette te glisse des mains et retourne à son enrouleur !', 'warn'); sfx('whoosh', ps.x, ps.z);
+      });
+    }
+    for (const o of S.items) if (o.type === 'soufflette' && o.rest && !U.inWorkshop(o)) { K.removeItem(o); K.hookBack(o); break; }
     for (const m of Sim.mods) if (m.step) m.step(dt);
     if (S.rt >= C.SHIFT_SEC && S.mode !== 'course') K.end();
   };
@@ -738,8 +775,8 @@
     S.over = true; Sim.dirty = true;
     const race = S.mode === 'course';
     if (!race) {
-      const sal = K.salaries(); S.money -= sal; S.today.salaires = sal;
-      const abo = Object.keys(ML.CATALOG).reduce((a, k) => a + (ML.CATALOG[k].daily && S.up[k] ? ML.CATALOG[k].daily : 0), 0); S.money -= abo; S.today.abos = abo;
+      const sal = K.salaries(); S.money -= sal; S.today.salaires = sal; if (sal) K.led(-sal, 'salaires', { what: 'Salaires du personnel' });
+      const abo = Object.keys(ML.CATALOG).reduce((a, k) => a + (ML.CATALOG[k].daily && S.up[k] ? ML.CATALOG[k].daily : 0), 0); S.money -= abo; S.today.abos = abo; if (abo) K.led(-abo, 'abos', { what: 'Abonnements' });
     }
     const T = S.today, profit = T.ca + T.bonus - T.achat - T.amende - T.salaires - (T.abos || 0);
     const k = (1 + 0.35 * (Math.max(1, S.n) - 1)) * K.D.stars * (0.6 + 0.2 * Object.keys(S.machines).length), need = ML.ECO.stars.map(v => Math.round(v * k / 10) * 10);
@@ -748,7 +785,7 @@
     if (Object.keys(S.machines).length >= 6) for (const p in S.pl) K.stat(p, 'full');
     if (S.nParts >= 3) for (const p in S.pl) K.stat(p, 'part3');
     const res = Object.assign({ mode: S.mode, diff: S.diff, day: S.day, score: race ? S.score : Math.max(0, Math.round(profit / 4)), served: S.served, failed: S.failed, stars, finds: S.finds.got, findsTotal: S.finds.total, sat: Math.round(S.sat), need,
-      money: S.money, profit, today: Object.assign({}, T), rep: S.rep, rep0: S.rep0, campaign: S.campaign, co: S.co, snap: Sim.companySnap(), bankrupt: !race && S.mode !== 'inspection' && S.money < ML.ECO.bankrupt }, extra || {});
+      money: S.money, profit, today: Object.assign({}, T), spent: JSON.parse(JSON.stringify(S.spent)), rep: S.rep, rep0: S.rep0, campaign: S.campaign, co: S.co, snap: Sim.companySnap(), bankrupt: !race && S.mode !== 'inspection' && S.money < ML.ECO.bankrupt }, extra || {});
     for (const m of Sim.mods) if (m.onEnd) m.onEnd(res);
     if (S.served >= 10) for (const p in S.pl) K.stat(p, 'served10');
     if (res.vote) { S.over = false; S.voting = { until: S.rt + 25, votes: {}, res }; K.ev({ e: 'vote', until: 25, players: Object.keys(S.pl).map(id => [id, S.pl[id].name]) }); return; }
@@ -777,7 +814,53 @@
     return { k: 's', S: out };
   };
   /** État de l'entreprise à sauvegarder (argent, machines, personnel, véhicules, stock, réputation) */
-  Sim.companySnap = () => S && ({ money: Math.round(S.money), rep: S.rep, mach: ML.MACHINE_ORDER.filter(id => S.machines[id]), staff: S.staff.slice(), ai: Object.assign({}, S.ai), veh: S.owned.slice(), up: Object.assign({}, S.up), stock: Object.assign({}, S.stock) });
+  Sim.companySnap = () => S && ({ money: Math.round(S.money), rep: S.rep, mach: ML.MACHINE_ORDER.filter(id => S.machines[id]), staff: S.staff.slice(), ai: Object.assign({}, S.ai), veh: S.owned.slice(), up: Object.assign({}, S.up), stock: Object.assign({}, S.stock),
+    mess: K.messSnap(), histDay: { d: S.co.day || S.day, p: Object.values(S.spent).map(v => [v.name, v.amende, v.achat, v.invest, v.autre]) } });
+  /* ======================= V5 : ce qui reste d'un jour à l'autre =======================
+     Les commandes en cours (avec le temps qui leur restait), le travail sur les machines,
+     les livraisons et la sous-traitance en route, et TOUT LE BAZAR : objets par terre,
+     dans les mains (posés là où on était), dans les bennes, bacs à copeaux, flaques. */
+  const r2s = v => Math.round(v * 100) / 100, NOKEEP = ['find', 'extincteur', 'cle', 'soufflette', 'casque', 'convention'];
+  K.messSnap = () => {
+    const keepOrd = S.orders.filter(o => o.client !== 'part'), ids = new Set(keepOrd.map(o => o.id));
+    const keepIt = it => it && !NOKEEP.includes(it.type) && (!it.d || it.d.oid === undefined || ids.has(it.d.oid));
+    const it = S.items.filter(keepIt).map(o => [o.type, o.d, r2s(o.x), r2s(o.rest ? o.y : ML.gy(o.x, o.z)), r2s(o.z)]);
+    for (const pid in S.pl) { const P = S.pl[pid], ps = pose[pid] || { x: 8, z: 2 }; P.inv.forEach((x, i) => { if (keepIt(x)) it.push([x.type, x.d, r2s(ps.x + i * 0.4), r2s(ML.gy(ps.x, ps.z)), r2s(ps.z)]); }); }
+    const beds = {}; for (const c of S.cars) if (c.bed.length) beds[c.kind] = c.bed.filter(keepIt).map(x => [x.type, x.d]);
+    return {
+      it: it.slice(0, 150), beds,
+      ord: keepOrd.slice(0, 14).map(o => ({ id: o.id, client: o.client, part: o.part, mat: o.mat, mtype: o.mtype, tool: o.tool, steps: o.steps, si: o.si, size: o.size, src: o.src, dur: Math.round(o.dur), price: o.price, left: Math.max(0, Math.round(o.dl - S.rt)), plan: o.plan || null, q: !!o.q })),
+      jobs: Object.keys(S.machines).filter(id => S.machines[id].job && ids.has(S.machines[id].job.oid)).map(id => { const j = S.machines[id].job; return [id, j.oid, j.need, j.tool ? 1 : 0, r2s(j.prog), r2s(j.total), j.wrong ? 1 : 0]; }),
+      mach: Object.fromEntries(Object.keys(S.machines).map(id => { const M = S.machines[id]; return [id, [Math.round(M.chips || 0), M.bin === false ? 0 : 1, M.broken ? 1 : 0, Math.round(M.wear || 0)]]; })),
+      deliv: S.deliv.filter(d => !d.oid || ids.has(d.oid)).slice(0, 20).map(d => Object.assign({}, d, { eta: Math.max(5, Math.round(d.eta - S.rt)) })),
+      subs: Object.keys(S.subs).flatMap(k => S.subs[k].filter(j => ids.has(j.oid)).map(j => Object.assign({ k }, j, { end: Math.max(5, Math.round(j.end - S.rt)) }))),
+      pud: (S.puddles || []).map(q => [q.x, q.z, r2s(q.r)])
+    };
+  };
+  K.restore = M => {
+    try {
+      let maxId = 0;
+      for (const o of M.ord || []) {
+        if (!COMP[o.client] || !Array.isArray(o.steps)) continue;
+        const ord = Object.assign({}, o, { t0: 0, dl: (o.left || 0) + 60, m: null, plan: o.plan && S.machines[o.plan] ? o.plan : null, q: !!o.q }); delete ord.left;
+        S.orders.push(ord); maxId = Math.max(maxId, o.id);
+      }
+      S.nextOid = Math.max(S.nextOid, maxId + 1);
+      for (const [mid, oid, need, tool, prog, total, wrong] of M.jobs || []) {
+        const Mm = S.machines[mid], o = S.orders.find(x => x.id === oid); if (!Mm || !o) continue;
+        Mm.job = { oid, need, tool: !!tool, prog, total, wrong: !!wrong }; o.m = mid;
+      }
+      for (const id in M.mach || {}) { const Mm = S.machines[id], v = M.mach[id]; if (!Mm) continue; Mm.chips = v[0]; Mm.bin = !!v[1]; Mm.broken = !!v[2]; Mm.wear = v[3]; }
+      for (const [type, d, x, y, z] of M.it || []) if (IT.TYPES[type]) K.spawnItem({ type, d: d || {} }, x, y, z);
+      for (const kind in M.beds || {}) { const c = S.cars.find(c2 => c2.kind === kind); if (c) for (const [type, d] of M.beds[kind]) if (IT.TYPES[type] && K.bedFree(c) > 0) c.bed.push({ type, d: d || {} }); }
+      for (const d of M.deliv || []) S.deliv.push(Object.assign({}, d, { eta: S.rt + d.eta, id: S.nextId++ }));
+      for (const j of M.subs || []) if (S.subs[j.k]) { const o = Object.assign({}, j, { end: S.rt + j.end }); delete o.k; S.subs[j.k].push(o); }
+      if (M.pud && M.pud.length) S.puddles = M.pud.slice(0, 8).map(([x, z, r], i) => ({ id: 900 + i, x, z, r, t: 0 }));
+      const n = (M.ord || []).length, m2 = (M.it || []).length;
+      if (n || m2) all(`🌅 Comme hier soir : ${n} commande${n > 1 ? 's' : ''} en cours${m2 ? `, et ${m2} objet${m2 > 1 ? 's' : ''} qui traîne${m2 > 1 ? 'nt' : ''} encore (le bazar d'hier : rangez !)` : ''}.`, 'info');
+    } catch (e) { console.warn('restore', e); }
+    Sim.dirty = true;
+  };
   /** Un joueur rejoint en cours de partie (drop-in) */
   Sim.addPlayer = (p, role) => {
     if (!S || S.pl[p.id]) return;
@@ -785,7 +868,9 @@
     S.n = Object.keys(S.pl).length; Sim.dirty = true;
     all(`👋 ${p.name} rejoint l'atelier en cours de journée !`, 'good');
   };
-  Sim.setRole = (pid, role) => { const P = S && S.pl[pid]; if (P && P.late !== undefined && S.rt - P.late < 20 && ML.ROLES[role]) { P.role = role; Sim.dirty = true; } };
+  Sim.setRole = (pid, role) => { const P = S && S.pl[pid]; if (P && P.late !== undefined && (!P.entered || S.rt - P.late < 20) && ML.ROLES[role]) { P.role = role; Sim.dirty = true; } };
+  /** V5 : changer de pseudo en cours de partie */
+  Sim.rename = (pid, name) => { const P = S && S.pl[pid]; name = String(name || '').replace(/[<>&"`]/g, '').trim().slice(0, 16); if (!P || !name || name === P.name) return; all(`✏ ${P.name} s'appelle maintenant ${name}.`, 'info'); P.name = name; Sim.dirty = true; };
   Sim.removePlayer = pid => {
     const P = S && S.pl[pid]; if (!P) return;
     K.dropAll(pid, 1);

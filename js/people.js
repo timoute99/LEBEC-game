@@ -67,9 +67,14 @@
       U.box(0.3, 0.36, 0.04, 0x7f8c8d, 0, -1.02, 0.28, sh).rotation.x = 0.25;
     }
     o.hand = new THREE.Group(); o.hand.position.set(0, 1.05 * s, 0.38); g.add(o.hand);        // objet porté devant soi
-    o.label = U.label(opts.name || '', { size: 0.24, color: opts.nameColor || '#ffe9a8' }); o.label.position.y = o.h + 0.3; g.add(o.label);
-    o.bubble = U.label('', { size: 0.3, color: '#111', bg: 'rgba(255,255,255,0.93)' }); o.bubble.position.y = o.h + 0.65; g.add(o.bubble);
-    o.emo = U.label('', { size: 0.7, bg: 'rgba(0,0,0,0)', fontSize: 80 }); o.emo.position.y = o.h + 1.3; g.add(o.emo); o.emoT = 0;
+    if (opts.bare) {                                                   // V5 : figurants (passants, employés) : pas d'étiquettes (moins de mémoire)
+      const dummy = () => { const d = new THREE.Object3D(); d.setText = () => {}; d.visible = false; return d; };
+      o.label = dummy(); o.bubble = dummy(); o.emo = dummy(); o.emoT = 0;
+    } else {
+      o.label = U.label(opts.name || '', { size: 0.24, color: opts.nameColor || '#ffe9a8' }); o.label.position.y = o.h + 0.3; g.add(o.label);
+      o.bubble = U.label('', { size: 0.3, color: '#111', bg: 'rgba(255,255,255,0.93)' }); o.bubble.position.y = o.h + 0.65; g.add(o.bubble);
+      o.emo = U.label('', { size: 0.7, bg: 'rgba(0,0,0,0)', fontSize: 80 }); o.emo.position.y = o.h + 1.3; g.add(o.emo); o.emoT = 0;
+    }
     ML.scene.add(g);
     return o;
   };

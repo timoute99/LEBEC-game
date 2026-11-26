@@ -294,3 +294,22 @@ button.mini.on { background: #2e86de; }
 button.mini.del { background: rgba(231,76,60,.35); } button.mini:disabled { opacity: .35; }
 .erp-tab.cart td { padding: 4px 18px 4px 0; } .cart-btns { margin-top: 10px; display: flex; gap: 8px; align-items: center; } .cart-btns .go { font-size: 15px; padding: 8px 16px; }
 #endcard .won.broke { border-color: #e74c3c; background: rgba(231,76,60,.15); } #endcard .won.broke h2 { color: #ff6b6b; }
+
+/* ===== V5 ===== */
+#tl .wx { font-size: 13px; color: #cfe8ff; margin: -2px 0 4px; }
+#jail { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); background: rgba(31, 58, 147, .92); border: 2px solid #74b9ff; color: #fff; font-weight: 800; font-size: 22px; padding: 8px 22px; border-radius: 14px; animation: evp 1.2s infinite; pointer-events: none; }
+#pause .pausecard { display: flex; flex-direction: column; gap: 10px; min-width: 360px; cursor: default; }
+#pause .pausecard button { width: 100%; font-size: 16px; padding: 10px; }
+#pause .pz-row { display: flex; gap: 6px; }
+#pause .pz-row input { flex: 1; font-size: 15px; padding: 8px; }
+#pause .pz-row button { width: auto; white-space: nowrap; }
+#endcard table.spent th { font-size: 12px; color: #aab; font-weight: normal; padding: 2px 6px; }
+#endcard table.spent td { padding: 2px 6px; }
+.erp-led { width: 100%; border-collapse: collapse; font-size: 13px; }
+.erp-led td { padding: 3px 6px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.erp-led td.amt { text-align: right; font-weight: bold; white-space: nowrap; }
+.erp-led td.amt.neg { color: #ff8a8a; } .erp-led td.amt.pos { color: #7dffa8; }
+.erp-led .who i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+.erp-filter button.on { background: #ffd257; color: #111; }
+#room-join { margin: 10px 0; padding: 10px; border-radius: 12px; background: rgba(62, 207, 110, .15); border: 1px solid #3ecf6e; }
+#lobby.ingame { background: rgba(10, 12, 18, .55); }

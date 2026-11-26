@@ -48,20 +48,30 @@
   GPS.draw = () => {
     if (GPS.mesh) { ML.scene.remove(GPS.mesh); GPS.mesh.geometry.dispose(); GPS.mesh = null; }
     if (!GPS.path || !GPS.target) { if (GPS.beacon) GPS.beacon.visible = false; return; }
-    const v = [], W = 0.8, P = GPS.path;
+    // V5 : le ruban flotte 25 cm au-dessus du sol (relief compris) et passe devant la route : il ne « disparaît » plus
+    const v = [], W = 0.95, P = GPS.path;
     for (let i = 0; i < P.length - 1; i++) {
       const A = P[i], B = P[i + 1], L = Math.hypot(B.x - A.x, B.z - A.z); if (L < 0.5) continue;
-      const nx = -(B.z - A.z) / L * W, nz = (B.x - A.x) / L * W, y = 0.09 + i * 0.0005;
-      v.push(A.x + nx, y, A.z + nz, A.x - nx, y, A.z - nz, B.x + nx, y, B.z + nz, A.x - nx, y, A.z - nz, B.x - nx, y, B.z - nz, B.x + nx, y, B.z + nz);
+      const nx = -(B.z - A.z) / L * W, nz = (B.x - A.x) / L * W, n = Math.max(1, Math.ceil(L / 3));
+      for (let k = 0; k < n; k++) {
+        const t0 = k / n, t1 = (k + 1) / n, ax = A.x + (B.x - A.x) * t0, az = A.z + (B.z - A.z) * t0, bx = A.x + (B.x - A.x) * t1, bz = A.z + (B.z - A.z) * t1;
+        const ya = ML.gy(ax, az) + 0.25, yb = ML.gy(bx, bz) + 0.25;
+        v.push(ax + nx, ya, az + nz, ax - nx, ya, az - nz, bx + nx, yb, bz + nz, ax - nx, ya, az - nz, bx - nx, yb, bz - nz, bx + nx, yb, bz + nz);
+      }
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-    GPS.mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xc061ff, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide }));
-    GPS.mesh.renderOrder = 2; ML.scene.add(GPS.mesh);
+    GPS.mat = GPS.mat || new THREE.MeshBasicMaterial({ color: 0xc061ff, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide, fog: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+    GPS.mesh = new THREE.Mesh(g, GPS.mat); GPS.mesh.renderOrder = 5; ML.scene.add(GPS.mesh);
     if (!GPS.beacon) {
-      GPS.beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 40, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xc061ff, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide }));
+      GPS.beacon = new THREE.Group();
+      GPS.beam = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 60, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xff2d2d, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+      GPS.beam.position.y = 30; GPS.beacon.add(GPS.beam);
+      GPS.ring = new THREE.Mesh(new THREE.RingGeometry(1.6, 2.4, 28), new THREE.MeshBasicMaterial({ color: 0xff2d2d, transparent: true, opacity: 0.95, side: THREE.DoubleSide, fog: false, depthWrite: false }));
+      GPS.ring.rotation.x = -Math.PI / 2; GPS.ring.position.y = 0.3; GPS.beacon.add(GPS.ring);
+      GPS.tag = ML.U.label('📍 REPÈRE', { size: 1.1, color: '#fff', bg: 'rgba(220,30,30,0.9)', depthTest: false }); GPS.tag.position.y = 6; GPS.tag.renderOrder = 12; GPS.beacon.add(GPS.tag);
     }
     if (GPS.beacon.parent !== ML.scene) ML.scene.add(GPS.beacon);
-    GPS.beacon.position.set(GPS.target.x, 20, GPS.target.z); GPS.beacon.visible = true;
+    GPS.beacon.position.set(GPS.target.x, ML.gy(GPS.target.x, GPS.target.z), GPS.target.z); GPS.beacon.visible = true;
   };
   /** À chaque image : recalcule le trajet de temps en temps, détecte l'arrivée */
   GPS.update = dt => {
@@ -75,7 +85,12 @@
       GPS.dist = 0; if (GPS.path) for (let i = 0; i < GPS.path.length - 1; i++) GPS.dist += Math.hypot(GPS.path[i + 1].x - GPS.path[i].x, GPS.path[i + 1].z - GPS.path[i].z);
       GPS.draw();
     }
-    if (GPS.beacon) GPS.beacon.material.opacity = 0.2 + Math.sin(performance.now() / 300) * 0.08;
+    if (GPS.beacon) {                                                  // repère ROUGE qui clignote
+      const t = performance.now(), on = Math.floor(t / 300) % 2;
+      GPS.beam.material.opacity = on ? 0.55 : 0.22; GPS.ring.scale.setScalar(1 + (t / 900) % 1 * 0.8); GPS.ring.material.opacity = 1 - (t / 900) % 1 * 0.7;
+      GPS.tag.setText(`📍 REPÈRE · ${Math.round(GPS.dist)} m`, '#fff', on ? 'rgba(220,30,30,0.92)' : 'rgba(120,10,10,0.92)');
+      GPS.mat.opacity = 0.7 + Math.sin(t / 250) * 0.2;
+    }
   };
   /** Trace le trajet sur un canvas 2D (carte / mini-carte). X, Z : conversions monde → pixels */
   GPS.paint = (ctx, X, Z, w) => {
@@ -84,7 +99,9 @@
       ctx.save(); ctx.strokeStyle = '#c061ff'; ctx.lineWidth = w; ctx.lineJoin = ctx.lineCap = 'round'; ctx.beginPath();
       GPS.path.forEach((q, i) => (i ? ctx.lineTo(X(q.x), Z(q.z)) : ctx.moveTo(X(q.x), Z(q.z)))); ctx.stroke(); ctx.restore();
     }
-    ctx.fillStyle = '#c061ff'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(X(GPS.target.x), Z(GPS.target.z), w + 3, 0, 7); ctx.fill(); ctx.stroke();
+    const on = Math.floor(performance.now() / 260) % 2;                 // V5 : rouge clignotant
+    ctx.fillStyle = on ? '#ff2d2d' : '#ffffff'; ctx.strokeStyle = on ? '#ffffff' : '#ff2d2d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(GPS.target.x), Z(GPS.target.z), w + (on ? 5 : 3.5), 0, 7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,45,45,0.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(X(GPS.target.x), Z(GPS.target.z), w + 6 + (performance.now() / 120) % 8, 0, 7); ctx.stroke();
   };
   GPS.reset = () => { GPS.target = null; GPS.path = null; if (GPS.mesh) { ML.scene.remove(GPS.mesh); GPS.mesh = null; } if (GPS.beacon) ML.scene.remove(GPS.beacon); };
 })();

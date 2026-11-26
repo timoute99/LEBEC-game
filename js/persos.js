@@ -41,6 +41,7 @@ ML.PERSOS_TXT = `
 #    Jacky       : audit (il attend sa caisse), réussi, raté, absent (personne
 #                  ne lui a présenté de caisse)
 #    inspecteur  : infraction
+#    gendarme    : caution (quand on paie la caution d'un collègue)
 #    tout le monde : renverse (quand on le renverse en voiture) — sinon
 #                  le jeu prend la liste « renverse » de [tous]
 #  Une liste que le jeu ne connaît pas encore (ex. « blague: ») est gardée :
@@ -657,6 +658,44 @@ répliques:
 merci:
 - Génial, merci les copains !
 - Trop bien, on vous fait de la pub !
+
+[espacil]
+nom: Accueil Espacil
+rôle: Client — Espacil Habitat
+personnalité: Chargée d'accueil du bailleur social, débordée mais souriante. Gère 300 portails, 40 ascenseurs capricieux et des locataires qui appellent pour tout.
+dans le jeu: Client (V5) : commande gonds de portail, axes de porte de garage, platines de boîtes aux lettres… Ses immeubles « ESPACIL » sont en ville.
+idées:
+répliques:
+- Bonjour ! Espacil Habitat, j'écoute.
+- On a 300 portails à réparer. Au moins.
+- L'ascenseur de la résidence du Taraud est encore en panne. Vous faites les ascenseurs ?
+- Un locataire m'a appelée parce que son voisin fait de l'usinage dans sa cave. C'est vous ?
+- Résidence Le Copeau, bâtiment B, troisième étage : la porte de garage ne ferme plus.
+- On rénove 22 000 logements. Un gond à la fois.
+- Le formulaire de demande d'intervention est en ligne. Il ne marche pas, mais il est en ligne.
+merci:
+- Super, je préviens le gardien de la résidence !
+- Merci ! Les locataires vont enfin pouvoir fermer leur portail.
+- Parfait. Je vous mets dans nos prestataires préférés.
+
+[gendarme]
+nom: Adjudant Le Goff
+rôle: Gendarme
+personnalité: Gendarme breton, moustache réglementaire, sévère mais juste. Connaît par cœur la plaque de la Méga Mégane. Adore les formulaires presque autant qu'Hervé.
+dans le jeu: À l'accueil de la gendarmerie (on peut entrer). 3 passants renversés dans la journée = poursuite puis garde à vue (45 s). Un collègue peut payer la caution à l'accueil.
+idées:
+répliques:
+- Bonjour. Papiers du véhicule ?
+- On vous a à l'œil, à l'atelier Lebec.
+- La Mégane jaune, c'est encore vous ? Elle a été flashée trois fois ce matin.
+- Les passants, ça se contourne. Ça ne se renverse pas.
+- Ici, c'est la gendarmerie. Pas une auto-école.
+- J'ai un formulaire pour ça. J'ai un formulaire pour tout.
+- Votre collègue en cellule chante du Lebec depuis vingt minutes. Faites quelque chose.
+caution:
+- Caution payée. Qu'on ne vous y reprenne pas.
+- Bon. Libéré. Et ralentissez devant les passages piétons !
+- Signez ici, ici et là. Voilà. Il peut sortir.
 
 [kevin]
 nom: Kévin

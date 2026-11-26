@@ -88,6 +88,10 @@
         if (!held) return null; return `Passer « ${IT.name(held)} » à ${p.name}`;
       }
       case 'npc': return npcLabel(a, held);
+      case 'show': {                                                // V5 : véhicule exposé au showroom du Garage Pasquier
+        const D = ML.DEALER[a]; if (!D) return null;
+        return S.owned.includes(a) ? `✔ ${D.name} : déjà à vous (il attend devant le garage ou à l'atelier)` : `🚗 ${D.name} — ${D.price.toLocaleString('fr-FR')} € : voir la fiche et acheter`;
+      }
     }
     return null;
   };
@@ -105,6 +109,7 @@
       case 'tony': return 'Tony (cariste) : il charge les palettes dans le camion';
       case 'jojo': return S.tour ? null : 'Jojo (livreur) : il part en tournée dès qu\'il y a des colis à l\'EXPÉDITION';
       case 'vendeur': return '🚗 Garage Pasquier : acheter un véhicule';
+      case 'gendarme': { const jailed = Object.keys(S.pl).filter(p => S.pl[p].jail > (G.rt || 0)); return jailed.length ? `👮 Payer la caution (${ML.ECO.jail.bail} €) : ${jailed.map(p => S.pl[p].name).join(', ')} en garde à vue` : '👮 Parler au gendarme'; }
       case 'lebec': return held && held.type === 'convention' && !held.d.signee ? '✍ Faire signer la convention à Lebec' : S.rule === 'no_lebec' ? 'Parler à Lebec (INTERDIT par l\'inspecteur !)' : 'Parler à François Lebec';
       case 'jacky': return 'Jacky : apporte une caisse au MARBRE';
       case 'herve': return held && held.type === 'convention' ? (held.d.signee ? '📝 Rendre la convention SIGNÉE à Hervé' : 'La convention n\'est pas signée (Lebec !)') : 'Hervé : « La convention ? »';
@@ -158,6 +163,13 @@
         return Mini.run('pied', { mes: held.d.mes }, r => { if (r !== null) G.intent({ a: 'use', id, ctl: r }); });
       }
       case 'pc': return ML.ERP.open();
+      case 'show': {
+        const D = ML.DEALER[a]; if (!D) return;
+        if (S.owned.includes(a)) return ML.Dialogue.info(P_('vendeur').name, `${D.name} ? Vous l'avez déjà ! ${ML.line('vendeur')}`);
+        const spec = (D.specs || []).map(([k, v]) => `${k} : ${v === 'CAR' || v === 'DUCATO' || v === 'CAMION' ? Math.round(ML.CFG[v].max * 3.6) + ' km/h' : v}`).join(' · ');
+        return ML.Dialogue.choice(`${D.name} — ${D.price.toLocaleString('fr-FR')} €`, `${D.desc} ${spec}. Dans la caisse : ${S.money.toLocaleString('fr-FR')} €.`,
+          [{ label: S.money >= D.price ? `✅ Acheter (${D.price.toLocaleString('fr-FR')} €)` : `💸 Pas assez d'argent (${D.price.toLocaleString('fr-FR')} €)`, fn: S.money >= D.price ? () => G.intent({ a: 'buycar', k: a }) : null }, { label: 'Juste regarder', fn: null }]);
+      }
       case 'panel': if (!S.power) return Mini.run('serrer', { title: '⚡ Réarmer le disjoncteur', text: 'Remonte le levier : tape <b>Espace</b> !', need: 8 }, r => { if (r === 'ok') G.intent({ a: 'use', id, mg: 'ok' }); }); break;
       case 'pl': {
         const T = S.pl[a];
@@ -175,6 +187,11 @@
         if (a === 'vendeur') {
           const opts = Object.keys(ML.DEALER).map(k => { const D = ML.DEALER[k], own = S.owned.includes(k); return { label: own ? `✔ ${D.name} (déjà à vous)` : `${D.name} — ${D.price.toLocaleString('fr-FR')} € : ${D.desc}`, fn: own ? null : () => G.intent({ a: 'buycar', k }) }; });
           return ML.Dialogue.choice(P_('vendeur').name, `${ML.line('vendeur')} Dans la caisse de l'atelier, vous avez ${S.money.toLocaleString('fr-FR')} €.`, opts.concat([{ label: 'Juste regarder', fn: null }]));
+        }
+        if (a === 'gendarme') {
+          const jailed = Object.keys(S.pl).filter(p => S.pl[p].jail > (G.rt || 0) && p !== G.me), me = S.pl[G.me];
+          const txt = (me && me.jail > (G.rt || 0) ? 'Vous, vous restez là. ' : '') + ML.line('gendarme', null, 'Bonjour.') + (S.pedHits && S.pedHits[G.me] ? ` (Passants renversés aujourd'hui : ${S.pedHits[G.me]}/${ML.ECO.jail.peds}. Au ${ML.ECO.jail.peds}e, c'est la garde à vue.)` : '');
+          return ML.Dialogue.choice(P_('gendarme').name, txt, jailed.map(p => ({ label: `💶 Payer la caution de ${S.pl[p].name} (${ML.ECO.jail.bail} €)`, fn: () => G.intent({ a: 'bail', id: p }) })).concat([{ label: 'Au revoir, monsieur l\'agent', fn: null }]));
         }
         if (a === 'mathieu') return ML.Dialogue.listen(P_('mathieu').name, [0, 1, 2, 3].map(() => ML.line('mathieu')).concat(['Et… du coup… voilà… quoi.']), 7, () => G.intent({ a: 'mathieu' }), null, () => G.npcDist('mathieu') < 6);
         const comp = COMP_OF[a], C = comp && COMP[comp];
