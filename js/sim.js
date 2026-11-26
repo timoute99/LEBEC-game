@@ -110,6 +110,8 @@
       nextOid: 1, nextItem: 1, nextOrder: C.ORDER.firstAt, nOrders: 0, nextId: 1
     };
     K.H = ML.HUMEURS[S.humeur];
+    // difficulté (menu : Facile / Normal / Difficile / LEBEC EN FEU) — ML.DIFFS dans config.js
+    K.D = ML.DIFFS[g.diff] || ML.DIFFS.normal; S.diff = ML.DIFFS[g.diff] ? g.diff : 'normal'; S.anger = C.LEBEC.base + K.D.base;
     // stock de départ un peu différent à chaque partie
     for (const k in C.START_STOCK) S.stock[k] = Math.max(1, C.START_STOCK[k] + Math.floor(rng() * 3) - 1);
     // opérateurs mélangés sur les postes
@@ -163,7 +165,8 @@
   K.big = (s, c, to) => ev.push({ e: 'big', s, c, to });
   K.ev = o => ev.push(o);
   K.stat = (to, k, n) => ev.push({ e: 'stat', to, k, n: n || 1 });
-  K.say = (n, s, speak) => { n.tmp = s; n.tmpT = 4; ev.push({ e: 'say', n: n.id, s, sp: speak ? 1 : 0 }); };
+  // ML.redraw (config.js) : une phrase connue de persos.js est retirée dans sa liste (pas de répétition)
+  K.say = (n, s, speak) => { if (!n) return; if (ML.redraw) s = ML.redraw(s, n.id); n.tmp = s; n.tmpT = Math.max(4, String(s).length / 15); ev.push({ e: 'say', n: n.id, s, sp: speak ? 1 : 0 }); };
   Sim.drain = () => { const e = ev; ev = []; return e; };
   const { note, all, sfx, big, say } = K;
 
@@ -186,6 +189,23 @@
     const i = sel !== undefined && !P.inv[sel] ? sel : P.inv.findIndex(x => !x);
     if (i < 0) { note(pid, 'Inventaire plein (3 places). Pose quelque chose (G).', 'warn'); return false; }
     P.inv[i] = it; Sim.dirty = true; return true;
+  };
+  /** V4.1 (portage) : range dans le stock TOUS les produits de ce type que le joueur a en main (rack / armoire) */
+  K.putAway = (pid, P, ps, type, key) => {
+    let n = 0; P.inv.forEach((it, i) => { if (it && it.type === type) { P.inv[i] = null; n++; } });
+    if (!n) return false;
+    S.stock[key] = (S.stock[key] || 0) + n; Sim.dirty = true; sfx('drop', ps.x, ps.z);
+    note(pid, `📦 Rangé : ${n} × ${ML.MATERIALS[key] ? 'barre ' + ML.MATERIALS[key].label : ML.TOOLS[key].label} (stock : ${S.stock[key]}).`, 'good');
+    return true;
+  };
+  /** Ouvre un colis { acier: 4, plaquette: 2… } : tout tombe par terre autour de (x, z) */
+  K.openColis = (c, x, z) => {
+    let n = 0;
+    for (const k in c) for (let i = 0; i < c[k]; i++, n++) {
+      const a = rng() * 6.283, r = 0.4 + rng() * 0.9;
+      K.spawnItem({ type: ML.MATERIALS[k] ? 'brut_' + k : k, d: {} }, x + Math.cos(a) * 0.2, 0.9, z + Math.sin(a) * 0.2, [Math.cos(a) * r * 2, 2.5 + rng() * 2, Math.sin(a) * r * 2]);
+    }
+    return n;
   };
   K.dropAll = (pid, impulse) => {
     const P = S.pl[pid], p = pose[pid] || { x: 0, z: 0 };
@@ -231,14 +251,14 @@
     const tpl = cs ? null : rng.pick(ML.PARTS[kind]);
     const [part, mat] = cs ? [cs.part, cs.mat] : tpl;
     if (!Object.values(S.machines).length) return;
-    const client = cs ? cs.client : rng.pick(K.clients()), cl = ML.LOC.comp[client], far = Math.hypot(cl.x, cl.z) > 200 || !!COMP[client].plateau;
+    const client = cs ? cs.client : rng.pick(K.clients()), cl = ML.LOC.comp[client] || { x: 0, z: 0 }, far = Math.hypot(cl.x, cl.z) > 200 || !!COMP[client].plateau;   // « part » (particulier) : pas de bâtiment, livré au comptoir
     const sr = rng(), size = cs ? cs.size : kind === 'plain' ? (sr < 0.3 ? 's' : sr < 0.78 ? 'm' : 'l') : kind === 'chaudro' ? (sr < 0.5 ? 'm' : 'l') : kind === 'tth' ? (sr < 0.5 ? 's' : 'm') : 'm';
     // gamme : celle du devis signé, sinon celle du catalogue ; client de passage = version simplifiée (nos machines seulement)
     const con = cs && cs.contract && S.car ? (S.car.contracts || []).find(c => c.id === cs.contract) : null;
     const types = {}; for (const d of (S.machDefs || ML.MACHINES)) if (S.machines[d.id]) types[d.type] = 1;
     const ops = RT.fit(cs ? (cs.ops || (con && con.ops) || RT.of(cs.part, cs.mtype, cs.tool)) : RT.of(tpl), size, cs && !cs.contract ? types : null);
     const steps = (kind === 'fonderie' || kind === 'chaudro' ? [kind] : []).concat(ops.map(() => 'usinage'), kind === 'tth' ? ['tth'] : [], ['livraison']);
-    const dur = (C.ORDER.base + C.ORDER.perStep * (steps.length - 2) + (far ? C.ORDER.far : 0)) * (K.H.dur || 1) * (S.mode === 'campagne' ? Math.max(0.75, 1 - 0.03 * (S.day - 1)) : 1);
+    const dur = (C.ORDER.base + C.ORDER.perStep * (steps.length - 2) + (far ? C.ORDER.far : 0)) * (K.H.dur || 1) * K.D.dur * (S.mode === 'campagne' ? Math.max(0.75, 1 - 0.03 * (S.day - 1)) : 1);
     const op0 = OPS[ops[0]];
     const o = { id: S.nextOid++, client, part, mat, mtype: op0.mt, tool: op0.tool, ops, oi: 0, qe: null, qc: null, steps, si: 0, size, src: kind === 'fonderie' || kind === 'chaudro' ? kind : null, t0: S.rt, dl: S.rt + dur * (size === 'l' ? 1.3 : 1), dur: dur * (size === 'l' ? 1.3 : 1), q: false, m: null, contract: cs ? cs.contract : null, price: cs ? cs.price : null };
     S.orders.push(o); Sim.dirty = true;
@@ -262,11 +282,11 @@
     if (S.nextOrder <= 0 && S.rt < C.SHIFT_SEC - 50) {
       if (S.orders.length < maxActive) genOrder();
       const camp = S.mode === 'campagne' ? Math.max(0.7, 1 - 0.05 * (S.day - 1)) : 1;
-      S.nextOrder = C.ORDER.interval / (1 + 0.25 * (n - 1)) * (0.8 + rng() * 0.4) * camp;
+      S.nextOrder = C.ORDER.interval / (1 + 0.25 * (n - 1)) * (0.8 + rng() * 0.4) * camp * K.D.interval;
     }
     for (const o of S.orders.slice()) if (S.rt > o.dl) K.failOrder(o);
   }
-  K.points = p => Math.round(p * (K.H.points || 1));
+  K.points = p => Math.round(p * (K.H.points || 1) * K.D.points);
   function deliver(pid, P, sel, held, comp, n) { return K.deliver(pid, P, sel, held, comp, n); }
   K.deliver = (pid, P, sel, held, comp, n) => {
     const o = S.orders.find(x => x.id === held.d.oid);
@@ -299,7 +319,7 @@
     else if (g.k === 'lim') all(`😬 #${o.id} : pièce LIMITE ${g.s} — ${COMP[comp].name} râle et paie −30 %.`, 'warn');
     const pts = K.points((20 + Math.round(20 * Math.max(0, (o.dl - S.rt) / o.dur)) + 10 * (o.steps.length - 2) + (held.d.ctl ? 5 : 0)) * C.SIZE[o.size || 'm'].pts * (held.d.npc ? 0.6 : 1) * qm);
     S.score += pts; S.served++; S.sat = Math.min(100, S.sat + (S.up.plantes ? 7 : 5));
-    say(n, U.pick(ML.LINES[n.id] || ['Merci !']));
+    say(n, ML.line(n.id, 'merci', ML.LINES[n.id] || ['Merci !']));
     big(`+${pts} · #${o.id} livrée à ${COMP[comp].name} !`, '#3ecf6e'); sfx('cash');
     for (const m of Sim.mods) if (m.onDeliver) m.onDeliver(pid, o);
   };
@@ -347,7 +367,7 @@
         if (!n.active || !near(ps, n.x, n.z, 7)) return;
         const o = S.orders.find(x => x.id === m.oid); if (!o || stage(o) !== comp || o.q) return;
         o.q = true; S.subs[comp].push({ oid: o.id, end: S.rt + C.SUB_SEC });
-        say(n, comp === 'fonderie' ? `Je coule le brut de la #${o.id}. Repasse dans ${C.SUB_SEC} s !` : U.pick(ML.LINES.nono));
+        say(n, comp === 'fonderie' ? `Je coule le brut de la #${o.id}. Repasse dans ${C.SUB_SEC} s !` : ML.line('nono'));
         break;
       }
       case 'emote': K.ev({ e: 'emote', pid, n: U.clamp(m.n | 0, 0, 5) }); break;
@@ -362,15 +382,18 @@
     for (const mod of Sim.mods) if (mod.use && mod.use(pid, P, ps, sel, held, kind, a, b, m)) return;
     switch (kind) {
       case 'rack': if (S.stock[a] === undefined) return;
+        if (K.putAway(pid, P, ps, 'brut_' + a, a)) return;              // V4.1 : produits en main → on les RANGE
         if (S.stock[a] <= 0) return note(pid, `Rupture de ${ML.MATERIALS[a].label} ! Commande chez Eliott (Aciers de l'Ouest).`, 'warn');
         if (K.give(pid, { type: 'brut_' + a, d: {} }, sel)) { S.stock[a]--; sfx('pickup', ps.x, ps.z); } return;
       case 'tool': if (!ML.TOOLS[a]) return;
+        if (K.putAway(pid, P, ps, a, a)) return;
         if (S.stock[a] <= 0) return note(pid, `Plus de ${ML.TOOLS[a].label.toLowerCase()} ! Va chez Outi'Pro (Coco).`, 'warn');
         if (K.give(pid, { type: a, d: {} }, sel)) { S.stock[a]--; sfx('pickup', ps.x, ps.z); } return;
-      case 'coffee': P.coffee = S.rt + (S.up.cafe_pro ? 90 : 40); note(pid, `☕ Un petit noir : sprint plus long pendant ${S.up.cafe_pro ? 90 : 40} s.`, 'good'); return;
+      case 'coffee': { const sec = S.up.cafe_pro || (S.car && S.car.rooms.pause) ? C.COFFEE.secPro : C.COFFEE.sec; P.coffee = S.rt + sec; note(pid, `☕ Un petit noir : tu vas BEAUCOUP plus vite pendant ${sec} s !`, 'good'); return; }   // V4.1 : café rapide
       case 'frigo': if (S.up.frigo && K.give(pid, { type: 'viennoiseries', d: {} }, sel)) sfx('pickup', ps.x, ps.z); return;
       case 'casques': if (K.give(pid, { type: 'casque', d: {} }, sel)) sfx('pickup', ps.x, ps.z); return;
       case 'reception':
+        if (held && held.type === 'colis') { P.inv[sel] = null; const r = ML.LOC.reception || ps, n = K.openColis(held.d.c || {}, r.x, r.z); sfx('clang', r.x, r.z); all(`📦 ${P.name} a ouvert un colis en RÉCEPTION : ${n} article(s) par terre, à ranger (E sur le rack / l'armoire, produits en main).`, 'good'); return; }
         if (!held || held.type !== 'matiere') return;
         P.inv[sel] = null;
         if (held.d.mat) { S.stock[held.d.mat] += held.d.q; all(`+${held.d.q} ${ML.MATERIALS[held.d.mat].label} en stock (merci ${P.name}).`, 'good'); }
@@ -439,7 +462,7 @@
       }
       P.inv[sel] = null; M.job.tool = true; M.mounted = t.tool;
       if (man && !op) note(pid, `🔧 Outil monté sur ${mid}. Machine MANUELLE sans ouvrier : [E] les mains vides pour usiner toi-même !`, 'good');
-      else say(op, K.trait(M.op, 'robot') ? 'Reçu. Exécution.' : man ? U.pick(['Je mouline… (aide-moi si t\'es pressé : E)', 'À la manivelle, ça va prendre un moment…']) : U.pick(["C'est parti !", 'Nickel, je lance.', 'Ça tourne !']));
+      else say(op, man && !K.trait(M.op, 'robot') ? ML.line(M.op, 'manivelle', ['Je mouline… (aide-moi si t\'es pressé : E)', 'À la manivelle, ça va prendre un moment…']) : ML.line(M.op, 'lance', K.trait(M.op, 'robot') ? 'Reçu. Exécution.' : ["C'est parti !", 'Nickel, je lance.', 'Ça tourne !']));
       return;
     }
     if (held.type === 'viennoiseries' && op && K.trait(M.op, 'hungry')) return feedMatis(pid, P, sel, op);
@@ -489,7 +512,7 @@
   function feedMatis(pid, P, sel, op) {
     P.inv[sel] = null; op.hunger = 0; op.fed = S.rt + 90;
     if (op.state !== 'work') K.backToWork(op);
-    say(op, 'MIAM ! Je suis une machine maintenant !'); all(`🥐 ${P.name} a nourri Matis : +40 % pendant 90 s.`, 'good');
+    say(op, ML.line(op.id, 'miam', 'MIAM ! Je suis une machine maintenant !')); all(`🥐 ${P.name} a nourri Matis : +40 % pendant 90 s.`, 'good');
   }
 
   function npcUse(pid, P, ps, sel, held, id) {
@@ -499,15 +522,15 @@
       if (n.state === 'pause' || n.state === 'forgot') return K.wake(n, pid);
       if (held && held.type === 'viennoiseries' && K.trait(id, 'hungry')) return feedMatis(pid, P, sel, n);
       if (held && n.mid) return machineUse(pid, P, sel, held, n.mid, {});
-      return say(n, U.pick(ML.LINES[id] || ['Oui ?']));
+      return say(n, ML.line(id, null, 'Oui ?'));
     }
-    if (id === 'lebec') return say(n, U.pick(ML.LINES.lebec));
+    if (id === 'lebec') return say(n, ML.line('lebec'));
     const comp = n.comp, C2 = comp && COMP[comp]; if (!C2) return;
     switch (C2.kind) {
       case 'boulangerie': if (K.give(pid, { type: 'viennoiseries', d: {} }, sel)) say(n, "Tiens mon grand, c'est la maison qui offre !"); return;
       case 'station': if (K.give(pid, { type: 'jerrican', d: {} }, sel)) say(n, 'Un jerrican, cadeau. Ramène-le pas, je m\'en fiche.'); return;
       case 'tth': {
-        if (!K.isPart(held)) return say(n, U.pick(ML.LINES.maurseau));
+        if (!K.isPart(held)) return say(n, ML.line('maurseau'));
         const o = S.orders.find(x => x.id === held.d.oid);
         if (!o || stage(o) !== 'tth') return say(n, "Celle-là, elle n'a pas besoin de traitement thermique !");
         P.inv[sel] = null; o.q = true; S.subs.tth.push({ oid: o.id, end: S.rt + C.SUB_SEC, nc: !!held.d.nc, mes: held.d.mes, type: held.type, q: held.d.q, ctl: held.d.ctl });
@@ -517,8 +540,8 @@
         if (K.isPart(held)) return deliver(pid, P, sel, held, comp, n);
         if (held && held.type === 'encours') { const o = S.orders.find(x => x.id === held.d.oid); return say(n, `Elle n'est pas finie, votre pièce ! Il reste : ${o && o.ops ? RT.label(o.ops.slice(K.opIdx(o))) : '???'}.`); }
         if (held && held.type === 'rebut') return say(n, "C'est de la ferraille, ça. La benne est chez vous.");
-        return say(n, U.pick(ML.LINES[id] || ['Bonjour !']));
-      default: return say(n, U.pick(ML.LINES[id] || ['Oui ?']));
+        return say(n, ML.line(id, null, 'Bonjour !'));
+      default: return say(n, ML.line(id, null, 'Oui ?'));
     }
   }
 
@@ -534,9 +557,9 @@
     n.stun = 0.7; sfx('punch', n.x, n.z);
     const ps = pose[by]; if (ps) { const dx = n.x - ps.x, dz = n.z - ps.z, d = Math.hypot(dx, dz) || 1; n.x += dx / d * 0.6; n.z += dz / d * 0.6; U.resolveCircle(n, 0.3); }
     for (const mod of Sim.mods) if (mod.npcHit && mod.npcHit(n, by)) return;
-    if (n.id === 'lebec') { say(n, "TU M'AS FRAPPÉ ?! COUP DE PELLE !!!", true); S.anger = 100; K.stat(by, 'slap_lebec'); K.startChase(by); return; }
-    if (ML.PEOPLE[n.id].op && ['pause', 'toPause', 'forgot', 'rant'].includes(n.state)) { K.backToWork(n); say(n, K.trait(n.id, 'deadstop') ? "Mmh. D'accord. J'y vais." : "Aïe ! OK OK, j'y retourne !"); }
-    else say(n, K.trait(n.id, 'robot') ? 'Choc détecté. Je continue.' : U.pick(['Aïe !', 'Hé ! Ça va pas ?!', 'Ouille !']));
+    if (n.id === 'lebec') { say(n, ML.line('lebec', 'frappe', "TU M'AS FRAPPÉ ?! COUP DE PELLE !!!"), true); S.anger = 100; K.stat(by, 'slap_lebec'); K.startChase(by); return; }
+    if (ML.PEOPLE[n.id].op && ['pause', 'toPause', 'forgot', 'rant'].includes(n.state)) { K.backToWork(n); say(n, ML.line(n.id, 'claque', K.trait(n.id, 'deadstop') ? "Mmh. D'accord. J'y vais." : "Aïe ! OK OK, j'y retourne !")); }
+    else say(n, ML.line(n.id, 'claque', K.trait(n.id, 'robot') ? 'Choc détecté. Je continue.' : ['Aïe !', 'Hé ! Ça va pas ?!', 'Ouille !']));
     K.witness(by, n.x, n.z);
   };
   K.playerHit = (tid, by, dur) => {
@@ -549,11 +572,11 @@
     if (by) { note(tid, `${S.pl[by] ? S.pl[by].name : '?'} t'a mis une claque !`, 'warn'); K.witness(by, tp.x, tp.z); if (S.pl[by]) K.damage(tid, C.HP.slap, 'claque'); }
   };
   K.witness = (pid, x, z) => {
-    const L = npcs.lebec, sight = K.H.sight || C.LEBEC.sight;
+    const L = npcs.lebec, sight = (K.H.sight || C.LEBEC.sight) * (K.D.sight || 1);
     if (!U.inWorkshop({ x, z }) || Math.hypot(L.x - x, L.z - z) > sight || S.chase) return;
     let add = C.LEBEC.hit * (K.H.anger || 1); if (S.buffs.calm > S.rt) add *= 0.3;
-    S.anger = Math.min(100, S.anger + add);
-    say(L, "JE T'AI VU ! ON NE FRAPPE PAS LES COLLÈGUES !");
+    S.anger = Math.min(100, S.anger + add * K.D.anger);
+    say(L, ML.line('lebec', 'colere', "JE T'AI VU ! ON NE FRAPPE PAS LES COLLÈGUES !"));
     note(pid, `😡 Lebec t'a vu (colère ${Math.round(S.anger)}/100). À 50 : coup de pelle !`, 'warn');
     if (S.anger >= C.LEBEC.chaseAt) K.startChase(pid);
   };
@@ -566,7 +589,7 @@
     P.stun = S.rt + 3; K.dropAll(pid, 4);
     const dx = tp.x - L.x, dz = tp.z - L.z, d = Math.hypot(dx, dz) || 1;
     ev.push({ e: 'pelle', to: pid, vx: dx / d * 9, vz: dz / d * 9 }); sfx('bong', tp.x, tp.z);
-    S.anger = C.LEBEC.base + 10; S.chase = null; S.score = Math.max(0, S.score - 5); K.stat(pid, 'pelle'); K.damage(pid, C.HP.pelle, 'coup de pelle');
+    S.anger = C.LEBEC.base + K.D.base + 10; S.chase = null; S.score = Math.max(0, S.score - 5); K.stat(pid, 'pelle'); K.damage(pid, C.HP.pelle, 'coup de pelle');
   }
   function applyFind(k, pid) {
     const F = ML.FINDS[k], who = S.pl[pid] ? S.pl[pid].name : '?';
@@ -632,8 +655,8 @@
   K.backToWork = n => { n.state = 'work'; K.stop(n); };
   K.wake = (n, pid) => {
     const forgot = n.state === 'forgot', chance = K.trait(n.id, 'deadstop') ? 0.25 : 0.7;
-    if (forgot || rng() < chance) { K.backToWork(n); say(n, forgot ? 'Ah ouiii ! Merci.' : U.pick(["Ouais ouais, j'y vais...", "Bon. D'accord."])); }
-    else { say(n, U.pick(['Encore cinq minutes...', 'Nan.', "J'arrive... (il n'arrive pas)"])); note(pid, 'Il ne bouge pas. Une claque (clic gauche) marcherait mieux...'); }
+    if (forgot || rng() < chance) { K.backToWork(n); say(n, ML.line(n.id, 'reveil', forgot ? 'Ah ouiii ! Merci.' : ["Ouais ouais, j'y vais...", "Bon. D'accord."])); }
+    else { say(n, ML.line(n.id, 'refus', ['Encore cinq minutes...', 'Nan.', "J'arrive... (il n'arrive pas)"])); note(pid, 'Il ne bouge pas. Une claque (clic gauche) marcherait mieux...'); }
   };
   K.workMult = n => {
     if (n.state !== 'work' || !K.atHome(n) || n.stun > 0 || !S.power) return 0;
@@ -649,16 +672,19 @@
     switch (n.state) {
       case 'work': {
         if (!K.atHome(n)) { if (!n.path.length) K.walkTo(n, n.home.x, n.home.z); break; }
+        // opérateurs bavards (V4.5) : une réplique de persos.js toutes les 50-110 s
+        n.chatT = (n.chatT === undefined ? 15 + rng() * 40 : n.chatT) - dt;
+        if (n.chatT <= 0) { n.chatT = 50 + rng() * 60; if (!(n.tmpT > 0)) say(n, ML.line(n.id)); }
         n.faceYaw = n.home.yaw;
         const lazy = op.lazy * (S.up.babyfoot ? 0.7 : 1);
         if (lazy > 0 && rng() < lazy * 0.012 * dt * (M.job ? 1 : 1.5)) {
-          if (op.traits.includes('deadstop')) { n.state = 'pause'; n.pauseT = 35 + rng() * 30; say(n, 'Flemme.'); }
-          else { const sp = U.pick(ML.LOC.coffee); n.state = 'toPause'; K.walkTo(n, sp.x, sp.z, () => { n.state = 'pause'; n.pauseT = (18 + rng() * 20) * (S.up.babyfoot ? 0.6 : 1); }); say(n, 'Petite pause café...'); }
+          if (op.traits.includes('deadstop')) { n.state = 'pause'; n.pauseT = 35 + rng() * 30; say(n, ML.line(n.id, 'pause', 'Flemme.')); }
+          else { const sp = U.pick(ML.LOC.coffee); n.state = 'toPause'; K.walkTo(n, sp.x, sp.z, () => { n.state = 'pause'; n.pauseT = (18 + rng() * 20) * (S.up.babyfoot ? 0.6 : 1); }); say(n, ML.line(n.id, 'pause', 'Petite pause café...')); }
         }
-        if (op.traits.includes('forgetful') && M.job && M.job.tool && rng() < 0.006 * dt) { n.state = 'forgot'; say(n, "Euh... j'usinais quoi déjà ?"); }
+        if (op.traits.includes('forgetful') && M.job && M.job.tool && rng() < 0.006 * dt) { n.state = 'forgot'; say(n, ML.line(n.id, 'oubli', "Euh... j'usinais quoi déjà ?")); }
         break;
       }
-      case 'pause': n.pauseT -= dt; if (n.pauseT <= 0) { K.backToWork(n); say(n, "Bon, j'y retourne."); } break;
+      case 'pause': n.pauseT -= dt; if (n.pauseT <= 0) { K.backToWork(n); say(n, ML.line(n.id, 'retour', "Bon, j'y retourne.")); } break;
       case 'rant': n.pauseT -= dt; if (n.pauseT <= 0) K.backToWork(n); break;
     }
     if (K.trait(n.id, 'hungry') && n.hunger > -100) n.hunger = Math.min(100, n.hunger + dt * 0.45);
@@ -669,25 +695,25 @@
       n.chaseT += dt; n.repath -= dt; n.shoutT -= dt; n.run = true;
       if (!tp || !P) { S.chase = null; n.state = 'patrol'; return; }
       if (n.repath <= 0) { n.repath = 0.3; n.path = [{ x: tp.x, z: tp.z }]; n.onArrive = null; }
-      if (n.shoutT <= 0) { n.shoutT = 3.5; say(n, 'COUP DE PELLE !', true); }
-      if (K.foot(P) && Math.hypot(n.x - tp.x, n.z - tp.z) < C.LEBEC.reach) { coupDePelle(S.chase); n.state = 'patrol'; K.stop(n); return; }
+      if (n.shoutT <= 0) { n.shoutT = 3.5; say(n, ML.line('lebec', 'poursuite', 'COUP DE PELLE !'), true); }
+      if (K.foot(P) && Math.hypot(n.x - tp.x, n.z - tp.z) < C.LEBEC.reach) { coupDePelle(S.chase); n.state = 'patrol'; K.stop(n); say(n, ML.line('lebec', 'pelle', 'La pelle a parlé.')); return; }
       if (!K.foot(P) || n.chaseT > 22 || (!U.inWorkshop(tp) && Math.hypot(n.x - tp.x, n.z - tp.z) > 30)) {
-        S.chase = null; n.state = 'patrol'; K.stop(n); say(n, 'Tu perds rien pour attendre, toi !'); S.anger = Math.max(C.LEBEC.base, S.anger - 25);
+        S.chase = null; n.state = 'patrol'; K.stop(n); say(n, ML.line('lebec', 'abandon', 'Tu perds rien pour attendre, toi !')); S.anger = Math.max(C.LEBEC.base + K.D.base, S.anger - 25);
       }
       return;
     }
     n.run = false;
     const decay = (S.up.posters ? 1 : 0.6) / (K.H.anger || 1);
-    if (S.anger > C.LEBEC.base) S.anger = Math.max(C.LEBEC.base, S.anger - dt * decay);
+    const floor = C.LEBEC.base + K.D.base; if (S.anger > floor) S.anger = Math.max(floor, S.anger - dt * decay);
     if (!n.path.length) { n.wait = (n.wait || 0) - dt; if (n.wait <= 0) { const p = U.pick(ML.LOC.patrol); K.walkTo(n, p.x, p.z); n.wait = 3 + rng() * 6; } }
     n.barkT = (n.barkT || 10) - dt;
     if (n.barkT <= 0) {
       n.barkT = 16 + rng() * 14;
       if (S.humeur === 'reforme' && rng() < 0.5) {   // tirade : l'opérateur le plus proche s'arrête pour écouter
         let best = null, bd = 9; for (const id in npcs) { const o = npcs[id]; if (o.mid && o.active && o.state === 'work') { const d = Math.hypot(o.x - n.x, o.z - n.z); if (d < bd) { bd = d; best = o; } } }
-        if (best) { best.state = 'rant'; best.pauseT = 10; say(n, U.pick(ML.LINES.tirade), true); return; }
+        if (best) { best.state = 'rant'; best.pauseT = 10; say(n, ML.line('lebec', 'tirades'), true); return; }
       }
-      say(n, U.pick(ML.LINES.lebec));
+      say(n, ML.line('lebec'));
     }
   }
   function brainShop(n, dt) {
@@ -713,7 +739,7 @@
       const t = n.path[0], dx = t.x - n.x, dz = t.z - n.z, d = Math.hypot(dx, dz);
       if (d < 0.3) { n.path.shift(); n.stuck = 0; n.stuckAll = 0; n.navFail = 0; if (!n.path.length) { const cb = n.onArrive; n.onArrive = null; n.run = n.state === 'chase'; if (cb) cb(); } }
       else {
-        const run = n.id === 'lebec' ? (K.H.run || C.LEBEC.run) : n.runSpeed || 5;
+        const run = n.id === 'lebec' ? (K.H.run || C.LEBEC.run) * K.D.run : n.runSpeed || 5;
         const sp = n.run ? run : n.speed, step = Math.min(sp * dt, d), ox = n.x, oz = n.z;
         n.x += dx / d * step; n.z += dz / d * step; U.resolveCircle(n, 0.3);
         const moved = Math.hypot(n.x - ox, n.z - oz);
@@ -844,8 +870,8 @@
   K.end = extra => {
     if (S.over || S.voting) return;
     S.over = true; Sim.dirty = true;
-    const k = 1 + 0.35 * (Math.max(1, S.n) - 1), stars = S.score >= 260 * k ? 3 : S.score >= 160 * k ? 2 : S.score >= 80 * k ? 1 : 0;
-    const res = Object.assign({ mode: S.mode, day: S.day, score: S.score, served: S.served, failed: S.failed, stars, finds: S.finds.got, findsTotal: S.finds.total, sat: Math.round(S.sat), need: [80, 160, 260].map(v => Math.round(v * k)) }, extra || {});
+    const k = (1 + 0.35 * (Math.max(1, S.n) - 1)) * K.D.stars, stars = S.score >= 260 * k ? 3 : S.score >= 160 * k ? 2 : S.score >= 80 * k ? 1 : 0;
+    const res = Object.assign({ mode: S.mode, diff: S.diff, day: S.day, score: S.score, served: S.served, failed: S.failed, stars, finds: S.finds.got, findsTotal: S.finds.total, sat: Math.round(S.sat), need: [80, 160, 260].map(v => Math.round(v * k)) }, extra || {});
     for (const m of Sim.mods) if (m.onEnd) m.onEnd(res);
     if (S.served >= 10) for (const p in S.pl) K.stat(p, 'served10');
     if (res.vote) { S.over = false; S.voting = { until: S.rt + 25, votes: {}, res }; K.ev({ e: 'vote', until: 25, players: Object.keys(S.pl).map(id => [id, S.pl[id].name]) }); return; }
@@ -873,6 +899,15 @@
     if (S.voting) out.voting = { until: S.voting.until };
     return { k: 's', S: out };
   };
+  /** Arrivée EN COURS DE JOURNÉE (V4.0 : rejoindre une partie en cours) */
+  Sim.addPlayer = (p, role) => {
+    if (!S || S.pl[p.id]) return;
+    S.pl[p.id] = { name: p.name, idx: p.idx, inv: [null, null, null], car: null, ride: null, stun: 0, coffee: 0, hp: C.HP.max, ko: false, role: ML.ROLES[role] ? role : 'poly', late: S.rt };
+    S.n = Object.keys(S.pl).length; Sim.dirty = true;
+    K.all(`👋 ${p.name} rejoint l'atelier en cours de journée !`, 'good');
+  };
+  /** Rôle choisi juste après l'arrivée en cours de journée (20 s pour se décider) */
+  Sim.setRole = (pid, role) => { const P = S && S.pl[pid]; if (P && P.late !== undefined && S.rt - P.late < 20 && ML.ROLES[role]) { P.role = role; Sim.dirty = true; } };
   Sim.removePlayer = pid => {
     const P = S && S.pl[pid]; if (!P) return;
     K.dropAll(pid, 1);

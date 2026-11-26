@@ -152,7 +152,8 @@
       const gamme = ops.map((id, i) => { const op = ML.OPS[id] || { n: id, ic: '', mt: '' }; return `<span style="display:inline-block;border:1px solid #888;border-radius:4px;padding:0 4px;margin:1px 0;background:${types[op.mt] ? '#eef6ea' : '#fde3df'}">${i + 1}. ${op.ic} ${esc(op.n)} <span class="dim">(${esc(ML.MTYPE[op.mt] || '?')})</span></span>`; }).join(' → ');
       const mat = ML.MATERIALS && ML.MATERIALS[o.mat] ? ML.MATERIALS[o.mat].label : o.mat;
       h += `<div class="be-mail${o.plateau ? ' plateau' : ''}">
-        <div class="be-mh"><b>De :</b> ${esc(comp(o.client))} &lt;achats@${esc(String(o.client).toLowerCase())}.bzh&gt; <span class="dim">· réf. ${esc(o.id)}</span></div>
+        ${o.who && ML.PEOPLE[o.who] ? `<div class="be-mh"><b>De :</b> 🙋 ${esc(ML.PEOPLE[o.who].name)} (${esc(ML.PEOPLE[o.who].role)}, particulier) &lt;${esc(o.who)}@wanadoo.fr&gt; <span class="dim">· réf. ${esc(o.id)}</span></div>
+        <div class="be-plat">🙋 « ${esc((ML.LINES[o.who] || ['Bonjour !'])[0])} » — Il passera chercher sa pièce au COMPTOIR de l'atelier (à côté de la porte). Payé en main propre, bien plus cher qu'un client pro !</div>` : `<div class="be-mh"><b>De :</b> ${esc(comp(o.client))} &lt;achats@${esc(String(o.client).toLowerCase())}.bzh&gt; <span class="dim">· réf. ${esc(o.id)}</span></div>`}
         <div class="be-ms">AO : ${o.qty} × ${esc(o.part)} <span class="dim">(${esc(mat)}, ${SIZE[o.size] || o.size})</span></div>
         <div class="be-mg">
           <span>💶 <b>${fmt(o.unit)}</b> / pièce</span><span>Total <b>${fmt(o.unit * o.qty)}</b></span>
@@ -171,7 +172,7 @@
       h += `<table class="be-t"><tr><th>Client</th><th>Pièce</th><th>Avancement</th><th>Pour le</th><th>Prix</th></tr>`;
       for (const c of cons) {
         const done = c.done || 0, tot = done + c.left, late = c.due <= C.day;
-        h += `<tr><td>${esc(comp(c.client))}${c.plateau ? ' ⛰' : ''}</td><td>${esc(c.part)} <span class="dim">(${SIZE[c.size] || ''})</span>${c.ops && ML.Routing ? `<br><span class="dim small">${esc(ML.Routing.label(c.ops))}</span>` : ''}</td>
+        h += `<tr><td>${esc(c.who && ML.PEOPLE[c.who] ? '🙋 ' + ML.PEOPLE[c.who].name : comp(c.client))}${c.plateau ? ' ⛰' : ''}</td><td>${esc(c.part)} <span class="dim">(${SIZE[c.size] || ''})</span>${c.ops && ML.Routing ? `<br><span class="dim small">${esc(ML.Routing.label(c.ops))}</span>` : ''}</td>
           <td>${bar(tot ? done / tot : 0, 'mint')} ${done}/${tot} <span class="dim">· reste ${c.left}</span></td>
           <td class="${late ? 'be-warn' : ''}">jour ${c.due}${late ? ' ⚠ ce soir !' : ''}</td><td>${fmt(c.unit)}</td></tr>`;
       }

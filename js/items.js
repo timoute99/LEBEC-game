@@ -96,7 +96,9 @@
     jerrican: { kind: 'equip', name: "Jerrican d'essence", icon: '⛽', hint: 'E sur une voiture : +40 % d\'essence' },
     casque: { kind: 'equip', name: 'Casque de sécurité', icon: '⛑️' },
     convention: { kind: 'paper', name: d => d.signee ? 'Convention SIGNÉE' : 'Convention (à faire signer)', icon: '📝' },
-    find: { name: d => ML.FINDS[d.k].name, icon: '⭐' }
+    find: { name: d => ML.FINDS[d.k].name, icon: '⭐' },
+    /* V4.1 (portage) : colis fournisseur (carrière) — d.c = { acier: 4, plaquette: 2… }, d.n = nb d'articles. À OUVRIR en RÉCEPTION (E), puis ranger. */
+    colis: { bulky: d => (d.n || 0) > 4, name: d => `Colis fournisseur (${d.n || '?'} article${(d.n || 0) > 1 ? 's' : ''})`, icon: '📦', hint: 'E en RÉCEPTION : l\'ouvrir (tout tombe par terre), puis range les produits au rack / à l\'armoire' }
   };
   I.def = it => I.TYPES[it.type];
   I.name = it => { const n = I.def(it).name; return typeof n === 'function' ? n(it.d || {}) : n; };
@@ -282,6 +284,14 @@
         cyl(0.12, 0.12, 0.94, P.steelDark, g, 0, 1.0, 0, 10).rotation.z = Math.PI / 2;
         for (const x of [-0.3, 0.3]) box(0.06, 0.72, 0.84, P.lebecYellow, g, x, 0.5, 0, 0.01);
         if (!opts.noLabel) { const o = ML.Game && ML.Game.order(d.oid); const l = U.label(`🏗 #${d.oid}` + (o ? ' → ' + ML.COMPANIES[o.client].name : ''), { size: 0.3, fontSize: 40, color: '#ffd257' }); l.position.y = 1.9; g.add(l); }
+        break;
+      }
+      case 'colis': {                                                       // carton scotché, taille selon le nombre d'articles
+        const n = d.n || 4, k = n <= 4 ? 0.5 : n <= 10 ? 0.75 : 0.95, h = k * 0.75;
+        box(k * 1.2, h, k, P.wood, g, 0, h / 2, 0, 0.03);
+        box(k * 1.22, 0.03, 0.14, P.plasterWarm, g, 0, h + 0.005, 0, 0.005);                          // scotch
+        box(0.26, 0.012, 0.18, P.white, g, k * 0.3, h + 0.012, k * 0.22, 0.004);                       // bordereau
+        if (!opts.noLabel) { const l = U.label(`📦 COLIS ×${n} (E en réception : ouvrir)`, { size: 0.22, fontSize: 40, color: '#ffe3a3' }); l.position.y = h + 0.45; g.add(l); g.userData.label = l; }
         break;
       }
       case 'machine': {                                                     // caisse de machine neuve (sim_build.js)

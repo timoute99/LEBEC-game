@@ -23,7 +23,7 @@
     ML.Career.apply(game.career || null);                  // carrière : machines, ouvriers, taille de l'atelier (career.js)
     ML.World.build(cfg.seed, game.upgrades || {});
     ML.World.setPower(true); ML.Fx.reset(); ML.Cars.clear(); ML.Cars.parkPolice();
-    const meP = G.players[G.me], sp = ML.LOC.spawn[meP.idx % 5];
+    const meP = G.players[G.me], SPW = ML.LOC.spawn, sp0 = SPW[meP.idx % SPW.length], sp = meP.idx < SPW.length ? sp0 : { x: sp0.x + 1.6, z: sp0.z };   // 6e joueur : à côté d'un point de départ
     G.p = { pos: new THREE.Vector3(sp.x, 0, sp.z), vy: 0, yaw: Math.PI / 2, pitch: -0.05, sel: 0, stamina: C.PLAYER.stamina, stun: 0, punchT: 0, bob: 0, car: null, look: { y: 0, p: 0 }, slip: 0, slipV: null, push: null, rag: null, roll: 0 };
     G.looks[G.me] = ML.Account.look();
     for (const p of cfg.players) if (p.id !== G.me) G.addAvatar(p);
@@ -53,7 +53,7 @@
     ML.Main.menuScene();
   };
   G.addAvatar = p => {
-    const c = ML.COLORS[p.idx % 5], L = G.looks[p.id] || {};
+    const c = ML.COLORS[p.idx % ML.COLORS.length], L = G.looks[p.id] || {};
     if (G.avatars[p.id]) ML.People.dispose(G.avatars[p.id]);
     const role = ML.ROLES[(G.game.roles || {})[p.id]] || ML.ROLES.poly, suit = L.suit !== undefined ? L.suit : 0x1f4e9a;
     const v = ML.People.build({ skin: L.skin !== undefined ? L.skin : ML.SKINS[p.idx % 5], shirt: L.shirt || suit, pants: suit, hair: L.hair !== undefined ? L.hair : ML.HAIRS[p.idx % 5], height: L.height || 1.78, width: L.width || 1, beard: L.beard, glasses: L.glasses },
@@ -179,7 +179,13 @@
       case 'stat': if (e.to === G.me) ML.Account.stat(e.k, e.n); break;
       case 'secret': if (e.to === G.me) { G.traitor = true; ML.HUD.secret(e.s); ML.HUD.big('🕵 TU ES LE TRAÎTRE', '#c39bff'); } break;
       case 'emote': { if (e.pid === G.me) ML.HUD.notify('Tu fais : ' + ML.EMOTES[e.n]); else if (G.avatars[e.pid]) { ML.People.emote(G.avatars[e.pid], ML.EMOTES[e.n]); ML.Sfx.play('emote', 0.6); } break; }
-      case 'ping': { const P = G.players[e.pid]; ML.Fx.ping(e.x, e.z, P ? P.name : '?', P ? ML.COLORS[P.idx % 5].hex : 0xffd257); ML.Sfx.play('bip'); break; }
+      case 'ping': {                                     // V4.2 : ping bien visible (colonne + message avec la distance)
+        const P = G.players[e.pid], nm = e.pid === G.me ? 'Toi' : P ? P.name : '?';
+        ML.Fx.ping(e.x, e.z, nm, P ? ML.COLORS[P.idx % ML.COLORS.length].hex : 0xffd257); ML.Sfx.play('bip');
+        const me = G.p.car !== null && ML.Cars.list[G.p.car] ? ML.Cars.list[G.p.car].pos : G.p.pos, dist = Math.round(Math.hypot(e.x - me.x, e.z - me.z));
+        ML.HUD.notify(e.pid === G.me ? `📍 Ping posé (${dist} m) : toute l'équipe le voit.` : `📍 ${nm} : « Viens ici ! » (à ${dist} m, suis la colonne de lumière)`, 'info');
+        break;
+      }
       case 'horn': ML.Sfx.horn(e.k, e.pid === G.me ? undefined : e.x, e.z); break;
       case 'flash': {
         const r = ML.World.radars[e.r]; if (r) r.flash = 0.4;
@@ -250,7 +256,7 @@
     if (p.stun > 0) p.stun -= dt;
     if (p.punchT > 0) p.punchT -= dt;
     G.fxNow = null;
-    const can = !ML.ui.modal && p.stun <= 0 && I.active() && !G.ended;
+    const can = !ML.ui.modal && p.stun <= 0 && I.active() && !G.ended, modal0 = ML.ui.modal;   // modal0 : fenêtre ouverte AVANT cette image (sinon M / Tab ouvrent et referment aussitôt)
     if (can) {
       if (I.pressed('KeyK')) ML.HUD.notify(ML.Sfx.toggleMute() ? '🔇 Son coupé' : '🔊 Son activé');
       if (I.pressed('KeyM')) ML.HUD.toggleMap();
@@ -260,9 +266,9 @@
       if (I.wheel) p.sel = (p.sel + (I.wheel > 0 ? 1 : -1) + 3) % 3;
       if (I.pressed('KeyT')) G.ping();
     }
-    if (ML.ui.modal === 'dialogue') { for (let i = 1; i <= 9; i++) if (I.pressed('Digit' + i) || I.pressed('Numpad' + i)) { ML.Dialogue.pick(i - 1); break; } if (I.pressed('Escape')) ML.Dialogue.close(); }
-    else if (ML.ui.modal === 'help' && (I.pressed('Tab') || I.pressed('Escape'))) ML.HUD.toggleHelp();
-    else if (ML.ui.modal === 'map' && (I.pressed('KeyM') || I.pressed('Escape'))) ML.HUD.toggleMap();
+    if (modal0 === 'dialogue' && ML.ui.modal === 'dialogue') { for (let i = 1; i <= 9; i++) if (I.pressed('Digit' + i) || I.pressed('Numpad' + i)) { ML.Dialogue.pick(i - 1); break; } if (I.pressed('Escape')) ML.Dialogue.close(); }
+    else if (modal0 === 'help' && ML.ui.modal === 'help' && (I.pressed('Tab') || I.pressed('Escape'))) ML.HUD.toggleHelp();
+    else if (modal0 === 'map' && ML.ui.modal === 'map' && (I.pressed('KeyM') || I.pressed('Escape'))) ML.HUD.toggleMap();
 
     // --- passager (cabine ou benne) ---
     if (p.ride) {
@@ -314,6 +320,7 @@
     let speed = ko ? C.HP.koSpeed : PC.walk, sprint = false;
     if (!ko && (I.down('ShiftLeft') || I.down('ShiftRight')) && len > 0 && (p.stamina > 0 || unlimited)) { speed = PC.sprint; sprint = true; if (!unlimited) p.stamina -= dt * (coffee ? 0.45 : 1); }
     else p.stamina = Math.min(PC.stamina, p.stamina + dt * 0.8);
+    if (coffee && !ko) speed *= (C.COFFEE ? C.COFFEE.mult : 1);                    // café rapide
     // auras : Fred (Arexis) et Mathieu (du coup…) ralentissent
     if (G.npcDist('fred') < 3.5 || (G.npcDist('mathieu') < 4 && (G.npcViews.mathieu || {}).group)) { speed *= 0.6; G.auraT -= dt; if (G.auraT <= 0) { G.auraT = 8; ML.HUD.notify(G.npcDist('fred') < 3.5 ? '💼 Fred te tient la jambe : « ARÉXIS ! » (tu ralentis)' : '🐌 Mathieu te parle… tu ralentis…'); } }
     const ox = p.pos.x, oz = p.pos.z;
@@ -389,8 +396,8 @@
   G.throwHeld = () => {
     const h = G.held();
     if (!h) { ML.HUD.notify('Rien en main à lancer. Prends un brut au rack !'); return; }
-    if (ML.Items.bulky(h)) { ML.HUD.notify('Trop lourd pour être lancé. Pose la caisse avec G.'); return; }
-    const f = G.forward(); G.intent({ a: 'throw', v: [f.x * 15, f.y * 15 + 2.5, f.z * 15] }); ML.Sfx.play('whoosh');
+    if (ML.Items.heavy(h)) { ML.HUD.notify('Une palette, ça ne se lance pas ! Le fenwick.'); return; }
+    const f = G.forward(), k = ML.Items.bulky(h) ? 1.25 : 1; G.intent({ a: 'throw', v: [f.x * 15 * k, f.y * 15 + 2.5 * k + (k > 1 ? 1.5 : 0), f.z * 15 * k] }); ML.Sfx.play('whoosh');
   };
 
   /* ======================= Voiture ======================= */

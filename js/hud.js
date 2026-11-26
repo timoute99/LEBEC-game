@@ -28,9 +28,9 @@
 
   /** Carte de début de journée : mode, humeur de Lebec, météo */
   H.dayCard = S => {
-    const Hm = ML.HUMEURS[S.humeur], W = ML.WEATHER[S.weather];
+    const Hm = ML.HUMEURS[S.humeur], W = ML.WEATHER[S.weather], Dd = ML.DIFFS && ML.DIFFS[S.diff];
     const mode = { coop: 'Journée libre', campagne: `Campagne — jour ${S.day}/${ML.CAMPAIGN.days}`, inspection: "INSPECTION de l'Éducation Nationale", course: 'Course de Mégane' }[S.mode] || S.mode;
-    H.el.daycard.innerHTML = `<div class="dc-mode">${U.esc(mode)}</div><div class="dc-h">😤 ${U.esc(Hm.name)}</div><div class="dim">${U.esc(Hm.desc)}</div><div class="dc-w">${S.weather === 'pluie' ? '🌧' : S.weather === 'brouillard' ? '🌫' : '☀️'} ${U.esc(W.name)}</div>` +
+    H.el.daycard.innerHTML = `<div class="dc-mode">${U.esc(mode)}</div>${Dd && S.diff !== 'normal' ? `<div class="dc-w">${Dd.icon} ${U.esc(Dd.name)}</div>` : ''}<div class="dc-h">😤 ${U.esc(Hm.name)}</div><div class="dim">${U.esc(Hm.desc)}</div><div class="dc-w">${S.weather === 'pluie' ? '🌧' : S.weather === 'brouillard' ? '🌫' : '☀️'} ${U.esc(W.name)}</div>` +
       (S.mode === 'inspection' ? '<div class="dc-x">Respecte ses règles absurdes (elles changent !). 5 infractions = échec.</div>' : S.mode === 'course' ? '<div class="dc-x">5 manches : le premier arrivé EN VOITURE devant l\'entreprise indiquée gagne.</div>' : '') +
       (S.traitorMode ? '<div class="dc-x">🕵 Un traître se cache parmi vous…</div>' : '');
     H.el.daycard.classList.remove('hidden'); clearTimeout(H._dc); H._dc = setTimeout(() => H.el.daycard.classList.add('hidden'), 7500);
@@ -68,6 +68,7 @@
     H.el.hostlost.classList.toggle('hidden', !lost);
     if (!G.isHost && performance.now() - G.lastSnap > 35000) { G.stop("L'hôte ne répond plus : partie terminée."); ML.Lobby.backToRoom(); return; }
 
+    if (ML.GPS) ML.GPS.update(dt);                                // V4.1 : GPS (objectif, trajet, flèche)
     if (S) H.drawMap(S); // mini-carte à chaque image (centrée sur le joueur → défilement fluide)
     H.tick -= dt; if (H.tick > 0 || !S) return; H.tick = 0.2;
     const min = G.clockMin();
@@ -143,7 +144,7 @@
   H.renderTeam = S => {
     const G = ML.Game;
     const html = Object.keys(S.pl).map(pid => {
-      const P = S.pl[pid], c = ML.COLORS[P.idx % 5], sel = pid === G.me ? G.p.sel : (G.remote[pid] ? G.remote[pid].sel || 0 : 0), it = P.inv[sel];
+      const P = S.pl[pid], c = ML.COLORS[P.idx % ML.COLORS.length], sel = pid === G.me ? G.p.sel : (G.remote[pid] ? G.remote[pid].sel || 0 : 0), it = P.inv[sel];
       const off = !G.solo && ML.Net.room && !(ML.Net.room.players.find(x => x.id === pid) || {}).on;
       const rp = S.race && S.race.pts ? ` · ${S.race.pts[pid] || 0} pts` : '';
       const hp = P.ko ? ' <b style="color:#ff6b6b">KO</b>' : P.hp < 100 ? ` <span class="dim">${P.hp}♥</span>` : '';
@@ -160,7 +161,7 @@
     for (const id in S.machines) if (S.machines[id].broken) out.push(`<span class="ev">🔧 ${id} en panne</span>`);
     if (S.rule) out.push(`<span class="ev rule">📏 ${U.esc(ML.RULES[S.rule])} · infractions ${S.viol}/5</span>`);
     const html = out.join('');
-    if (html !== H._ev) { H.el.evbar.innerHTML = html; H._ev = html; }
+    if (html !== H._ev) { H.el.evbar.innerHTML = html; H._ev = html; document.documentElement.style.setProperty('--evh', (html ? H.el.evbar.offsetHeight + 6 : 0) + 'px'); }   // bas à gauche : les messages remontent au-dessus
   };
   H.renderRace = S => {
     const R = S.race; let html = '';
@@ -179,7 +180,7 @@
     while (H.el.notifs.children.length > 6) H.el.notifs.firstChild.remove();
     setTimeout(() => d.remove(), 7000);
   };
-  H.subtitle = (name, text) => { H.el.subtitle.innerHTML = `<b>${U.esc(name)} :</b> ${U.esc(text)}`; clearTimeout(H._st); H._st = setTimeout(() => { H.el.subtitle.innerHTML = ''; }, 4500); };
+  H.subtitle = (name, text) => { H.el.subtitle.innerHTML = `<b>${U.esc(name)} :</b> ${U.esc(text)}`; clearTimeout(H._st); H._st = setTimeout(() => { H.el.subtitle.innerHTML = ''; }, Math.max(4500, String(text).length * 75)); };
   H.big = (text, color) => { const b = H.el.big; b.textContent = text; b.style.color = color || '#ff3b30'; b.style.opacity = 1; clearTimeout(H._bg); H._bg = setTimeout(() => { b.style.opacity = 0; }, 2200); };
   H.flash = color => { const f = H.el.flash; f.style.background = color || '#fff'; f.style.opacity = 0.9; setTimeout(() => { f.style.opacity = 0; }, 300); };
   H.toast = text => { const d = document.createElement('div'); d.className = 'toast'; d.textContent = text; H.el.toasts.appendChild(d); setTimeout(() => d.remove(), 5000); };
@@ -191,7 +192,34 @@
   H.toggleHelp = () => {
     const open = H.el.help.classList.contains('hidden');
     H.el.help.classList.toggle('hidden', !open);
-    if (open) { ML.ui.modal = 'help'; ML.Input.unlock(); H.showPause(false); } else { ML.ui.modal = null; ML.Input.lock(); }
+    if (open) { ML.ui.modal = 'help'; ML.Input.unlock(); H.showPause(false); H.fillTips(); } else { ML.ui.modal = null; ML.Input.lock(); }
+  };
+  /* ---------- Guide & astuces (V3.2, adapté V5) : 4 astuces au hasard dans l'aide (Tab) ---------- */
+  ML.TIPS = ML.TIPS || [
+    "Carrière : les devis se signent au PC du BE (LebecOS). Un devis en retard coûte des pénalités le soir.",
+    "Une machine achetée arrive en CAISSE : fenwick ou transpalette (R), puis E pour l'installer où tu veux.",
+    "Machine manuelle : c'est toi qui usines (mini-jeu). Une CN fait le travail seule une fois réglée.",
+    "Contrôle tes pièces au MARBRE : la qualité ★★★ paie mieux, et les rebuts vont à la benne.",
+    "Matis (et tous les gourmands) ralentit quand il a faim : une viennoiserie et il repart à +40 %.",
+    "Un ouvrier en pause ne repart qu'avec E… ou une claque. Mais Lebec n'aime pas la violence dans SON atelier.",
+    "Sors de l'atelier pour mettre une claque : Lebec ne voit que ce qui s'y passe.",
+    "Un bac à copeaux plein bloque la machine : vide-le dans la benne dehors.",
+    "Le chien de la casse adore les viennoiseries. Une lancée, et il dort.",
+    "Le pigeon vole les plaquettes : lance-lui n'importe quoi pour qu'il la lâche.",
+    "Deux passants renversés = RECHERCHÉ. La cellule de l'Adjudant Kerbrigand, c'est 45 s minimum.",
+    "La soufflette est reliée au compresseur par 14 m de tuyau. Pas un de plus.",
+    "Les clients du plateau (Carrière du Bec, barrage de Kerlebec) sont en haut du col : conduis doucement, les caisses tombent dans les virages.",
+    "Touche M : la carte complète. F1 : Lebec et ses astuces (F2 pour passer).",
+    "Embauche au PC (onglet Personnel) : chaque ouvrier a un trait. Les légendes de l'ancien atelier passent parfois.",
+    "Les amendes sont à TON nom : PC → Compta → le mur de la honte.",
+    "« C'est écrit dans le poly ! » — François Lebec, tous les jours depuis 1987."
+  ];
+  H.tipsHTML = n => U.shuffle(ML.TIPS).slice(0, n || ML.TIPS.length).map(t => `<li>${U.esc(t)}</li>`).join('');   // aussi pour un écran « Guide » du menu
+  H.fillTips = () => {
+    const card = H.el.help && H.el.help.querySelector('.card'); if (!card || !ML.TIPS.length) return;
+    let box = card.querySelector('#help-tips');
+    if (!box) { box = document.createElement('div'); box.id = 'help-tips'; const keys = card.querySelector('.keys'); card.insertBefore(box, keys || null); }
+    box.innerHTML = '<p><b>💡 Astuces :</b></p><ul class="tips">' + H.tipsHTML(4) + '</ul>';
   };
 
   /* ---------- Vote (mode traître) ---------- */
@@ -386,10 +414,11 @@
     if (ML.Fx.dog) pin(ML.Fx.dog.position.x, ML.Fx.dog.position.z, '#8d6e63', big ? 4 : 2.5, big ? '🐕' : '');
     const Lb = G.npcViews.lebec; if (Lb && Lb.seen) pin(Lb.pos.x, Lb.pos.z, Lb.st === 'c' ? '#ff0000' : MC.navy, big ? 5 : 3, big ? 'Lebec' : '');
     for (const p of ML.Fx.pings || []) pin(p.g.position.x, p.g.position.z, MC.yellow, big ? 7 : 4, '📍', !big);
+    if (ML.GPS) ML.GPS.paint(c, X, Z, big);                    // V4.1 : trajet GPS (gps.js)
     // joueurs (moi en dernier, en flèche)
     let mine = null;
     for (const pid in S.pl) {
-      const P = S.pl[pid], col = ML.COLORS[P.idx % 5].css;
+      const P = S.pl[pid], col = ML.COLORS[P.idx % ML.COLORS.length].css;
       if (pid === G.me) { mine = [P, col]; continue; }
       const a = G.avatars[pid]; if (a && a.seen) pin(a.pos.x, a.pos.z, col, big ? 6 : 3.5, P.name + (P.ko ? ' (KO)' : ''), !big);
     }
@@ -441,8 +470,10 @@
       if (!drag) return; const d = drag; drag = null; cv.classList.remove('drag');
       if (d.moved || !H.bigK || e.target !== cv) return;
       const [px, pz] = toCv(e), w = inv(H.bigK.v, px, pz);
-      ML.Game.intent({ a: 'ping', x: Math.round(w.x), z: Math.round(w.z) }); H.toast('📍 Repère posé pour toute l\'équipe');
+      ML.Game.intent({ a: 'ping', x: Math.round(w.x), z: Math.round(w.z) });
+      if (ML.GPS) { ML.GPS.set(w.x, w.z); H.toast('📍 Repère posé pour l\'équipe : suis le trajet violet (GPS) ! Clic droit : effacer'); } else H.toast('📍 Repère posé pour toute l\'équipe');
     });
+    cv.addEventListener('contextmenu', e => { e.preventDefault(); if (ML.GPS && ML.GPS.manual) { ML.GPS.clear(); H.toast('Repère GPS effacé.'); } });   // V4.1 : GPS
     cv.addEventListener('dblclick', () => { H.bm = null; }); // double-clic : revenir à la vue de la ville
   }
   H.drawBigMap = S => {

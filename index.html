@@ -3,9 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mécanique Lebec — en équipe (v2)</title>
+<title>Mécanique Lebec — en équipe (V5.0)</title>
 <link rel="stylesheet" href="css/style.css">
-<link rel="icon" href="data:,">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest"> <!-- PWA : bouton « Installer le jeu » (lobby.js), sw.js -->
+<meta name="theme-color" content="#24457a">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 </head>
 <body>
 <canvas id="gl"></canvas>
@@ -79,7 +82,8 @@
 
 <!-- ================= Menus ================= -->
 <div id="lobby" class="overlay">
-  <div id="scr-home" class="card wide">
+  <!-- Accueil sobre (V3.2) : SOLO / MULTIJOUEUR -->
+  <div id="scr-home" class="card home">
     <div class="hazard"></div>
     <div class="logo">
       <svg width="78" height="78" viewBox="0 0 100 100" aria-hidden="true">
@@ -98,64 +102,107 @@
       </svg>
       <h1 class="logo-t"><span class="l1">MÉCANIQUE</span><span class="l2">LEBEC</span></h1>
     </div>
-    <h3>Usinage en équipe — jusqu'à 5 joueurs</h3>
-    <p class="pitch">Des tickets tombent, des opérateurs flemmardent, Eliott parle trop vite et Lebec a une pelle. Fabriquez, transportez, livrez… ensemble.</p>
-    <div class="acc box2">
-      <div id="acc-state"></div>
-      <div id="acc-form" class="actions"><input id="in-user" maxlength="16" placeholder="Pseudo du compte"><input id="in-pass" type="password" maxlength="64" placeholder="Mot de passe"><button id="btn-login" class="sec tiny">Se connecter</button><button id="btn-register" class="sec tiny">Créer un compte</button></div>
-      <div class="actions"><button id="btn-logout" class="sec tiny hidden">Se déconnecter</button></div>
+    <h3>Usinage en équipe — jusqu'à 6 joueurs</h3>
+    <p class="pitch">Reprends un atelier pourri, fais-en une usine de fou. Des devis, des machines, des ouvriers… et Lebec a une pelle.</p>
+    <div class="bigchoice">
+      <button id="go-solo" class="choice"><span class="ic">🧑‍🔧</span>SOLO<small>toi contre l'atelier</small></button>
+      <button id="go-multi" class="choice"><span class="ic">👥</span>MULTIJOUEUR<small>jusqu'à 6 en ligne, même en cours de partie</small></button>
     </div>
+    <div class="homebar"><button id="go-account" class="link">👤 <span id="acc-mini">Compte</span></button><button id="go-perso" class="link">👕 Mon perso</button><button id="go-guide" class="link">📖 Guide &amp; astuces</button><button id="go-install" class="link hidden">📲 Installer le jeu</button></div>
+    <div class="tipbox" id="tip-home"></div>
+  </div>
+
+  <!-- Compte -->
+  <div id="scr-account" class="card hidden">
+    <h2>👤 Compte</h2>
+    <p id="acc-state"></p>
+    <div id="acc-form"><div class="actions"><input id="in-user" maxlength="16" placeholder="Pseudo du compte"><input id="in-pass" type="password" maxlength="64" placeholder="Mot de passe"></div>
+      <div class="actions"><button id="btn-login">Se connecter</button><button id="btn-register" class="sec">Créer un compte</button></div>
+      <p class="dim small">Sans compte, tu joues en invité : ton perso, tes jetons et ta carrière restent sur ce PC. Avec un compte : entreprises partagées avec tes potes, sauvegarde en ligne.</p></div>
+    <div class="actions"><button id="btn-logout" class="sec hidden">Se déconnecter</button><button class="sec back">Retour</button></div>
+  </div>
+
+  <!-- Guide -->
+  <div id="scr-guide" class="card wide hidden">
+    <h2>📖 Guide</h2>
+    <div class="guide">
+      <p><b>Le but :</b> tu reprends <b>le Hangar Pourri</b> (un tour de 1974, un apprenti) et tu en fais une usine. Tout se gère au <b>💻 PC du BE</b> (LebecOS 95) : devis, matière, machines, embauches, travaux, compta.</p>
+      <ol><li>Le matin, au PC : <b>accepte des devis</b>, commande la matière, achète des machines, affecte tes ouvriers.</li>
+        <li>Un ticket arrive : prends le <b>brut</b> au rack et l'<b>outil</b> à l'armoire, donne-les à la bonne machine. Les vieilles machines manuelles, c'est <b>toi</b> qui usines (mini-jeu 3D).</li>
+        <li>Contrôle au <b>marbre</b>, puis <b>livre</b> le client (voiture, camion pour les grosses pièces). La route en corniche est plus courte… et plus dangereuse.</li>
+        <li>Le soir : salaires, loyer, électricité. Les travaux et embauches prennent effet le lendemain. Sous −6 000 € : <b>faillite</b>.</li></ol>
+      <p><b>🏭 Machines :</b> elles arrivent en caisse sur palette. Fenwick ou transpalette (R) jusqu'à l'atelier, puis E pour l'installer. Clé à molette pour la désinstaller.</p>
+      <p><b>👥 Multijoueur :</b> jusqu'à <b>6 joueurs</b>. Un pote peut rejoindre le salon <b>même en pleine journée</b>. Si l'hôte part, un autre joueur reprend la partie. Avec un compte, l'<b>entreprise</b> se partage : chacun peut l'héberger.</p>
+      <p><b>Rôles :</b> ⛑ Médecin · 🚜 Cariste · 🚚 Livreur · 🔧 Maintenance · 📦 Magasinier · 🛠 Polyvalent. Un rôle sans joueur est tenu par un PNJ… lent.</p>
+      <p><b>Difficultés :</b> 🙂 Facile (tickets longs, peu de chaos, pénalités ÷2) · 😐 Normal · 😤 Difficile (pannes et feux fréquents, pièces +10 %) · 🔥 LEBEC EN FEU (tout brûle, Lebec voit tout, pièces +25 %, pénalités salées).</p>
+      <p><b>Lebec :</b> il ne supporte pas la violence dans SON atelier. Coup de pelle, KO, et il faut le médecin.</p>
+      <p class="keys"><kbd>ZQSD</kbd> bouger · <kbd>Maj</kbd> courir · <kbd>E</kbd> interagir · <kbd>G</kbd> poser · <kbd>clic G</kbd> claque/outil · <kbd>clic D</kbd> lancer · <kbd>M</kbd> carte · <kbd>T</kbd> ping · <kbd>Tab</kbd> aide · <kbd>F1</kbd> Lebec · manette compatible</p>
+      <p><b>📲 Installer le jeu :</b> bouton « Installer le jeu » sur l'accueil (Chrome ou Edge). Il s'installe comme un programme, avec une icône sur le bureau et sa propre fenêtre, sans .exe ni alerte Windows. Les mises à jour arrivent toutes seules.</p>
+      <h3>💡 Astuces</h3><ul id="guide-tips" class="tips"></ul>
+    </div>
+    <div class="actions"><button class="back">Retour</button></div>
+  </div>
+
+  <!-- Solo -->
+  <div id="scr-solo" class="card wide hidden">
+    <h2>🧑‍🔧 Partie solo</h2>
+    <div id="solo-name-row" class="form"><label>Pseudo <input id="in-name" maxlength="16" placeholder="Ton pseudo"></label></div>
     <div class="perso box2">
       <button id="btn-profile" class="bigperso">👕 Personnaliser mon perso<br><span class="dim">apparence, tenue, chapeau, klaxon, tuning, succès</span></button>
       <div class="rolepick"><b>Ton rôle</b><div id="h-roles" class="roles"></div><div id="h-role-desc" class="dim small"></div></div>
     </div>
-    <div class="form">
-      <label>Pseudo <input id="in-name" maxlength="16" placeholder="Ton pseudo"></label>
-      <label id="server-row">Serveur <input id="in-server" placeholder="ws://localhost:8080"></label>
-    </div>
-    <div class="modes box2"><label>Mode (solo) <select id="h-mode"><option value="carriere" selected>🏭 Carrière (l'atelier à faire grandir)</option><option value="coop">Journée libre</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label>
-      <span id="h-desc" class="dim"></span><div id="h-camp" class="hidden"><span id="h-camp-info"></span> <button id="h-camp-reset" class="sec tiny">recommencer</button><div id="h-team" class="team"></div></div></div>
-    <div class="actions">
-      <button id="btn-solo" class="sec">Jouer en solo</button>
-      <button id="btn-create">Créer un salon</button>
-      <label class="chk"><input type="checkbox" id="in-priv"> privé</label>
-    </div>
-    <div class="actions">
-      <input id="in-code" maxlength="4" placeholder="CODE" class="code">
-      <button id="btn-join">Rejoindre</button>
-      <button id="btn-list" class="sec">Salons ouverts</button>
-    </div>
-    <div id="room-list"></div>
-    <p id="status" class="dim"></p>
-    <ol class="how small">
-      <li>Prends les tickets en haut de l'écran.</li><li>Brut (racks) + outil (armoire rouge) → la bonne machine.</li>
-      <li>Caisse finie → benne de la Mégane → client.</li><li>Fonderie, chaudronnerie, traitement thermique : certains tickets passent chez les sous-traitants.</li>
-    </ol>
+    <div class="modes box2"><label>Mode <select id="h-mode"><option value="carriere" selected>🏭 Carrière (l'atelier à faire grandir)</option><option value="coop">Journée libre</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label>
+      <label>Difficulté <select id="h-diff"><option value="facile">🙂 Facile</option><option value="normal" selected>😐 Normal</option><option value="difficile">😤 Difficile</option><option value="feu">🔥 LEBEC EN FEU</option></select></label>
+      <span id="h-desc" class="dim"></span><span id="h-diff-desc" class="dim small diffdesc"></span><div id="h-camp" class="hidden"><span id="h-camp-info"></span> <button id="h-camp-reset" class="sec tiny">recommencer</button><div id="h-team" class="team"></div></div></div>
+    <div class="tipbox" id="tip-h"></div>
+    <div class="actions"><button id="btn-solo" class="go">LANCER LA JOURNÉE</button><button class="sec back">Retour</button></div>
   </div>
+
+  <!-- Multijoueur : créer / rejoindre -->
+  <div id="scr-multi" class="card hidden">
+    <h2>👥 Multijoueur</h2>
+    <div class="form"><label id="multi-name-row">Pseudo <input id="m-name" maxlength="16" placeholder="Ton pseudo"></label><label id="server-row">Serveur <input id="in-server" placeholder="ws://localhost:8080"></label></div>
+    <div class="box2 mbox"><b>Créer un salon</b><div class="actions"><button id="btn-create">Créer</button><label class="chk"><input type="checkbox" id="in-priv"> privé (pas dans la liste)</label></div></div>
+    <div class="box2 mbox"><b>Rejoindre avec un code</b> <span class="dim small">(même si la partie a commencé)</span><div class="actions"><input id="in-code" maxlength="4" placeholder="CODE" class="code"><button id="btn-join">Rejoindre</button></div></div>
+    <div class="box2 mbox"><b>Salons ouverts</b> <button id="btn-list" class="sec tiny">actualiser</button><div id="room-list"></div></div>
+    <p id="status" class="dim small"></p>
+    <div class="actions"><button class="sec back">Retour</button></div>
+  </div>
+
   <div id="scr-profile" class="card side hidden">
     <h2>👕 Mon perso</h2>
     <div id="prof-body"></div>
-    <div class="actions"><button id="btn-prof-back">Retour</button></div>
+    <div class="actions"><button id="btn-prof-back">Valider</button></div>
   </div>
-  <div id="scr-room" class="card hidden">
+
+  <!-- Salon -->
+  <div id="scr-room" class="card wide hidden">
     <h2>Salon <span id="room-code" class="code big"></span> <button id="btn-copy" class="sec tiny">copier</button></h2>
-    <p class="dim">Donne ce code à tes amis : ils cliquent « Rejoindre » avec ce code.</p>
+    <p class="dim">Donne ce code à tes amis : Multijoueur → Rejoindre. Ils peuvent arriver même en pleine journée (6 max).</p>
     <div id="room-players"></div>
-    <div class="box2"><b>Ton rôle</b> <span class="dim">(un seul joueur par rôle, sauf Polyvalent)</span><div id="r-roles" class="roles"></div><div id="r-role-desc" class="dim small"></div></div>
+    <div id="room-name-row" class="form"><label>Ton pseudo <input id="r-name" maxlength="16" placeholder="Ton pseudo"></label></div>
+    <div class="perso box2">
+      <button id="btn-profile-r" class="bigperso">👕 Mon perso<br><span class="dim">apparence, tenue, boutique</span></button>
+      <div class="rolepick"><b>Ton rôle</b> <span class="dim small">(un seul joueur par rôle, sauf Polyvalent)</span><div id="r-roles" class="roles"></div><div id="r-role-desc" class="dim small"></div></div>
+    </div>
     <div id="room-opts" class="modes box2"><label>Mode <select id="r-mode"><option value="carriere" selected>🏭 Carrière (l'atelier à faire grandir)</option><option value="coop">Journée libre</option><option value="inspection">Inspection (boss)</option><option value="course">Course de Mégane</option></select></label>
+      <label>Difficulté <select id="r-diff"><option value="facile">🙂 Facile</option><option value="normal" selected>😐 Normal</option><option value="difficile">😤 Difficile</option><option value="feu">🔥 LEBEC EN FEU</option></select></label>
       <label class="chk"><input type="checkbox" id="r-traitor"> 🕵 Mode traître (3 joueurs min.)</label>
-      <span id="r-desc" class="dim"></span><div id="r-camp" class="hidden"><span id="r-camp-info"></span> <button id="r-camp-reset" class="sec tiny">recommencer</button><div id="r-team" class="team"></div></div></div>
-    <div class="actions"><button id="btn-start">LANCER LA JOURNÉE</button><span id="room-wait" class="dim"></span></div>
-    <div class="actions"><button id="btn-leave" class="sec">Quitter le salon</button></div>
+      <span id="r-desc" class="dim"></span><span id="r-diff-desc" class="dim small diffdesc"></span><div id="r-camp" class="hidden"><span id="r-camp-info"></span> <button id="r-camp-reset" class="sec tiny">recommencer</button><div id="r-team" class="team"></div></div></div>
+    <div id="room-cfg" class="box2 small hidden"></div>
+    <div class="tipbox" id="tip-r"></div>
+    <div class="actions"><button id="btn-start" class="go">LANCER LA JOURNÉE</button><span id="room-wait" class="dim"></span><button id="btn-leave" class="sec">Quitter le salon</button></div>
   </div>
 </div>
 <div id="toasts"></div>
+<div id="version" style="position:fixed;right:6px;bottom:3px;font-size:10px;opacity:.45;color:#fff;pointer-events:none;z-index:50">V5.0</div>
 
 <!-- Three.js r128 + chargeur glTF (copies locales : marche hors ligne et en double-clic) -->
 <script src="lib/three.min.js"></script>
 <script src="lib/GLTFLoader.js"></script>
 <script src="assets-ville.js"></script>   <!-- décors KayKit en base64 -->
-<script src="js/config.js"></script>      <!-- réglages, persos, entreprises, pièces -->
+<script src="js/config.js"></script>      <!-- réglages, entreprises, pièces -->
+<script src="js/persos.js"></script>      <!-- LES PERSONNAGES et leurs répliques : fichier à modifier librement -->
 <script src="js/util.js"></script>
 <script src="js/style.js"></script>       <!-- direction artistique : palette, matériaux toon, ciel -->
 <script src="js/textures.js"></script>
@@ -173,6 +220,7 @@
 <script src="js/world_atelier.js"></script>   <!-- atelier : bâtiment, mobilier, machines -->
 <script src="js/world_buildings.js"></script> <!-- entreprises et bâtiments de ville -->
 <script src="js/cars.js"></script>
+<script src="js/gps.js"></script>         <!-- GPS : repère / objectif + trajet par les rues -->
 <script src="js/rules.js"></script>       <!-- textes des actions [E] (client) -->
 <script src="js/fx.js"></script>          <!-- feux, flaques, pigeon, particules -->
 <script src="js/nav.js"></script>         <!-- navigation des PNJ (grille + A*) -->

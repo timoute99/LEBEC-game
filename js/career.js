@@ -162,6 +162,14 @@
       const unit = Math.round(base * (plateau ? CAT.PRICE.plateau : 1) * (0.85 + r() * 0.4) * (0.9 + car.rep / 250));
       out.push({ id: nid(car, 'D'), client, part, mat, mtype: op0.mt, tool: op0.tool, ops, kind, size, qty, unit, days: 1 + Math.floor(r() * 3) + (ops.length > 2 ? 1 : 0), plateau });
     }
+    // V4.0 (portage) : PARTICULIERS — une petite pièce urgente, bien payée, à remettre en main propre au COMPTOIR de l'atelier
+    const PR = (ML.PART_REQ || []).filter(fits), PI = ML.PARTI || {};
+    for (let k = 0, np = r() < 0.75 ? (r() < 0.3 ? 2 : 1) : 0; k < np && PR.length; k++) {
+      const tpl = r.pick(PR), [part, mat] = tpl, ops = RT.of(tpl), op0 = ML.OPS[ops[0]], who = r.pick(ML.PARTICULIERS);
+      if (out.some(o => o.who === who)) continue;
+      const unit = Math.round(CAT.PRICE.s * (1 + CAT.PRICE.op * (ops.length - 1)) * (CAT.PRICE.mat[mat] || 1) * (PI.mult || 2) * (0.85 + r() * 0.3) / 5) * 5;
+      out.push({ id: nid(car, 'D'), client: 'part', who, part, mat, mtype: op0.mt, tool: op0.tool, ops, kind: 'plain', size: 's', qty: 1, unit, days: 1, plateau: false, perso: true });
+    }
     car.offers = out;
   };
   CR.machineDef = m => {

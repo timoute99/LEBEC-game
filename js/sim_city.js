@@ -7,6 +7,8 @@
   const Sim = ML.Sim, K = Sim.K, U = ML.U, C = ML.CFG, IT = ML.Items;
   let S, rng, city, tr, pol, peds;
   const mod = {};
+  /** V4.1 (portage) : places libres dans une benne. Camion : plateau de cap × 4 places, une palette (lourde) en prend 4, une caisse 1. */
+  K.bedFree = c => c.kind === 'camion' ? c.cap * 4 - c.bed.reduce((a, it) => a + (IT.heavy(it) ? 4 : 1), 0) : c.cap - c.bed.length;
 
   mod.init = cfg => {
     S = K.S; rng = K.rng; city = ML.World.city;
@@ -496,8 +498,7 @@
     if (c.kind === 'fenwick') { K.note(pid, 'Le fenwick se conduit (E côté conducteur) ; R pour lever/poser les fourches.'); return true; }
     if (held && IT.heavy(held)) return true;
     if (held && (IT.bulky(held) || held.type === 'piece')) {
-      if (c.kind === 'camion') { K.note(pid, 'Le camion ne prend que les PALETTES (chargées au fenwick).', 'warn'); return true; }
-      if (c.bed.length >= c.cap) { K.note(pid, c.kind === 'tp' ? 'Le transpalette est plein (4 caisses).' : 'La benne est pleine.', 'warn'); return true; }
+      if (K.bedFree(c) < 1) { K.note(pid, c.kind === 'tp' ? 'Le transpalette est plein (4 caisses).' : c.kind === 'camion' ? 'Le plateau du camion est plein.' : 'La benne est pleine.', 'warn'); return true; }   // V4.1 : caisses aussi sur le plateau du camion
       P.inv[sel] = null; c.bed.push(held); K.sfx('drop', c.x, c.z); return true;
     }
     if (!c.bed.length) {
@@ -507,11 +508,12 @@
       }
       return true;
     }
-    if (c.kind === 'camion') { K.note(pid, 'Les palettes se déchargent au fenwick ou avec R (livreur) chez le client.'); return true; }
+    if (c.kind === 'camion' && c.bed.every(it => IT.heavy(it))) { K.note(pid, 'Les palettes se déchargent au fenwick ou avec R (livreur) chez le client.'); return true; }
     let idx = c.bed.length - 1, here = null;
+    if (IT.heavy(c.bed[idx])) idx = c.bed.map(it => !IT.heavy(it)).lastIndexOf(true);   // plateau du camion : on ne prend à la main que les caisses
     for (const k in ML.LOC.comp) if (Math.hypot(ML.LOC.comp[k].dock.x - c.x, ML.LOC.comp[k].dock.z - c.z) < 25) here = k;
     const fits = it => { if (!K.isPart(it)) return here === null && U.inWorkshop({ x: c.x, z: c.z - 10 }); const o = S.orders.find(x => x.id === it.d.oid); return o && ((here === o.client && K.stage(o) === 'livraison') || (here === 'tth' && K.stage(o) === 'tth')); };
-    const j = c.bed.findIndex(fits); if (j >= 0) idx = j;
+    const j = c.bed.findIndex(it => !IT.heavy(it) && fits(it)); if (j >= 0) idx = j;
     if (K.give(pid, c.bed[idx], sel)) { c.bed.splice(idx, 1); K.sfx('pickup', c.x, c.z); }
     return true;
   };

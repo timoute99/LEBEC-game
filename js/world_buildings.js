@@ -167,7 +167,8 @@
     ublo: ['Ublo — on adore le Ra 0,4', 'Ici on mesure deux fois, on râle une fois'],
     usiflash: ['Usinage en 24 h (ou 48 h) (ou jamais)', 'Ceci n\'est PAS un plan volé'],
     police: ['Accueil : sonnez fort (sieste en cours)', 'Cellule de dégrisement — Wi-Fi : non'],
-    casse: ['⚠ CHIEN MÉCHANT ⚠', 'Pièces d\'occasion — garanti 3 minutes']
+    casse: ['⚠ CHIEN MÉCHANT ⚠', 'Pièces d\'occasion — garanti 3 minutes'],
+    concession: ['Reprise de votre Kangoo : 0 € (et encore)', 'Occasion du jour : roulé par une mamie (pilote)']
   };
   const SKINS = [0xf0c8a0, 0xe2b48c, 0xc68642, 0x8d5524, 0xf3cba5];
   const HAIRS = [PAL.woodDark, PAL.black, PAL.sand, PAL.trunk];
@@ -208,6 +209,14 @@
     }
   }
 
+  /** voiture d'exposition (Garage Pasquier) : caisse, cabine vitrée, 4 roues */
+  function showCar(par, x, y, z, ry, mat) {
+    const s = grp(par, x, y, z, ry);
+    rb(s, 3.6, 0.7, 1.7, mat, 0, 0.62, 0, 0.15); rb(s, 2.0, 0.6, 1.5, mat, -0.2, 1.25, 0, 0.15);
+    b(s, 1.9, 0.42, 1.54, K.glass, -0.2, 1.26, 0);
+    for (const wx of [-1.15, 1.15]) for (const wz of [-0.8, 0.8]) { const wh = cy(s, 0.36, 0.36, 0.24, K.black, wx, 0.36, wz, 12); wh.rotation.x = PI / 2; }
+    return s;
+  }
   W.company = (key, C, P) => {
     const root = W.root;
     const y0 = (ML.Terrain && ML.Terrain.h) ? ML.Terrain.h(P.x, P.z) || 0 : 0;
@@ -390,6 +399,15 @@
       if (key === 'aerotech') { const pl = grp(g, 0, hw - 1.8, zb, 0.3); b(pl, 3, 0.4, 0.4, KI.white, 0, 0, 0); b(pl, 0.5, 0.06, 3, KI.white, 0, 0, 0); b(pl, 0.06, 0.6, 0.3, accent, -1.4, 0.3, 0); }
       worker(xL + 2, zIn + 0.85, 0, 'desk', { shirt: PAL.white, tie: C.roof }, {});
       worker(mx, zIn + 3.0, PI, 'wave', { shirt: C.roof }, {});
+    } else if (kind === 'concession') {                                          // V4.0 (portage) : Garage Pasquier — showroom
+      for (const [x, cc, ry] of [[xL + 3.2, M(PAL.shutterBlue), 0.25], [xR - 3.4, KI.red, -0.3]]) {
+        const z = zb; cy(g, 2.1, 2.1, 0.14, KI.white, x, 0.07, z, 20);           // podium
+        showCar(g, x, 0.14, z, ry, cc); col(x - 2.1, z - 1.3, x + 2.1, z + 1.3, 'car');
+      }
+      desk(g, 0, zIn + 1.4, 0); chair(g, 0, zIn + 0.6, 0, accent); col(-0.85, zIn + 0.9, 0.85, zIn + 1.9, 'desk');
+      b(g, 0.06, 1.4, 2.4, KI.white, xL + 0.06, 1.9, zb);                        // affiche « PROMO »
+      signPlane(g, A, 1, 2.2, 0.55, xL + 0.1, 2.9, zb, PI / 2);
+      worker(1.6, zb + 1.2, PI * 0.8, 'wave', { shirt: C.roof, tie: PAL.black }, {});
     } else if (kind === 'boulangerie') {
       rb(g, 3, 2.2, 2, KI.pot, xL + 2.2, 1.1, zIn + 1.3, 0.3); b(g, 1.4, 0.6, 0.05, KI.glow, xL + 2.2, 1.1, zIn + 2.32);   // four à pain
       col(xL, zIn, xL + 3.8, zIn + 2.4, 'four');
@@ -466,6 +484,13 @@
         for (const x of [-3, 3]) { rb(g, 0.8, 1.6, 0.6, KI.red, x, 0.8, d / 2 + 3.5, 0.08); b(g, 0.6, 0.3, 0.05, GLOW(PAL.plaster, 0.7), x, 1.3, d / 2 + 3.82); cy(g, 0.05, 0.05, 1, K.black, x + 0.45, 0.9, d / 2 + 3.5, 5); }
         const pumpPos = new THREE.Vector3(0, 0, d / 2 + 3.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), ang).add(new THREE.Vector3(P.x, 0, P.z));
         W.targets.push({ id: 'pump', x: pumpPos.x, y: y0 + 1.2, z: pumpPos.z, r: 4 }); ML.LOC.pump = { x: pumpPos.x, z: pumpPos.z };
+        break;
+      }
+      case 'concession': {                                                      // voiture d'occasion devant + fanions
+        const x = w / 2 - 2.6, z = d / 2 + 3.4; showCar(g, x, 0, z, PI / 2 + 0.2, M(PAL.lebecYellow)); col(x - 1.1, z - 2, x + 1.1, z + 2, 'car');
+        b(g, 0.9, 0.6, 0.05, KI.white, x + 1.3, 1.4, z + 1.2); b(g, 0.05, 1.1, 0.05, K.black, x + 1.3, 0.55, z + 1.2);   // pancarte prix
+        for (const sx of [-w / 2 - 1, w / 2 + 1]) b(g, 0.12, 5.5, 0.12, KI.white, sx, 2.75, d / 2 + 1.2);
+        for (let k = 0; k < 12; k++) { const f = b(g, 0.5, 0.45, 0.03, [KI.red, KI.white, M(PAL.shutterBlue)][k % 3], -w / 2 - 1 + (w + 2) * (k + 0.5) / 12, 5.0 - Math.sin((k + 0.5) / 12 * PI) * 0.8, d / 2 + 1.2); f.rotation.z = PI / 4; }
         break;
       }
       case 'police': {

@@ -53,6 +53,7 @@
     // caisses de machines pas encore installées (posées où on les a laissées hier)
     for (const c of (ML.ATELIER.crates || [])) K.spawnItem({ type: 'machine', d: { uid: c.uid, model: c.model } }, c.x, 0, c.z);
     K.inProd = {};
+    K.newbies = car.day > 1 ? car.workers.filter(w => !w.xp).map(w => w.legend || 'w_' + w.uid) : [];   // embauchés d'hier : premier jour
   };
   const strip = w => ({ uid: w.uid, name: w.name, trait: w.trait, speed: w.speed, lazy: w.lazy, salary: w.salary, assign: w.assign || null, legend: w.legend || null, look: w.look, xp: w.xp || 0 });
 
@@ -73,7 +74,7 @@
   mod.onDeliver = (pid, o) => {
     if (!on) return;
     const early = Math.max(0, (o.dl - S.rt) / o.dur), P = S.pl[pid];
-    const price = Math.round((o.price || CAT.PRICE[o.size || 'm']) * (0.9 + 0.25 * early) * (S.car.rooms.metrologie ? 1.1 : 1));
+    const price = Math.round((o.price || CAT.PRICE[o.size || 'm']) * (0.9 + 0.25 * early) * (S.car.rooms.metrologie ? 1.1 : 1) * (K.D ? K.D.pay || 1 : 1));   // difficulté : prix de vente
     book('vente', price, `Pièce #${o.id} (${o.part}) livrée à ${ML.COMPANIES[o.client].name}`, P ? P.name : null);
     K.big(`+${CR.fmt(price)}`, '#3ecf8e');
     const c = o.contract && S.car.contracts.find(x => x.id === o.contract);
@@ -83,7 +84,7 @@
   };
   mod.onFail = o => {
     if (!on) return;
-    const pen = Math.round((o.price || 150) * 0.25);
+    const pen = Math.round((o.price || 150) * 0.25 * (K.D ? K.D.pen || 1 : 1));   // difficulté : pénalités
     book('penalite', -pen, `Pénalité de retard #${o.id} (${ML.COMPANIES[o.client].name})`);
     S.car.rep = Math.max(0, S.car.rep - 2); car.stats.failed++;
   };
@@ -101,7 +102,7 @@
         C2.offers = C2.offers.filter(x => x !== o);
         C2.contracts.push(Object.assign({}, o, { left: o.qty, due: C2.day + o.days }));
         car.stats.signed++; checkGoals();
-        K.all(`📝 ${who} a signé le devis ${ML.COMPANIES[o.client].name} : ${o.qty} × ${o.part} (${CR.fmt(o.unit)} pièce, pour le jour ${C2.day + o.days}).`, 'good'); K.sfx('cash'); break;
+        K.all(`📝 ${who} a signé le devis ${o.who && ML.PEOPLE[o.who] ? ML.PEOPLE[o.who].name + ' (particulier, il passera au comptoir)' : ML.COMPANIES[o.client].name} :${o.qty} × ${o.part} (${CR.fmt(o.unit)} pièce, pour le jour ${C2.day + o.days}).`, 'good'); K.sfx('cash'); break;
       }
       case 'decline': C2.offers = C2.offers.filter(x => x.id !== m.id); break;
       case 'order': {
@@ -179,16 +180,16 @@
   mod.step = dt => {
     if (!on) return;
     K.goalT -= dt; if (K.goalT <= 0) { K.goalT = 5; checkGoals(); }
+    if (K.newbies && K.newbies.length && S.rt > 4) { for (const id of K.newbies) { const n = K.npcs[id]; if (n) K.say(n, ML.line ? ML.line(id, 'embauche', 'Bonjour ! Premier jour. On m’a dit de demander Lebec ?') : 'Bonjour, premier jour !'); } K.newbies = []; }
     for (const d of S.car.deliv.slice()) {
       if (S.rt < d.eta) continue;
       S.car.deliv = S.car.deliv.filter(x => x !== d);
       const Z = ML.LOC.livraison || { x: 0, z: 24 };
       if (d.kind === 'matiere') {
         if (S.car.rooms.stock) { S.stock[d.what] = (S.stock[d.what] || 0) + d.qty; K.all(`🚚 Livraison rangée au magasin : +${d.qty} ${CAT.SUPPLY[d.what].label}.`, 'good'); }
-        else {
-          const mat = ML.MATERIALS[d.what];
-          for (let q = d.qty; q > 0; q -= 3) K.spawnItem({ type: 'matiere', d: mat ? { mat: d.what, q: Math.min(3, q) } : { t: 1, tool: d.what, q: Math.min(3, q) } }, Z.x + (K.rng() - 0.5) * 4, 0, Z.z + (K.rng() - 0.5) * 3);
-          K.all(`🚚 Le camion a livré ${d.qty} × ${CAT.SUPPLY[d.what].label} en zone LIVRAISONS : à ranger en RÉCEPTION !`, 'good');
+        else {                                                       // V4.1 (portage) : un COLIS à ouvrir en réception, produits à ranger
+          K.spawnItem({ type: 'colis', d: { c: { [d.what]: d.qty }, n: d.qty } }, Z.x + (K.rng() - 0.5) * 4, 0, Z.z + (K.rng() - 0.5) * 3);
+          K.all(`🚚 Le camion a livré un COLIS (${d.qty} × ${CAT.SUPPLY[d.what].label}) en zone LIVRAISONS : porte-le en RÉCEPTION, ouvre-le (E) et range les produits !`, 'good');
         }
       } else if (d.kind === 'machine') {
         K.spawnItem({ type: 'machine', d: { uid: d.uid, model: d.model } }, Z.x, 0, Z.z);
@@ -224,13 +225,16 @@
     charge('charges', CAT.POWER * S.machDefs.length, `Électricité (${S.machDefs.length} machine${S.machDefs.length > 1 ? 's' : ''})`);
     charge('charges', CAT.LEVELS[C2.lvl].rent, `Loyer : ${CAT.LEVELS[C2.lvl].name}`);
     // devis en retard
-    for (const c of C2.contracts.slice()) if (C2.day + 1 > c.due) { const pen = Math.round(c.unit * c.left * 0.4); charge('penalite', pen, `Contrat ${ML.COMPANIES[c.client].name} non honoré (${c.left} pièce(s))`); C2.rep = Math.max(0, C2.rep - 6); C2.contracts = C2.contracts.filter(x => x !== c); }
+    for (const c of C2.contracts.slice()) if (C2.day + 1 > c.due) { const pen = Math.round(c.unit * c.left * 0.4 * (K.D ? K.D.pen || 1 : 1)); charge('penalite', pen, `Contrat ${ML.COMPANIES[c.client].name} non honoré (${c.left} pièce(s))`); C2.rep = Math.max(0, C2.rep - 6); C2.contracts = C2.contracts.filter(x => x !== c); }
     const earned = C2.ledger.filter(l => l.a > 0).reduce((a, l) => a + l.a, 0), spent = -C2.ledger.filter(l => l.a < 0).reduce((a, l) => a + l.a, 0);
     // réputation : satisfaction du jour
     C2.rep = U.clamp(C2.rep + Math.round((S.sat - 60) / 10), 0, 100);
     // → état persistant
     car.money = C2.money; car.rep = C2.rep; car.day = C2.day + 1; car.contracts = C2.contracts; car.stats.earned += earned; car.stats.spent += spent;
     car.stats.best = Math.max(car.stats.best, earned - spent);
+    // V4.1 (portage) : colis pas ouverts, produits pas rangés (par terre, en main, caisses matière) → la nuit, Lebec range tout en râlant
+    { const back = (k, n) => { if (CAT.SUPPLY[k] && n > 0) S.stock[k] = (S.stock[k] || 0) + n; }, loose = it => { const df = ML.Items.def(it) || {}; if (it.type === 'colis') for (const k in (it.d.c || {})) back(k, it.d.c[k]); else if (it.type === 'matiere') back(it.d.mat || it.d.tool, it.d.q || 0); else if (!it.d.oid && (df.kind === 'brut' || df.kind === 'tool')) back(df.mat || df.tool, 1); };
+      S.items.forEach(loose); for (const p of Object.values(S.pl)) p.inv.forEach(it => it && loose(it)); }
     for (const k in S.stock) if (car.stock[k] !== undefined || CAT.SUPPLY[k]) car.stock[k] = S.stock[k];
     // commandes pas encore arrivées : livrées demain matin
     car.deliveries = C2.deliv;

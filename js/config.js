@@ -33,8 +33,9 @@ ML.CFG = {
   SIZE: { s: { name: 'petite', pts: 0.8, prod: 0.8 }, m: { name: 'moyenne', pts: 1, prod: 1 }, l: { name: 'GROSSE', pts: 1.7, prod: 1.5 } },
   FENWICK: { accel: 7, brake: 18, max: 7, rev: 4, steer: 0.8, wb: 1.5, cap: 1 },
   CAMION: { accel: 8, brake: 18, max: 21, rev: 5, steer: 0.45, wb: 4.2, cap: 2, fuelUse: 0.05 },
-  ORDER: { base: 165, perStep: 60, far: 20, interval: 44, firstAt: 2 },
+  ORDER: { base: 215, perStep: 80, far: 30, interval: 44, firstAt: 2 },   // V4.1 (portage) : plus de temps pour faire les pièces (+30 % environ)
   PROD_SEC: 17, SUB_SEC: 18,
+  COFFEE: { mult: 1.45, sec: 60, secPro: 120 },                           // V4.1 (portage) : café = BEAUCOUP plus vite pendant 1 min (2 min café pro / salle de pause)
   START_STOCK: { acier: 4, alu: 4, inox: 3, plaquette: 3, fraise: 3, foret: 3 },
   SPEED_LIMIT: 16.7,                   // 60 km/h : au-delà, les radars flashent
   POLICE_TRIGGER: 19.5,                // 70 km/h près de la police : poursuite
@@ -45,7 +46,7 @@ ML.CFG = {
 ML.COLORS = [
   { name: 'Rouge', hex: 0xe74c3c, css: '#e74c3c' }, { name: 'Bleu', hex: 0x3498db, css: '#3498db' },
   { name: 'Vert', hex: 0x2ecc71, css: '#2ecc71' }, { name: 'Jaune', hex: 0xf1c40f, css: '#f1c40f' },
-  { name: 'Violet', hex: 0x9b59b6, css: '#9b59b6' }
+  { name: 'Violet', hex: 0x9b59b6, css: '#9b59b6' }, { name: 'Orange', hex: 0xe67e22, css: '#e67e22' }   // 6e joueur (V4.0)
 ];
 ML.MATERIALS = {
   acier: { label: 'ACIER', color: 0x8c9199, css: '#9aa0a8' }, alu: { label: 'ALU', color: 0xdfe5ea, css: '#e8edf1' },
@@ -132,11 +133,23 @@ ML.COMPANIES = {
   ublo: { name: 'Ublo', sub: 'Client', kind: 'client', npc: 'ublo', w: 20, d: 16, h: 9, wall: 'beton', color: 0xfdf2e9, roof: 0xff6f61, unlock: 3 },
   casse: { name: 'Casse Auto Jacquot', sub: 'Attention au chien !', kind: 'casse', npc: null, w: 22, d: 18, h: 4, wall: 'tole', color: 0x7f6a55, roof: 0x4b3b2a },
   usiflash: { name: 'UsiFlash', sub: 'Concurrent (louche)', kind: 'concurrent', npc: 'kevin', w: 20, d: 14, h: 7, wall: 'tole', color: 0xa29bfe, roof: 0x6c5ce7 },
+  concession: { name: 'Garage Pasquier', sub: 'Concessionnaire — véhicules neufs et d\'occasion', kind: 'concession', npc: 'vendeur', w: 22, d: 14, h: 7, wall: 'beton', color: 0xf5f6fa, roof: 0xc0392b },   // V4.0 (portage)
   carriere: { name: 'Carrière du Bec', sub: 'Client — granit (sur le plateau)', kind: 'client', npc: 'roudaut', w: 26, d: 18, h: 9, wall: 'tole', color: 0xb9b4ab, roof: 0x8a5a3c, plateau: true },
   barrage: { name: 'Barrage de Kerlebec', sub: 'Client — hydroélectricité (sur le plateau)', kind: 'client', npc: 'yvonne', w: 22, d: 16, h: 10, wall: 'beton', color: 0xdfe6e9, roof: 0x2a7fa8, plateau: true },
   police: { name: 'Gendarmerie', sub: 'Brigade routière', kind: 'police', npc: null, w: 16, d: 12, h: 7, wall: 'beton', color: 0xecf0f1, roof: 0x1f3a93 }
 };
 ML.CLIENTS = ['aerotech', 'agrimeca', 'novatics', 'ublo', 'carriere', 'barrage'];
+/* PARTICULIERS (V4.0, portage) : clients de passage qui viennent à pied au COMPTOIR de l'atelier (près de la porte)
+   commander une petite pièce urgente, bien payée. Pseudo-entreprise « part » NON énumérable : COMP.part.name marche
+   partout, mais le générateur de ville (Object.keys) ne lui construit pas de bâtiment. Logique : sim_roles.js (fin). */
+Object.defineProperty(ML.COMPANIES, 'part', { enumerable: false, value: { name: 'Particulier', sub: 'Client au comptoir', kind: 'particulier', npc: null, virtual: true, w: 1, d: 1, h: 1, wall: 'beton', color: 0xffffff, roof: 0xe84393 } });
+ML.PARTICULIERS = ['part1', 'part2', 'part3', 'part4'];
+/* Pièces demandées : [désignation, matière, type de machine, outil, gamme] */
+ML.PART_REQ = [['Axe de remorque', 'acier', 'tour', 'plaquette', ['tournage']], ['Bague de tracteur', 'alu', 'tour', 'plaquette', ['tournage', 'percage_tour']],
+  ['Entretoise de moto', 'alu', 'tour', 'plaquette', ['tournage']], ['Platine de portail', 'acier', 'fraiseuse', 'foret', ['percage']],
+  ['Patte de fixation', 'inox', 'fraiseuse', 'foret', ['percage', 'taraudage']], ['Came de tondeuse', 'acier', 'fraiseuse', 'fraise', ['fraisage']]];
+/* every : délai entre deux particuliers (s) · wait : patience au comptoir · dur : délai de la pièce · mult : prix × (pièce urgente) */
+ML.PARTI = { every: [150, 230], firstAt: [60, 110], wait: 90, dur: 260, mult: 2.2, price: 140, max: 2 };
 
 /* Véhicules de l'atelier (kind) */
 ML.VEHICLES = {
@@ -144,7 +157,7 @@ ML.VEHICLES = {
   ducato: { name: 'le Ducato', color: 0x95a5a6, seats: 3 }, tp: { name: 'le transpalette', color: 0xe67e22, seats: 0 },
   fenwick: { name: 'le fenwick', color: 0xf39c12, seats: 0, role: 'cariste' }, camion: { name: 'le camion', color: 0x2c6fbb, seats: 1, role: 'livreur' }
 };
-ML.RACE_COLORS = [0xf4c430, 0xe74c3c, 0x3498db, 0x2ecc71, 0x9b59b6];
+ML.RACE_COLORS = [0xf4c430, 0xe74c3c, 0x3498db, 0x2ecc71, 0x9b59b6, 0xe67e22];
 ML.EMOTES = ['👋', '👍', '😂', '😡', '💤', '🙏'];
 /* Campagne : 5 journées, la dernière = inspection (boss) */
 ML.CAMPAIGN = { days: 5, bossDay: 5 };
@@ -252,6 +265,46 @@ ML.UPGRADES = {
 };
 ML.APPRENTIS = [['Kylian', 0x2980b9], ['Lilou', 0xe84393], ['Enzo', 0x00b894], ['Inès', 0xfdcb6e], ['Nathan', 0x6c5ce7]];
 
+/* ===================== DIFFICULTÉS (portées de la V3.2, choisies au menu, cfg.game.diff) =====================
+   dur : durée des tickets · interval : temps entre deux tickets · chaos : feux / pannes / flaques / usure
+   anger : colère de Lebec quand il voit une claque · base : colère minimale · run : vitesse de Lebec
+   sight : portée de son regard · points : score (hors carrière) · stars : seuils d\'étoiles
+   events : nombre de visiteurs surprise [min, max] · pay : prix de vente (carrière) · pen : pénalités (carrière) */
+ML.DIFFS = {
+  facile: { name: 'Facile', icon: '🙂', desc: 'Tickets longs, peu de chaos, Lebec patient, pénalités divisées par deux.', dur: 1.4, interval: 1.3, chaos: 0.5, anger: 0.6, base: 0, run: 0.9, points: 1, stars: 0.75, events: [1, 2], pay: 1, pen: 0.5, dmg: 0.6 },
+  normal: { name: 'Normal', icon: '😐', desc: 'L\'atelier comme d\'habitude.', dur: 1, interval: 1, chaos: 1, anger: 1, base: 0, run: 1, points: 1, stars: 1, events: [2, 4], pay: 1, pen: 1 },
+  difficile: { name: 'Difficile', icon: '😤', desc: 'Tickets serrés, pannes et feux fréquents, Lebec à cran. Pièces payées +10 %.', dur: 0.85, interval: 0.85, chaos: 1.5, anger: 1.3, base: 10, run: 1.08, points: 1.2, stars: 1.1, events: [3, 4], pay: 1.1, pen: 1.3, dmg: 1.25 },
+  feu: { name: 'LEBEC EN FEU', icon: '🔥', desc: 'Tout brûle. Lebec voit tout, court vite et cogne fort. Points ×1,5, pièces payées +25 %, pénalités salées.', dur: 0.75, interval: 0.7, chaos: 2.2, anger: 1.8, base: 25, run: 1.18, points: 1.5, stars: 1.2, events: [4, 5], sight: 1.6, pay: 1.25, pen: 1.6, dmg: 1.6 }
+};
+/* Astuces affichées au menu (guide, partie solo, salon) */
+ML.TIPS = [
+  'Regarde la couleur du ticket : plus la barre est rouge, plus c\'est urgent.',
+  'Un outil lancé (clic droit) à un usineur qui l\'attend, il l\'attrape au vol !',
+  'Les caisses se lancent aussi dans la benne de la Mégane. Gain de temps garanti.',
+  'Contrôle tes pièces au MARBRE : une pièce non conforme repérée à temps, c\'est un client content.',
+  'Carrière : tout se gère au PC du BE (LebecOS 95) — devis, machines, matière, embauches, travaux.',
+  'Une machine achetée arrive EN CAISSE : fenwick ou transpalette (R), puis E pour l\'installer.',
+  'Machine manuelle (vieux tour) : prends les commandes toi-même, c\'est un mini-jeu et c\'est plus rapide.',
+  'La route en corniche est plus courte… et plus dangereuse. Les clients du plateau paient mieux.',
+  'Matis ralentit quand il a faim : une viennoiserie et il repart.',
+  'Sors de l\'atelier pour mettre une claque : Lebec ne voit que ce qui s\'y passe.',
+  'Un bac à copeaux plein bloque la machine : appelle la maintenance (T = ping).',
+  'Le pigeon vole les plaquettes : lance-lui n\'importe quoi pour qu\'il la lâche.',
+  'Radars en ville, gendarmerie, prison : les amendes sont à TON nom dans la compta.',
+  'Touche M : la carte complète. Clic = repère pour toute l\'équipe.',
+  'KO ? Pas de panique : le médecin (ou le Docteur Gwenn, un peu lent) va venir.',
+  'En virage, les caisses tombent de la benne. Ralentis… ou rattrape-les.',
+  'L\'huile soluble fait glisser : la soufflette sèche les flaques.',
+  'Multijoueur : un pote peut rejoindre le salon même quand la journée a commencé (jusqu\'à 6).',
+  'F1 : l\'aide de Lebec. Tab : les commandes. K : couper le son.',
+  '« C\'est écrit dans le poly ! » — François Lebec, tous les jours depuis 1987.',
+  'Un particulier au COMPTOIR (près de la porte) ? E pour prendre sa commande : petite pièce urgente, bien payée. Ne le fais pas attendre !',
+  'Un colis livré : R pour l\'ouvrir (tout tombe par terre), puis E sur le rack ou l\'armoire avec les produits en main pour les ranger.',
+  'Touche M : clique sur la carte pour poser un repère, le trajet s\'affiche comme un GPS. Une caisse à livrer en main ? Le GPS te guide tout seul.',
+  'Un café et tu vas BEAUCOUP plus vite pendant une minute.',
+  'Les caisses se lancent aussi sur le plateau du camion (clic droit).'
+];
+
 /* Rôles (choisis au salon). Sans joueur pour un rôle, un PNJ le fait… lentement. */
 ML.ROLES = {
   poly: { name: 'Polyvalent', icon: '🛠️', color: 0x7f8c8d, css: '#95a5a6', desc: 'Usine, transporte et livre les petites et moyennes pièces. Plusieurs joueurs peuvent l\'être.' },
@@ -290,6 +343,12 @@ ML.PEOPLE = {
   novatics: { name: 'Accueil Novatics', role: 'Client — Novatics', look: { skin: 0xe6b48d, shirt: 0x00a8e8, pants: 0x2d3e50, hair: 0x2a2a2a, height: 1.76 } },
   ublo: { name: 'Accueil Ublo', role: 'Client — Ublo', look: { skin: 0xf0c8a0, shirt: 0xff6f61, pants: 0x34495e, hair: 0x4a3426, height: 1.7, longHair: true } },
   kevin: { name: 'Kévin', role: "Chef d'atelier — UsiFlash", look: { skin: 0xd9a37a, shirt: 0x6c5ce7, pants: 0x222222, hair: 0x111111, height: 1.77, cap: 0x111111 } },
+  vendeur: { name: 'Bernard Pasquier', role: 'Concessionnaire — Garage Pasquier', look: { skin: 0xe8b98f, shirt: 0xc0392b, pants: 0x1c1c1c, hair: 0xbdc3c7, height: 1.79, width: 1.15, glasses: true } },
+  // particuliers (V4.0, portage) : viennent au comptoir de l'atelier
+  part1: { name: 'Gérard Le Floch', role: 'Agriculteur', visitor: true, look: { skin: 0xe2b48c, shirt: 0x27ae60, pants: 0x34495e, hair: 0xbdc3c7, height: 1.76, width: 1.2 } },
+  part2: { name: 'Mme Rousseau', role: 'Retraitée bricoleuse', visitor: true, look: { skin: 0xf3cba5, shirt: 0x8e44ad, pants: 0x555555, hair: 0xdddddd, height: 1.6, longHair: true, glasses: true } },
+  part3: { name: 'Jean-Mi', role: 'Motard', visitor: true, look: { skin: 0xd9a37a, shirt: 0x111111, pants: 0x1f4e9a, hair: 0x3b2a1a, height: 1.84, beard: true } },
+  part4: { name: 'Patrick', role: 'Voisin (portail cassé)', visitor: true, look: { skin: 0xf0c8a0, shirt: 0xe67e22, pants: 0x34495e, hair: 0x8b5a2b, height: 1.72, width: 1.25 } },
   // visiteurs et événements
   jacky: { name: 'Jacky Foucher', role: 'Inspecteur Qualité', visitor: true, look: { skin: 0xe8b98f, shirt: 0xf4f4f4, pants: 0x2c3e50, hair: 0x555555, height: 1.86, tie: 0x2c3e50, glasses: true } },
   herve: { name: 'Hervé Lehec', role: 'Référent stages', visitor: true, look: { skin: 0xeec4a0, shirt: 0xbfa77a, pants: 0x4d4d4d, hair: 0x777777, height: 1.74, glasses: true } },
@@ -326,6 +385,11 @@ ML.LINES = {
   novatics: ['Bonjour ! Vous avez notre commande ?'],
   ublo: ["Salut ! C'est pour nous ?"],
   kevin: ['Chut. On ne s\'est jamais vus.', 'Une caisse de chez Lebec ? Je prends, je prends.'],
+  vendeur: ['Elle a jamais roulé sous la pluie, celle-là !', 'Pour vous, je fais un prix. Enfin… presque.', 'Contrôle technique ? Il passera. Sûrement.', 'Le Kangoo de Lebec ? Je le reprends pas, même gratuit.'],
+  part1: ['Mon tracteur est en panne en pleine moisson !', 'Vous me sauvez la vie, là.'],
+  part2: ['C\'est pour ma remorque, mon défunt mari la bichonnait…', 'Merci jeune homme !'],
+  part3: ['Ma bécane démarre plus, faut que ça roule ce week-end !', 'Trop stylé, merci !'],
+  part4: ['Le portail ne ferme plus, les chiens du voisin rentrent !', 'Impeccable, merci les gars.'],
   jacky: ['MIP/MAP irréprochable, appui plan sur la Réf A.', 'Apportez-moi une caisse au marbre. Tout de suite.'],
   herve: ['Alors, ce stage, trouvé ? Et la convention ?', "Pas de convention, pas d'outils ! C'est le règlement."],
   fred: ["Tu as pensé à l'alternance ? Penses-y... Naval Group recrute !", 'Tu as rempli Arexis ? ARÉXIS !'],
@@ -333,6 +397,66 @@ ML.LINES = {
   saboteur: ['Rien à voir, je passe.', 'Hé hé hé...'],
   inspecteur: ['Je note. Je note tout.', 'Votre référentiel de compétences, je vous prie.', 'Infraction !']
 };
+/* Les listes ci-dessus sont des SECOURS : js/persos.js (chargé juste après) les remplace et en ajoute
+   des centaines (une par situation : ML.LINES[id + '_' + situation], ML.LINE_META[clé] = { o: id, sit }).
+   - ML.line(id, situation, secours) : tirage « paquet de cartes » (jamais deux fois la même tant que
+     la liste n'a pas été dite en entier). Cherche la liste du perso, puis celle de son trait (ouvriers
+     embauchés : [robot], [gourmand]…), puis [ouvrier], puis [tous], sinon `secours` (texte ou tableau).
+   - ML.redraw(texte, id) : si `texte` est une réplique connue (ou commence par une), la remplace par un
+     tirage de la même situation pour ce perso. Branché dans K.say (sim.js) et les dialogues : les
+     phrases écrites en dur ailleurs profitent ainsi des listes de persos.js. */
+(function () {
+  const bags = {};
+  ML.LINE_META = ML.LINE_META || {};
+  ML.PERSO_TRAITS = { forgetful: 'tete_en_lair', robot: 'robot', hungry: 'gourmand', deadstop: 'flemmard', apprenti: 'apprenti' };
+  const has = k => Array.isArray(ML.LINES[k]) && ML.LINES[k].length > 0;
+  const keyOf = (o, sit) => sit && sit !== 'repliques' ? o + '_' + sit : o;
+  ML.drawLine = k => {
+    const a = ML.LINES[k]; if (!a || !a.length) return undefined;
+    let b = bags[k];
+    if (!b || b.src !== a || !b.q.length) {
+      const q = a.slice();
+      for (let j = q.length - 1; j > 0; j--) { const r = Math.floor(Math.random() * (j + 1)); [q[j], q[r]] = [q[r], q[j]]; }
+      if (b && b.last && q.length > 1 && q[q.length - 1] === b.last) [q[0], q[q.length - 1]] = [q[q.length - 1], q[0]];
+      b = bags[k] = { src: a, q, last: b && b.last };
+    }
+    return (ML.drawLine.last = b.last = b.q.pop());
+  };
+  ML.lineChain = id => {
+    const P = id && ML.PEOPLE[id], out = [id];
+    if (P && P.op) { for (const t of P.op.traits || []) if (ML.PERSO_TRAITS[t]) out.push(ML.PERSO_TRAITS[t]); out.push('ouvrier'); }
+    out.push('tous'); return out;
+  };
+  ML.line = (id, sit, fb) => {
+    const own = keyOf(id, sit); if (has(own)) return ML.drawLine(own);
+    const rest = ML.lineChain(id).slice(1).map(o => keyOf(o, sit)).filter(has);
+    if (rest.length) return ML.drawLine(sit && sit !== 'repliques' ? rest[0] : rest[Math.floor(Math.random() * rest.length)]);
+    return Array.isArray(fb) ? fb[Math.floor(Math.random() * fb.length)] : fb;
+  };
+  let idx = null;
+  const ALIAS = { tirade: { o: 'lebec', sit: 'tirades' }, cocoBoxe: { o: 'coco', sit: 'boxe' } };
+  function build() {
+    idx = new Map();
+    for (const k in ML.LINES) {
+      const a = ML.LINES[k], meta = ML.LINE_META[k] || ALIAS[k] || { o: k, sit: null }; if (!Array.isArray(a)) continue;
+      for (const s of a) if (typeof s === 'string') { const l = idx.get(s) || []; if (!l.some(e => e.o === meta.o && e.sit === meta.sit)) l.push(meta); idx.set(s, l); }
+    }
+  }
+  function find(s, id) {
+    const c = idx.get(s); if (!c) return null;
+    const ch = id && ML.PEOPLE[id] ? ML.lineChain(id) : null, ok = ch ? c.filter(e => ch.includes(e.o)) : c;
+    return ok.find(e => e.sit) || ok[0] || null;
+  }
+  ML.lineMeta = s => { if (!idx) build(); return find(s); };      // { o, sit } d'une réplique connue, sinon null
+  ML.redraw = (s, id) => {
+    if (typeof s !== 'string' || !s || s === ML.drawLine.last) return s;
+    if (!idx) build();
+    let e = find(s, id); if (e) return ML.line(id && ML.PEOPLE[id] ? id : e.o, e.sit, s);
+    const m = s.match(/^(.+?[.!?…»])\s+(\S[\s\S]*)$/);
+    if (m && (e = find(m[1], id))) return ML.line(id && ML.PEOPLE[id] ? id : e.o, e.sit, m[1]) + ' ' + m[2];
+    return s;
+  };
+})();
 
 ML.QUIZ_JACKY = [
   ["Pour la mise en position, où placez-vous l'appui plan ?", 'Sur la surface Réf A', 'Sur la face la plus large', 'Sur la Réf C', 'On serre fort, ça ira'],

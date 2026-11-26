@@ -18,6 +18,7 @@ Conception et contrats d'API : **docs/V5-CONCEPTION.md**. Résumé :
 - **Patch note** : soufflette au tuyau (`sim_law.js`), gendarmerie → prison → caution, entreprises visitables.
 - **Multijoueur** (`server.js`, `net.js`, `lobby.js`) : entreprises partagées (`saves/careers/<id>.json` sur GitHub), sauvegarde auto à mi-journée, reprise d'hôte.
 - **Tutoriel** (`tuto.js`) : Lebec guide le jour 1 + astuces contextuelles (F1 / F2).
+- **Reports de la branche V4.0→V4.5 (Timothée)** : `persos.js` (≈560 répliques, `ML.line` / `ML.redraw` dans config.js, tirage sans répétition), accueil SOLO / MULTIJOUEUR + guide (`ML.TIPS`), **difficultés** `ML.DIFFS` (facile, normal, difficile, LEBEC EN FEU → `cfg.game.diff`, `K.D`), **6 joueurs** et **rejoindre en cours de partie**, **PWA** (`manifest.webmanifest`, `sw.js` réseau d'abord : changer `CACHE` après une grosse mise à jour), touches M/Tab/AZERTY réparées, ping visible, événements en bas à gauche, **particuliers** au comptoir (`ML.PARTICULIERS`, offres au BE en carrière), **Garage Pasquier** (`concession`), **GPS** (`gps.js`), **colis** à ouvrir à la réception et ranger, caisses lancées dans le camion, café rapide (`CFG.COFFEE`), +30 % de temps sur les tickets. Non reportés (remplacés par la carrière V5) : sim_eco.js, erp.js, codes de sauvegarde, achat de véhicules au garage.
 - Dev : `index.html#cam=x,y,z,cx,cy,cz&lvl=N&rooms=be,stock&demo` (vue fixe du menu), serveur local sans cache `.claude/devserver.py`.
 
 ## V4 — REFONTE VISUELLE (nov. 2026) : à lire en premier
@@ -56,7 +57,7 @@ Style « jouet low-poly » : aplats, ombrage toon à 3 tons, proportions un peu 
 | Historique des dépenses (amendes par joueur) | ❌ non fait (c'est surtout de la logique + un écran HUD) | à faire |
 
 ## 1. Le projet
-Jeu coopératif 3D façon *Overcooked* en atelier d'usinage, 1 à 5 joueurs dans le navigateur, clavier/souris ou manette.
+Jeu coopératif 3D façon *Overcooked* en atelier d'usinage, 1 à 6 joueurs dans le navigateur, clavier/souris ou manette.
 V2 = V1 (multi validé) + les 4 vagues demandées : chaos, ville vivante, mini-jeux/événements/visiteurs/humeur, campagne/comptes/boutique/succès/traître/inspecteur.
 
 ## 2. Contraintes (à respecter)

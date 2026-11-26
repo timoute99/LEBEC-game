@@ -90,16 +90,17 @@
   })();
 
   /** Texte affiché pour une cible, ou null si rien à faire */
+  const myInv = () => { const S = S_(); return S && S.pl[ML.Game.me] ? S.pl[ML.Game.me].inv : []; };
   R.label = id => {
     const G = ML.Game, S = G.S; if (!S) return null;
     const held = G.held(), [kind, a, b] = id.split(':');
     switch (kind) {
-      case 'rack': return `Prendre un brut ${ML.MATERIALS[a].label} (stock : ${S.stock[a]})`;
-      case 'tool': return S.evs && S.evs.herve ? '🔒 Armoire bloquée par Hervé : il veut sa convention !' : `Prendre : ${ML.TOOLS[a].label} (stock : ${S.stock[a]})`;
-      case 'coffee': return `Café : sprint plus long (${S.up && S.up.cafe_pro ? 90 : 40} s)`;
+      case 'rack': { const n = myInv().filter(x => x && x.type === 'brut_' + a).length; return n ? `📦 Ranger ${n} barre${n > 1 ? 's' : ''} ${ML.MATERIALS[a].label} dans le rack (stock : ${S.stock[a]})` : `Prendre un brut ${ML.MATERIALS[a].label} (stock : ${S.stock[a]})`; }   // V4.1 : ranger
+      case 'tool': { if (S.evs && S.evs.herve) return '🔒 Armoire bloquée par Hervé : il veut sa convention !'; const n = myInv().filter(x => x && x.type === a).length; return n ? `📦 Ranger ${n} × ${ML.TOOLS[a].label} dans l'armoire (stock : ${S.stock[a]})` : `Prendre : ${ML.TOOLS[a].label} (stock : ${S.stock[a]})`; }
+      case 'coffee': { const C2 = ML.CFG.COFFEE || { sec: 60, secPro: 120 }; return `☕ Café : tu vas BEAUCOUP plus vite (${(S.up && S.up.cafe_pro) || (S.car && S.car.rooms && S.car.rooms.pause) ? C2.secPro : C2.sec} s)`; }
       case 'frigo': return 'Frigo : prendre des viennoiseries';
       case 'casques': return 'Prendre un casque de sécurité';
-      case 'reception': return held && held.type === 'matiere' ? 'Déposer la caisse en réception (+ stock)' : null;
+      case 'reception': return held && held.type === 'colis' ? `📦 OUVRIR le colis (${held.d.n || '?'} articles par terre, à ranger au rack / à l'armoire)` : held && held.type === 'matiere' ? 'Déposer la caisse en réception (+ stock)' : null;
       case 'printer': return S.evs && S.evs.herve ? '📝 Imprimer la convention de stage' : null;
       case 'pc': return S.evs && S.evs.fred ? '💻 Remplir ARÉXIS (Fred partira)' : (S.car && !ML.World.target('be') ? '💻 PC du BE : allumer LebecOS 95' : null);
       case 'be': return S.car ? '💻 PC du BE : allumer LebecOS 95' : null; // V5 (be.js)
@@ -116,7 +117,7 @@
         return M.chips >= 15 ? `🗑 Prendre le bac de copeaux de ${a} (${Math.round(M.chips)} %)` : null;
       }
       case 'benne': return held && held.type === 'rebut' ? `♻ Jeter le rebut #${held.d.oid} (la ferraille rembourse un peu)` : held && held.type === 'bac_plein' ? '🗑 Vider le bac dans la benne à copeaux' : null;
-      case 'item': { const it = G.itemViews[a]; if (!it) return null; if (it.type === 'machine' && ML.Place) return ML.Place.crateLabel(it); if (it.type === 'palette') return `🏗 Palette #${it.d.oid} : trop lourd ! Fenwick (cariste)`; return it.type === 'find' ? `★ Ramasser la trouvaille : ${IT.name(it)}` : `Ramasser : ${IT.name(it)}`; }
+      case 'item': { const it = G.itemViews[a]; if (!it) return null; if (it.type === 'machine' && ML.Place) return ML.Place.crateLabel(it); if (it.type === 'palette') return `🏗 Palette #${it.d.oid} : trop lourd ! Fenwick (cariste)`; if (it.type === 'colis') return `📦 Porter le colis (${it.d.n || '?'} articles) → à ouvrir en RÉCEPTION (E)`; return it.type === 'find' ? `★ Ramasser la trouvaille : ${IT.name(it)}` : `Ramasser : ${IT.name(it)}`; }
       case 'car': {
         const c = S.cars[+a]; if (!c) return null;
         if (ML.Law && ML.Law.hasHose() && (b === 'door' ? !(held && held.type === 'jerrican') : !held && !c.bed.length)) return '🔴 Soufflette en main : le tuyau est trop court !';
@@ -128,7 +129,11 @@
           return `Conduire ${c.name}` + (['tp', 'fenwick'].includes(c.kind) ? '' : ` (⛽ ${c.fuel} %)`) + (c.kind === 'fenwick' ? ' — R : fourches' : c.kind === 'tp' && S.machDefs ? ' — R : lever une caisse machine' : c.kind === 'camion' ? ' — R : décharger' : '');
         }
         if (c.kind === 'fenwick') return null;
-        if (c.kind === 'camion') return c.bed.length ? `Camion : ${c.bed.length} palette(s)` : null;
+        if (c.kind === 'camion') {                                   // V4.1 : caisses aussi sur le plateau
+          const free = c.cap * 4 - c.bed.reduce((t, it) => t + (IT.heavy(it) ? 4 : 1), 0), np = c.bed.filter(it => IT.heavy(it)).length, nc = c.bed.length - np;
+          if (held && (IT.bulky(held) || held.type === 'piece') && !IT.heavy(held)) return free >= 1 ? `Charger sur le plateau du camion (${free} place${free > 1 ? 's' : ''})` : 'Plateau du camion plein';
+          return nc ? `Décharger une caisse du camion (${nc} caisse${nc > 1 ? 's' : ''}${np ? `, ${np} palette${np > 1 ? 's' : ''}` : ''})` : np ? `Camion : ${np} palette(s)` : null;
+        }
         if (!held && !c.bed.length && ML.VEHICLES[c.kind].seats > 1 && (c.pass || []).filter(x => x.seat !== 'cab').length < 2) return '🛻 Monter dans la benne';
         if (held && (IT.bulky(held) || held.type === 'piece') && !IT.heavy(held)) return c.bed.length >= c.cap ? (c.kind === 'tp' ? 'Transpalette plein' : 'Benne pleine') : `Charger ${c.kind === 'tp' ? 'sur le transpalette' : 'dans la benne'} (${c.bed.length}/${c.cap})`;
         return c.bed.length ? `Décharger une caisse (${c.bed.length} chargée${c.bed.length > 1 ? 's' : ''})` : null;
@@ -153,6 +158,12 @@
       if (held && held.type === 'viennoiseries' && ML.PEOPLE[n] && ML.PEOPLE[n].op && ML.PEOPLE[n].op.traits.includes('hungry')) return 'Donner les viennoiseries à Matis (+40 % vitesse)';
       if (held && (['brut', 'tool'].includes(IT.def(held).kind) || held.type === 'encours')) return machineLabel(mid, held);
       return `Parler à ${opName(n)}`;
+    }
+    if ((ML.PARTICULIERS || []).includes(n)) {                       // V4.0 : particuliers au comptoir (sim_roles.js)
+      const p = (S.parts || []).find(x => x.id === n); if (!p) return null;
+      if (p.st === 'wait') return `🙋 ${P_(n).name} : prendre sa commande (« ${p.part} », urgent)`;
+      if (p.st === 'order') return isPart(held) ? (held.d.oid === p.oid ? `🙋 Remettre la pièce #${p.oid} à ${P_(n).name}` : `${P_(n).name} attend la #${p.oid}, pas celle-là !`) : `🙋 ${P_(n).name} attend sa pièce #${p.oid}`;
+      return null;
     }
     switch (n) {
       case 'lebec': return held && held.type === 'convention' && !held.d.signee ? '✍ Faire signer la convention à Lebec' : S.rule === 'no_lebec' ? 'Parler à Lebec (INTERDIT par l\'inspecteur !)' : 'Parler à François Lebec';

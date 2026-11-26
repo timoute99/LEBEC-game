@@ -17,7 +17,7 @@
     S.evs = {}; K.sched = []; K.vcd = {}; K.lastPos = {};
     if (S.mode !== 'course') {
       const pool = K.shuffle(['audit', 'coupure', 'sabotage', 'herve', 'fred', 'mathieu', 'panne']);
-      const n = S.mode === 'inspection' ? 2 : 2 + Math.floor(rng() * 3);
+      const ev = K.D.events, n = S.mode === 'inspection' ? Math.max(1, ev[0]) : ev[0] + Math.floor(rng() * (ev[1] - ev[0] + 1));   // difficulté : nombre de visiteurs
       const times = []; for (let i = 0; i < n; i++) times.push(60 + rng() * 340);
       times.sort((a, b) => a - b).forEach((t, i) => K.sched.push({ k: pool[i], t: Math.max(t, (K.sched.length ? K.sched[K.sched.length - 1].t : 0) + 45) }));
     }

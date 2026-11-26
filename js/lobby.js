@@ -1,7 +1,9 @@
 /* =====================================================================
-   lobby.js — Menus : accueil (compte / invité, solo, créer / rejoindre),
-   profil (apparence + boutique), salon (5 joueurs, mode de jeu choisi
-   par l'hôte), et la CAMPAGNE (sauvegardée sur le PC de l'hôte).
+   lobby.js — Menus : accueil sobre (SOLO / MULTIJOUEUR, compte, perso,
+   guide & astuces, bouton « Installer le jeu »), partie solo, multijoueur
+   (créer / rejoindre, même en cours de partie), salon (6 joueurs, mode et
+   DIFFICULTÉ choisis par l'hôte), profil (apparence + boutique) et la
+   CAMPAGNE (sauvegardée sur le PC de l'hôte).
    ===================================================================== */
 (function () {
   const L = ML.Lobby = {};
@@ -40,27 +42,68 @@
     c.budget -= u.price; c.up[k] = lvl + 1; Camp.save(c); ML.Sfx.play('cash'); return null;
   };
 
+  /* ======================= Écrans ======================= */
+  const SCREENS = ['scr-home', 'scr-account', 'scr-guide', 'scr-solo', 'scr-multi', 'scr-profile', 'scr-room'];
+  L.screen = id => {
+    if (id !== 'scr-profile') L.cur = id;
+    L.show(); for (const k of SCREENS) $(k).classList.toggle('hidden', k !== id);
+    const pv = id === 'scr-profile'; L.el.classList.toggle('preview', pv); if (ML.Main.preview) ML.Main.preview(pv);
+    if (id !== 'scr-profile') L.tip();
+  };
+  /** Astuce au hasard (accueil, solo, salon) */
+  L.tip = () => { const t = U.pick(ML.TIPS || ['']); for (const id of ['tip-home', 'tip-h', 'tip-r']) if ($(id)) $(id).innerHTML = '💡 ' + U.esc(t); };
+  /** Appli installable (PWA, V4.1) : bouton « Installer le jeu » (Chrome / Edge), icône sur le bureau, sa propre fenêtre */
+  L.initInstall = () => {
+    const web = /^https?:/.test(location.protocol), btn = $('go-install');
+    const installed = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+    if (web && 'serviceWorker' in navigator && !ML.debug) navigator.serviceWorker.register('sw.js').catch(() => { /* rien */ });
+    if (!web || installed()) return;
+    btn.classList.remove('hidden');
+    window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); L.installEv = e; });
+    window.addEventListener('appinstalled', () => { btn.classList.add('hidden'); ML.HUD.toast('📲 Jeu installé ! Lance-le depuis l\'icône « Mécanique Lebec » sur ton bureau.'); });
+    btn.onclick = async () => {
+      if (!L.installEv) return ML.HUD.toast(/iPhone|iPad/.test(navigator.userAgent) ? 'Sur iPhone : bouton Partager, puis « Sur l\'écran d\'accueil ».' : 'Ouvre le jeu dans Chrome ou Edge : menu ⋮ → « Installer Mécanique Lebec » (ou l\'icône ⊕ dans la barre d\'adresse).');
+      L.installEv.prompt(); const r = await L.installEv.userChoice; L.installEv = null;
+      if (r && r.outcome === 'accepted') btn.classList.add('hidden');
+    };
+  };
+  /** Difficulté choisie (h = solo, r = salon) */
+  L.diff = p => { const v = $(p + '-diff').value; return ML.DIFFS && ML.DIFFS[v] ? v : 'normal'; };
+
   /* ======================= Init ======================= */
   L.init = () => {
     L.el = $('lobby');
     A.load();
-    $('in-name').value = A.name();
+    $('in-name').value = A.name(); $('m-name').value = A.name(); $('r-name').value = A.name();
     $('in-server').value = N.defaultUrl();
     if (/^https?:/.test(location.protocol)) $('server-row').classList.add('hidden');
     L.renderAccount();
-    $('btn-solo').onclick = () => { if (!L.name()) return; ML.Sfx.init(); const cfg = L.gameCfg('h'); ML.Game.start({ solo: true, seed: cfg.seed || Date.now() >>> 0, me: 'solo', host: 'solo', players: [{ id: 'solo', name: L.name(), idx: 0 }], game: cfg }); };
-    $('btn-create').onclick = async () => { if (!L.name() || !(await L.ensure())) return; N.send({ t: 'create', priv: $('in-priv').checked }); };
-    $('btn-join').onclick = async () => { const code = $('in-code').value.trim().toUpperCase(); if (!L.name()) return; if (code.length !== 4) return ML.HUD.toast('Le code fait 4 lettres.'); if (!(await L.ensure())) return; N.send({ t: 'join', code }); };
-    $('btn-list').onclick = async () => { if (!L.name() || !(await L.ensure())) return; N.send({ t: 'list' }); };
-    $('btn-start').onclick = async () => { if ($('r-mode').value === 'carriere') await L.ensureCareer(); const cfg = L.gameCfg('r'); N.send({ t: 'start', seed: cfg.seed || (Math.random() * 1e9) >>> 0, cfg }); };
+    // navigation (accueil sobre)
+    $('go-solo').onclick = () => { L.screen('scr-solo'); L.renderRoles(); L.renderModes(); };
+    $('go-multi').onclick = async () => { L.screen('scr-multi'); if (N.online || /^https?:/.test(location.protocol)) { if (await L.ensure()) N.send({ t: 'list' }); } };
+    $('go-account').onclick = () => { L.screen('scr-account'); L.renderAccount(); };
+    $('go-perso').onclick = () => { L.cur = 'scr-home'; L.showProfile(); };
+    $('go-guide').onclick = () => { L.screen('scr-guide'); $('guide-tips').innerHTML = (ML.TIPS || []).map(t => `<li>${U.esc(t)}</li>`).join(''); };
+    for (const b of L.el.querySelectorAll('.back')) b.onclick = () => L.showHome();
+    $('btn-solo').onclick = () => { const n = L.name('h'); if (!n) return; ML.Sfx.init(); const cfg = L.gameCfg('h'); ML.Game.start({ solo: true, seed: cfg.seed || Date.now() >>> 0, me: 'solo', host: 'solo', players: [{ id: 'solo', name: n, idx: 0 }], game: cfg }); };
+    $('btn-create').onclick = async () => { if (!L.name('m') || !(await L.ensure())) return; N.send({ t: 'create', priv: $('in-priv').checked }); };
+    $('btn-join').onclick = async () => { const code = $('in-code').value.trim().toUpperCase(); if (!L.name('m')) return; if (code.length !== 4) return ML.HUD.toast('Le code fait 4 lettres.'); if (!(await L.ensure())) return; N.send({ t: 'join', code }); };
+    $('btn-list').onclick = async () => { if (!L.name('m') || !(await L.ensure())) return; N.send({ t: 'list' }); };
+    $('btn-start').onclick = async () => { if (!L.name('r')) return; if ($('r-mode').value === 'carriere') await L.ensureCareer(); const cfg = L.gameCfg('r'); N.send({ t: 'start', seed: cfg.seed || (Math.random() * 1e9) >>> 0, cfg }); };
     $('btn-leave').onclick = () => { N.send({ t: 'leave' }); L.showHome(); };
     $('btn-copy').onclick = () => { try { navigator.clipboard.writeText(N.room.code); ML.HUD.toast('Code copié !'); } catch (e) { /* rien */ } };
-    $('btn-profile').onclick = () => L.showProfile();
-    $('btn-prof-back').onclick = () => L.showHome();
+    $('r-name').onchange = () => L.name('r');
+    $('btn-profile').onclick = () => L.showProfile(); $('btn-profile-r').onclick = () => L.showProfile();
+    $('btn-prof-back').onclick = () => { if (L.cur === 'scr-room' && N.room) L.showRoom(); else if (L.cur && L.cur !== 'scr-home') { L.screen(L.cur); L.renderRoles(); L.renderModes(); } else L.showHome(); };
+    // difficulté (mémorisée sur ce PC) ; le choix de l'hôte est montré aux autres joueurs du salon
+    const lastDiff = localStorage.getItem('ml_diff'); if (ML.DIFFS && ML.DIFFS[lastDiff]) { $('h-diff').value = lastDiff; $('r-diff').value = lastDiff; }
+    for (const p of ['h', 'r']) $(p + '-diff').onchange = () => { localStorage.setItem('ml_diff', $(p + '-diff').value); L.renderModes(); if (p === 'r') L.sendCfg(); };
+    $('r-traitor').onchange = () => L.sendCfg();
+    setInterval(() => { if (!L.el.classList.contains('hidden') && L.cur !== 'scr-guide') L.tip(); }, 9000);
     $('btn-login').onclick = () => L.auth('login');
     $('btn-register').onclick = () => L.auth('register');
     $('btn-logout').onclick = () => { A.logout(); ML.Career.teams = []; ML.Career.car = ML.Career.local(); L.renderAccount(); L.renderModes(); ML.HUD.toast('Déconnecté : tu joues en invité.'); };
-    for (const p of ['h', 'r']) { $(p + '-mode').onchange = () => L.renderModes(); $(p + '-camp-reset').onclick = () => {
+    for (const p of ['h', 'r']) { $(p + '-mode').onchange = () => { L.renderModes(); if (p === 'r') L.sendCfg(); }; $(p + '-camp-reset').onclick = () => {
       if ($(p + '-mode').value === 'carriere') {
         const team = ML.Career.car && ML.Career.car.cid;
         if (confirm(team ? `Recommencer l'entreprise « ${ML.Career.car.name} » À ZÉRO ? C'est valable pour TOUS ses membres : atelier, argent et ouvriers seront perdus.` : 'Recommencer une NOUVELLE carrière ? Atelier, argent et ouvriers actuels seront perdus.')) { ML.Career.reset(); L.renderModes(); }
@@ -72,7 +115,12 @@
 
     N.on('status', s => { $('status').textContent = s; });
     N.on('relay', m => {
-      if (m.d && m.d.k === 'role') { L.roles[m.from] = ML.ROLES[m.d.role] ? m.d.role : 'poly'; if (!ML.Game.on) L.renderRoles(); return; }
+      if (m.d && m.d.k === 'role') {
+        L.roles[m.from] = ML.ROLES[m.d.role] ? m.d.role : 'poly';
+        if (!ML.Game.on) L.renderRoles(); else if (ML.Game.isHost && ML.Sim.setRole) ML.Sim.setRole(m.from, L.roles[m.from]);   // arrivé en cours de journée
+        return;
+      }
+      if (m.d && m.d.k === 'cfg') { if (N.room && m.from === N.room.host) { L.hostCfg = m.d; if (!ML.Game.on) L.renderHostCfg(); } return; }
       ML.Game.onRelay(m);
     });
     L.roles = {}; L.myRole = ML.ROLES[localStorage.getItem('ml_role')] ? localStorage.getItem('ml_role') : 'poly';
@@ -86,7 +134,7 @@
       });
     });
     N.on('rooms', list => {
-      $('room-list').innerHTML = list.length ? list.map(r => `<button class="rl" data-code="${r.code}">${r.code} — ${U.esc(r.host)} (${r.n}/${r.max})</button>`).join('') : '<p class="dim">Aucun salon public. Crée le tien !</p>';
+      $('room-list').innerHTML = list.length ? list.map(r => `<button class="rl" data-code="${r.code}" ${r.n >= r.max ? 'disabled' : ''}>${r.code} — ${U.esc(r.host)} (${r.n}/${r.max})${r.game ? ' · 🔨 partie en cours : rejoindre' : ''}</button>`).join('') : '<p class="dim small">Aucun salon public pour l\'instant. Crée le tien !</p>';
       for (const b of $('room-list').querySelectorAll('button')) b.onclick = () => N.send({ t: 'join', code: b.dataset.code });
     });
     N.on('room', room => {
@@ -98,13 +146,23 @@
           G.stop('Coupure trop longue : un autre joueur a repris la partie.'); L.migMsg = 'Reprise de la journée par le nouvel hôte…'; L.showRoom(); return;
         }
         if (G.isHost) for (const pid in (G.S ? G.S.pl : {})) if (!room.players.find(p => p.id === pid)) ML.Sim.removePlayer(pid);
+        for (const p of room.players) if (!G.players[p.id]) {                // arrivée EN COURS DE PARTIE (drop-in, V4.0)
+          G.players[p.id] = { id: p.id, name: p.name, idx: p.idx }; if (p.id !== G.me) G.addAvatar(G.players[p.id]);
+          if (G.isHost && ML.Sim.addPlayer) ML.Sim.addPlayer(G.players[p.id], L.roles[p.id]);
+          if (p.id !== G.me) ML.HUD.notify(`👋 ${p.name} arrive dans l'atelier !`, 'good');
+        }
         return;
       }
-      L.showRoom(); L.sendRole();
+      if ($('scr-profile').classList.contains('hidden')) L.showRoom(); else L.cur = 'scr-room';
+      L.sendRole(); if (room.host === N.id) L.sendCfg();
     });
     N.on('start', m => {
       const r = m.room; ML.Sfx.init(); L.migMsg = null;
-      ML.Game.start({ seed: m.seed, me: N.id, host: r.host, players: r.players.map(p => ({ id: p.id, name: p.name, idx: p.idx })), game: m.cfg || { mode: 'coop' } });
+      ML.Game.start({ seed: m.seed, me: N.id, host: r.host, players: r.players.map(p => ({ id: p.id, name: p.name, idx: p.idx })), game: m.cfg || { mode: 'coop' }, late: !!m.late });
+      if (m.late) {                                            // partie en cours : on demande tout de suite l'état complet à l'hôte
+        ML.HUD.toast('Tu rejoins la partie en cours !');
+        setTimeout(() => { if (ML.Game.on && ML.Sync) { ML.Sync.rsAt = 0; ML.Sync.ask(); } }, 800);
+      }
     });
     N.on('host', m => {
       const G = ML.Game;
@@ -114,6 +172,7 @@
     N.on('unstable', () => ML.HUD.toast('Connexion instable… reconnexion en cours.'));
     N.on('resumed', () => { ML.HUD.toast('Reconnecté !'); const G = ML.Game; if (G.on && !G.isHost && !G.solo && ML.Sync) { ML.Sync.rsAt = 0; ML.Sync.ask(); } });   // on redemande l'état complet
     N.on('lost', () => { ML.Game.stop('Connexion perdue.'); L.showHome(); ML.HUD.toast('Connexion au serveur perdue.'); });
+    L.initInstall();
     L.showHome();
   };
 
@@ -121,8 +180,10 @@
   L.renderAccount = () => {
     const logged = A.logged();
     $('acc-state').innerHTML = logged ? `Connecté·e : <b>${U.esc(A.user)}</b> · 🪙 ${A.prof.coins} jetons` : `Invité·e (profil gardé sur ce PC) · 🪙 ${A.prof.coins} jetons`;
+    $('acc-mini').textContent = logged ? `${A.user} · 🪙 ${A.prof.coins}` : 'Compte (invité)';
     $('acc-form').classList.toggle('hidden', logged); $('btn-logout').classList.toggle('hidden', !logged);
-    $('in-name').disabled = logged; if (logged) $('in-name').value = A.user;
+    for (const id of ['solo-name-row', 'multi-name-row', 'room-name-row']) $(id).classList.toggle('hidden', logged);   // connecté : le pseudo = le compte
+    if (logged) for (const id of ['in-name', 'm-name', 'r-name']) $(id).value = A.user;
   };
   L.auth = async op => {
     const user = $('in-user').value.trim(), pass = $('in-pass').value;
@@ -135,9 +196,12 @@
     if (N.name !== A.user) { N.name = A.user; N.send({ t: 'name', name: A.user }); }
     ML.HUD.toast(op === 'register' ? `Compte créé : bienvenue ${A.user} !` : `Re-bonjour ${A.user} !`);
   };
-  L.name = () => {
-    const n = (A.logged() ? A.user : $('in-name').value.trim()).slice(0, 16);
-    if (!n) { ML.HUD.toast('Choisis un pseudo !'); $('in-name').focus(); return null; }
+  /** Pseudo saisi (where : 'h' solo, 'm' multijoueur, 'r' salon) */
+  L.name = where => {
+    const field = $(where === 'r' ? 'r-name' : where === 'm' ? 'm-name' : 'in-name');
+    const n = (A.logged() ? A.user : field.value.trim()).slice(0, 16);
+    if (!n) { ML.HUD.toast('Choisis un pseudo !'); field.focus(); return null; }
+    for (const id of ['in-name', 'm-name', 'r-name']) $(id).value = n;
     localStorage.setItem('ml_name', n); if (!A.logged() && A.prof.name !== n) { A.prof.name = n; A.save(); }
     if (N.online && n !== N.name) { N.name = n; N.send({ t: 'name', name: n }); }
     return n;
@@ -145,14 +209,11 @@
   L.ensure = async nm => {
     if (N.online) return true;
     $('status').textContent = 'Connexion...';
-    return N.connect($('in-server').value.trim() || N.defaultUrl(), nm || L.name() || 'Joueur');
+    return N.connect($('in-server').value.trim() || N.defaultUrl(), nm || L.name('m') || 'Joueur');
   };
 
   /* ======================= Profil & boutique ======================= */
-  L.showProfile = () => {
-    $('scr-home').classList.add('hidden'); $('scr-room').classList.add('hidden'); $('scr-profile').classList.remove('hidden');
-    L.el.classList.add('preview'); L.renderProfile();
-  };
+  L.showProfile = () => { L.screen('scr-profile'); L.renderProfile(); };
   /* ---------- Rôles ---------- */
   L.sendRole = () => { if (N.room) { L.roles[N.id] = L.myRole; N.relay({ k: 'role', role: L.myRole }); } };
   /** Rôles finaux : premier arrivé, premier servi (sauf polyvalent) */
@@ -208,7 +269,8 @@
   L.renderModes = () => {
     const c = Camp.load();
     for (const p of ['h', 'r']) {
-      const mode = $(p + '-mode').value;
+      const mode = $(p + '-mode').value, Dd = ML.DIFFS && ML.DIFFS[L.diff(p)];
+      if ($(p + '-diff-desc')) $(p + '-diff-desc').textContent = Dd ? `${Dd.icon} ${Dd.desc}` : '';
       $(p + '-camp').classList.toggle('hidden', mode !== 'campagne' && mode !== 'carriere');
       if (mode === 'carriere') {
         const car = ML.Career.car, CAT = ML.CAREER;
@@ -226,16 +288,28 @@
   };
   /** Configuration de la partie envoyée à tous */
   L.gameCfg = p => {
-    const mode = $(p + '-mode').value, traitor = p === 'r' && $('r-traitor').checked;
+    const mode = $(p + '-mode').value, traitor = p === 'r' && $('r-traitor').checked, diff = L.diff(p);
     if (mode === 'carriere') {
       const CR = ML.Career; if (!CR.car) CR.car = CR.fresh();
-      return Object.assign(L.careerCfg(CR.car), { traitor: false, roles: L.cfgRoles(p) });
+      return Object.assign(L.careerCfg(CR.car), { traitor: false, roles: L.cfgRoles(p), diff });
     }
     if (mode === 'campagne') {
       const c = Camp.load();
-      return { mode: c.day === ML.CAMPAIGN.bossDay ? 'inspection' : 'campagne', campaign: true, day: c.day, upgrades: c.up, traitor, roles: L.cfgRoles(p) };
+      return { mode: c.day === ML.CAMPAIGN.bossDay ? 'inspection' : 'campagne', campaign: true, day: c.day, upgrades: c.up, traitor, roles: L.cfgRoles(p), diff };
     }
-    return { mode, day: 1, upgrades: {}, traitor, roles: L.cfgRoles(p) };
+    return { mode, day: 1, upgrades: {}, traitor, roles: L.cfgRoles(p), diff };
+  };
+  /** Hôte du salon : montre son choix (mode, difficulté, entreprise) aux autres joueurs */
+  L.sendCfg = () => {
+    if (!N.room || N.room.host !== N.id || ML.Game.on) return;
+    const mode = $('r-mode').value, car = ML.Career.car;
+    N.relay({ k: 'cfg', mode, diff: L.diff('r'), traitor: $('r-traitor').checked, co: mode === 'carriere' && car ? { name: car.name, day: car.day } : null });
+  };
+  L.renderHostCfg = () => {
+    const c = L.hostCfg, el = $('room-cfg'); if (!el) return;
+    const show = !!(c && N.room && N.room.host !== N.id); el.classList.toggle('hidden', !show); if (!show) return;
+    const D = (ML.DIFFS && ML.DIFFS[c.diff]) || { icon: '😐', name: 'Normal' }, M = { carriere: '🏭 Carrière', coop: 'Journée libre', inspection: 'Inspection (boss)', course: 'Course de Mégane' }[c.mode] || c.mode;
+    el.innerHTML = `Choix de l'hôte : <b>${U.esc(M)}</b>${c.co ? ` « ${U.esc(c.co.name)} », jour ${c.co.day}` : ''} · ${D.icon} <b>${U.esc(D.name)}</b>${c.traitor ? ' · 🕵 traître' : ''}`;
   };
   L.cfgRoles = p => (p === 'h' ? { solo: L.myRole } : L.resolveRoles());
   /** Partie de la config propre à la carrière (cid = entreprise : le serveur autorise l'hôte du salon à la sauvegarder) */
@@ -321,24 +395,24 @@
   /* ======================= Écrans ======================= */
   L.show = () => { L.el.classList.remove('hidden'); };
   L.hide = () => { L.el.classList.add('hidden'); };
-  L.showHome = () => { L.show(); L.el.classList.remove('preview'); if (ML.Main.preview) ML.Main.preview(false); L.renderRoles(); $('scr-home').classList.remove('hidden'); $('scr-room').classList.add('hidden'); $('scr-profile').classList.add('hidden'); L.renderAccount(); L.renderModes(); };
+  L.showHome = () => { L.screen('scr-home'); L.renderRoles(); L.renderAccount(); L.renderModes(); };
   L.showRoom = () => {
     const r = N.room; if (!r) return L.showHome();
-    L.el.classList.remove('preview'); if (ML.Main.preview) ML.Main.preview(false);
-    L.show(); $('scr-home').classList.add('hidden'); $('scr-profile').classList.add('hidden'); $('scr-room').classList.remove('hidden');
+    if (L.el.classList.contains('hidden') || $('scr-room').classList.contains('hidden')) L.screen('scr-room');
+    if (!A.logged() && !$('r-name').value) $('r-name').value = N.name || '';
     $('room-code').textContent = r.code;
     const slots = [];
     for (let i = 0; i < r.max; i++) {
       const p = r.players[i];
       const rr = p ? ML.ROLES[p.id === N.id ? L.myRole : L.roles[p.id] || 'poly'] : null;
-      slots.push(p ? `<div class="pslot"><i style="background:${ML.COLORS[p.idx % 5].css}"></i>${rr.icon} ${U.esc(p.name)} <span class="dim">${rr.name}</span>${p.id === r.host ? ' 👑' : ''}${p.id === N.id ? ' (toi)' : ''}${p.on ? '' : ' <span class="dim">(reconnexion…)</span>'}</div>` : '<div class="pslot empty">— place libre —</div>');
+      slots.push(p ? `<div class="pslot"><i style="background:${ML.COLORS[p.idx % ML.COLORS.length].css}"></i>${rr.icon} ${U.esc(p.name)} <span class="dim">${rr.name}</span>${p.id === r.host ? ' 👑' : ''}${p.id === N.id ? ' (toi)' : ''}${p.on ? '' : ' <span class="dim">(reconnexion…)</span>'}</div>` : '<div class="pslot empty">— place libre —</div>');
     }
     $('room-players').innerHTML = slots.join('');
     const host = r.host === N.id;
     $('btn-start').classList.toggle('hidden', !host); $('room-opts').classList.toggle('hidden', !host);
     $('room-wait').classList.toggle('hidden', host);
     $('room-wait').textContent = r.state === 'game' ? (L.migMsg || 'Partie en cours…') : "En attente que l'hôte choisisse le mode et lance la journée…";
-    L.renderModes(); L.renderRoles(true);
+    L.renderModes(); L.renderRoles(true); L.renderHostCfg();
   };
   L.backToRoom = () => { if (N.room) L.showRoom(); else L.showHome(); };
 

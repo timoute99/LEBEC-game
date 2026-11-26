@@ -2,8 +2,9 @@
 // server.js — Serveur de MÉCANIQUE LEBEC (v2)
 // ---------------------------------------------------------------------
 // 1) SALONS + RELAIS : le serveur ne fait pas tourner le jeu ; il gère des
-//    salons (code de 4 lettres, 5 joueurs), relaie les messages et garde
+//    salons (code de 4 lettres, 6 joueurs), relaie les messages et garde
 //    la place d'un joueur 20 s après une coupure. L'HÔTE simule l'atelier.
+//    On peut rejoindre une partie EN COURS (drop-in) : {t:'start', …, late:true}.
 // 2) COMPTES : pseudo + mot de passe (scrypt), jeton signé, profil
 //    (apparence, jetons, objets, succès). Stockage :
 //      - fichier server/data/accounts.json (par défaut, local) ;
@@ -39,7 +40,7 @@ const PORT = process.env.PORT || 8080;
 const ROOT = path.join(__dirname, '..');
 const DATA = path.join(__dirname, 'data');
 const VERSION = 2;
-const MAX_PLAYERS = 5, GRACE_MS = 20000, RATE_PER_SEC = 150, MAX_MSG = 512 * 1024;
+const MAX_PLAYERS = 6, GRACE_MS = 20000, RATE_PER_SEC = 150, MAX_MSG = 512 * 1024;
 const HOST_WAIT_MS = +process.env.HOST_WAIT_MS || 5000;   // hôte coupé en pleine partie : délai avant migration
 
 /* ======================= Comptes : stockage ======================= */
@@ -309,7 +310,7 @@ function accountOp(m) {
 }
 
 /* ======================= Fichiers statiques ======================= */
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.json': 'application/json', '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8' };
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
   if (url === '/health') {
@@ -356,8 +357,10 @@ function leaveRoom(c) {
 function joinRoom(c, r) {
   leaveRoom(c);
   const used = new Set(r.players.map(id => clients.get(id) && clients.get(id).idx));
-  c.idx = [0, 1, 2, 3, 4].find(i => !used.has(i)) || 0;
+  c.idx = [0, 1, 2, 3, 4, 5].find(i => !used.has(i)) || 0;
   r.players.push(c.id); c.room = r.code; broadcastRoom(r);
+  // partie en cours : le nouveau venu démarre directement (drop-in), l'hôte l'ajoute à sa simulation
+  if (r.state === 'game') { c.gen = r.gen; send(c, { t: 'start', seed: r.seed, cfg: r.cfg, room: roomInfo(r), gen: r.gen, late: true }); }
 }
 
 /* ======================= WebSocket ======================= */
@@ -400,14 +403,13 @@ wss.on('connection', ws => {
         if (res.ok && res.user) { c.name = cleanName(res.user); c.user = String(res.user).toLowerCase(); }
         send(c, Object.assign({ t: 'accr', q: m.q }, res)); break;
       }
-      case 'list': send(c, { t: 'rooms', list: [...rooms.values()].filter(x => !x.priv && x.state === 'lobby').map(x => { const h = clients.get(x.host); return { code: x.code, n: x.players.length, max: MAX_PLAYERS, host: h ? h.name : '?' }; }) }); break;
+      case 'list': send(c, { t: 'rooms', list: [...rooms.values()].filter(x => !x.priv).map(x => { const h = clients.get(x.host); return { code: x.code, n: x.players.length, max: MAX_PLAYERS, host: h ? h.name : '?', game: x.state === 'game' }; }) }); break;
       case 'create': { const room = { code: newCode(), host: c.id, players: [], state: 'lobby', priv: !!m.priv, seed: 0, cfg: null }; rooms.set(room.code, room); joinRoom(c, room); break; }
       case 'join': {
         const room = rooms.get(String(m.code || '').toUpperCase().trim());
         if (!room) { send(c, { t: 'err', m: 'Salon introuvable. Vérifie le code.' }); break; }
         if (room.players.includes(c.id)) { broadcastRoom(room); break; }
-        if (room.players.length >= MAX_PLAYERS) { send(c, { t: 'err', m: 'Salon complet (5 joueurs).' }); break; }
-        if (room.state !== 'lobby') { send(c, { t: 'err', m: 'La partie a déjà commencé dans ce salon.' }); break; }
+        if (room.players.length >= MAX_PLAYERS) { send(c, { t: 'err', m: `Salon complet (${MAX_PLAYERS} joueurs).` }); break; }
         joinRoom(c, room); break;
       }
       case 'leave': leaveRoom(c); send(c, { t: 'room', room: null }); break;

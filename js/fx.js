@@ -75,15 +75,16 @@
     if (!F.root) return;
     const col = color || PAL.lebecYellow;
     const g = new THREE.Group(); g.position.set(x, H(x, z), z);
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 14, 8, 1, true), S.toon(col, col, { transparent: true, opacity: 0.5, side: THREE.DoubleSide, key: 'ping' }));
-    beam.material.depthWrite = false; beam.position.y = 7; g.add(beam);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.9, 20), S.toon(col, col, { side: THREE.DoubleSide, transparent: true, opacity: 0.85, key: 'ping2' }));
+    // V4.2 : ping BIEN VISIBLE — grosse colonne de 40 m qui traverse le brouillard, 12 s
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 40, 10, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+    beam.position.y = 20; beam.renderOrder = 3; g.add(beam);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.5, 24), S.toon(col, col, { side: THREE.DoubleSide, transparent: true, opacity: 0.85, key: 'ping2' }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; g.add(ring);
     const pin = new THREE.Group(); pin.position.y = 2.2; g.add(pin);                       // grosse épingle qui rebondit
     mesh(BALL1, S.toon(col, col), pin, 0, 0.35, 0, 0.32); mesh(new THREE.ConeGeometry(0.22, 0.5, 8), S.toon(col, col), pin, 0, 0, 0).rotation.x = Math.PI;
     mesh(BALL1, PAL.white, pin, 0, 0.38, 0.24, 0.12);
-    const l = U.label('📍 ' + name + ' : viens ici !', { size: 0.5, color: '#ffd257', depthTest: false }); l.position.y = 3.3; g.add(l);
-    F.root.add(g); F.pings.push({ g, t: 6, ring, pin });
+    const l = U.label('📍 ' + name + ' : viens ici !', { size: 0.9, color: '#ffd257', bg: 'rgba(0,0,0,0.78)', depthTest: false }); l.position.y = 4; g.add(l);
+    F.root.add(g); F.pings.push({ g, t: 12, ring, pin });
   };
 
   /* ---------- Chien de la casse (low-poly) ---------- */
@@ -269,7 +270,7 @@
       P.im.count = P.list.length; P.im.instanceMatrix.needsUpdate = true;
     }
     for (const p of F.pings.slice()) {
-      p.t -= dt; p.ring.scale.setScalar(1 + (6 - p.t) % 1);
+      p.t -= dt; p.ring.scale.setScalar(1 + (12 - p.t) % 1);
       p.pin.position.y = 2.2 + Math.abs(Math.sin(t * 4)) * 0.4; p.pin.rotation.y = t * 2;
       if (p.t <= 0) { F.root.remove(p.g); F.pings.splice(F.pings.indexOf(p), 1); }
     }

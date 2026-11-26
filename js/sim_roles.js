@@ -40,6 +40,7 @@
   /* ---------- Vie ---------- */
   K.damage = (pid, amt, why) => {
     const P = S.pl[pid]; if (!P || P.ko || amt <= 0) return;
+    amt *= (K.D && K.D.dmg) || 1;                                                  // difficulté
     P.hp = Math.max(0, P.hp - amt); Sim.dirty = true;
     K.ev({ e: 'hurt', to: pid, hp: P.hp, why });
     if (P.hp <= 0) {
@@ -107,7 +108,7 @@
     if (!K.hasRole('cariste')) for (const o of S.items) {
       if (o.type !== 'palette' || !o.rest) continue;
       K.momoT[o.id] = K.momoT[o.id] || S.rt;
-      if (S.rt - K.momoT[o.id] > 25 && cam && !cam.dr && cam.bed.length < cam.cap && Math.hypot(cam.x - o.x, cam.z - o.z) < 35) {
+      if (S.rt - K.momoT[o.id] > 25 && cam && !cam.dr && K.bedFree(cam) >= 4 && Math.hypot(cam.x - o.x, cam.z - o.z) < 35) {
         delete K.momoT[o.id]; cam.bed.push(K.strip(o)); K.removeItem(o);
         K.all(`🚜 Momo a chargé la palette #${o.d.oid} dans le camion (enfin).`, 'good');
       }
@@ -207,7 +208,7 @@
           c.load = K.strip(o); K.removeItem(o); K.sfx('pickup', fx, fz);
         } else {
           const cam = S.cars.find(x => x.kind === 'camion' && Math.hypot(x.x - fx, x.z - fz) < 5.5);
-          if (cam && cam.bed.length < cam.cap) { cam.bed.push(c.load); c.load = null; K.note(pid, '🚚 Palette chargée dans le camion !', 'good'); K.sfx('drop', fx, fz); }
+          if (cam && K.bedFree(cam) >= 4) { cam.bed.push(c.load); c.load = null; K.note(pid, '🚚 Palette chargée dans le camion !', 'good'); K.sfx('drop', fx, fz); }
           else if (cam) K.note(pid, 'Le camion est plein (2 palettes).', 'warn');
           else { K.spawnItem(c.load, fx, 0, fz); c.load = null; K.sfx('drop', fx, fz); }
         }
@@ -292,12 +293,12 @@
         K.say(n, U.pick(['Bien reçu !', 'Belle passe !', 'Attrapé !'])); K.stat(o.thr, 'catch'); Sim.dirty = true; return true;
       }
     }
-    // dans une benne / un camion
+    // dans une benne / sur le plateau du camion (V4.1 : les caisses lancées atterrissent aussi sur le plateau)
     for (let i = 0; i < S.cars.length; i++) {
       const c = S.cars[i]; if (c.kind === 'fenwick' || IT.heavy(o)) continue;
       if (S.pl[o.thr] && (S.pl[o.thr].car === i)) continue;
-      const k = c.kind === 'tp' ? 0.4 : c.kind === 'camion' ? 2.2 : 1.25, bx = c.x - Math.sin(c.h) * k, bz = c.z - Math.cos(c.h) * k;
-      if (Math.hypot(o.x - bx, o.z - bz) < (c.kind === 'tp' ? 0.9 : 1.3) && o.y < 2.4 && o.vy < 0 && c.bed.length < c.cap && c.kind !== 'camion') {
+      const cam = c.kind === 'camion', k = c.kind === 'tp' ? 0.4 : cam ? 2.0 : 1.25, bx = c.x - Math.sin(c.h) * k, bz = c.z - Math.cos(c.h) * k;
+      if (Math.hypot(o.x - bx, o.z - bz) < (c.kind === 'tp' ? 0.9 : cam ? 2.6 : 1.4) && o.y < (cam ? 2.8 : 2.4) && o.vy < 0 && (K.bedFree ? K.bedFree(c) >= 1 : c.bed.length < c.cap)) {
         o.gone = true; o.rest = true; c.bed.push(K.strip(o)); K.sfx('drop', c.x, c.z); K.note(o.thr, `🎯 Dans ${c.name} !`, 'good'); Sim.dirty = true; return true;
       }
     }
@@ -305,5 +306,125 @@
   };
   const r2 = v => Math.round(v * 100) / 100;
   mod.fast = f => { const d = K.dog; f.dog = d ? [r2(d.x), r2(d.z), r2(d.h), d.st === 'sleep' ? 0 : d.st === 'chase' ? 2 : 1] : null; };
+  Sim.mods.push(mod);
+})();
+
+/* =====================================================================
+   PARTICULIERS (V4.0, portage) — clients de passage, à pied, au COMPTOIR
+   de l'atelier (juste derrière la porte, ML.LOC.doorIn).
+   - Modes classiques : un particulier arrive de temps en temps (ML.PARTI),
+     attend au comptoir ; E dessus = on prend sa commande (petite pièce
+     urgente) → ticket client « part » ; on lui rapporte la caisse (E).
+     S'il attend trop sans qu'on le serve, il repart (satisfaction −).
+   - Carrière : les particuliers écrivent au BE (CR.rollOffers, offre
+     client 'part' + who) ; le devis signé donne un ticket (K.careerOrder)
+     et le particulier vient l'attendre au comptoir.
+   État diffusé : S.parts = [{ id (PNJ), st: arrive|wait|order|leave, part, mat, ops, oid, exp }].
+   ===================================================================== */
+(function () {
+  const Sim = ML.Sim, K = Sim.K, U = ML.U, C = ML.CFG, RT = ML.Routing;
+  const mod = {}; let S, npcs, on = false;
+  const isP = id => (ML.PARTICULIERS || []).includes(id);
+  const PI = () => ML.PARTI || { every: [150, 230], firstAt: [60, 110], wait: 90, dur: 260, max: 2 };
+  const name = id => (ML.PEOPLE[id] || { name: '?' }).name;
+  const counter = k => { const d = ML.LOC.doorIn || { x: 0, z: 12 }; return { x: d.x + (k % 2 ? -1.7 : 1.7) + (k > 1 ? (k % 2 ? -1 : 1) : 0), z: d.z - 1.3 }; };
+  const gate = () => { const L = ML.LOC.livraison || { x: 0, z: 26 }; return { x: L.x + 6, z: Math.max(L.z + 2, 24) }; };
+  const career = () => !!(K.careerOn && K.careerOn());
+  const types = () => { const t = {}; for (const d of (S.machDefs || ML.MACHINES)) if (S.machines[d.id]) t[d.type] = 1; return t; };
+  const freeIds = () => (ML.PARTICULIERS || []).filter(id => npcs[id] && !npcs[id].active && !S.parts.some(p => p.id === id));
+
+  mod.init = cfg => {
+    S = K.S; npcs = K.npcs; S.parts = [];
+    on = S.mode !== 'course' && S.mode !== 'inspection' && (ML.PARTICULIERS || []).every(id => npcs[id]);
+    const f = PI().firstAt; K.partT = f[0] + K.rng() * (f[1] - f[0]);
+  };
+  function spawn(id, p) {
+    const n = npcs[id], g = gate(), c = counter(S.parts.indexOf(p));
+    Object.assign(n, { active: true, x: g.x, z: g.z, state: 'part', stun: 0, speed: 2.1, path: [], faceYaw: null, comp: null });
+    K.walkTo(n, c.x, c.z, () => { if (p.st === 'arrive') { p.st = p.ord ? 'order' : 'wait'; p.exp = S.rt + PI().wait; K.say(n, U.pick(ML.LINES[id] || ['Bonjour !'])); } n.faceYaw = Math.PI; Sim.dirty = true; });
+    Sim.dirty = true;
+  }
+  function leave(p, line) {
+    const n = npcs[p.id]; p.st = 'leave'; if (!n) return;
+    if (line) K.say(n, line);
+    const g = gate(); n.faceYaw = null;
+    K.walkTo(n, g.x, g.z, () => { n.active = false; n.state = 'away'; S.parts = S.parts.filter(x => x !== p); Sim.dirty = true; });
+    Sim.dirty = true;
+  }
+  /** Ticket du particulier (mode classique : à la prise de commande au comptoir) */
+  function makeOrder(p) {
+    const ops = RT.fit(p.ops, 's', types()), op0 = ML.OPS[ops[0]];
+    const dur = PI().dur * (K.H.dur || 1) * ((K.D && K.D.dur) || 1);
+    const o = { id: S.nextOid++, client: 'part', who: p.id, part: p.part, mat: p.mat, mtype: op0.mt, tool: op0.tool, ops, oi: 0, qe: null, qc: null, steps: ops.map(() => 'usinage').concat(['livraison']), si: 0, size: 's', src: null, t0: S.rt, dl: S.rt + dur, dur, q: false, m: null, contract: null, price: null };
+    S.orders.push(o); p.oid = o.id; p.st = 'order'; Sim.dirty = true;
+    return o;
+  }
+  mod.step = dt => {
+    if (!on || S.over) return;
+    // carrière : un ticket « part » (devis signé) → le particulier vient l'attendre au comptoir
+    for (const o of S.orders) if (o.client === 'part' && !S.parts.some(p => p.oid === o.id)) {
+      if (!o.who) { const c = o.contract && S.car && (S.car.contracts || []).find(x => x.id === o.contract); o.who = (c && c.who) || null; }
+      const free = freeIds(), who = o.who && free.includes(o.who) ? o.who : free[0];
+      if (!who || S.parts.length >= 4) continue;
+      o.who = who; const p = { id: who, st: 'arrive', part: o.part, mat: o.mat, ops: o.ops, oid: o.id, exp: 0, ord: true };
+      S.parts.push(p); spawn(who, p);
+      K.all(`🙋 ${name(who)} (particulier) passe à l'atelier attendre sa pièce : ${o.part} (ticket #${o.id}). À lui remettre au COMPTOIR, près de la porte !`, 'info');
+    }
+    // modes classiques : particuliers de passage
+    if (!career()) {
+      K.partT -= dt;
+      if (K.partT <= 0) {
+        const ev = PI().every; K.partT = ev[0] + K.rng() * (ev[1] - ev[0]);
+        const tps = types(), reqs = (ML.PART_REQ || []).filter(r => tps[r[2]]), free = freeIds();
+        if (S.rt < C.SHIFT_SEC - 120 && S.parts.filter(p => !p.ord).length < (PI().max || 2) && reqs.length && free.length) {
+          const r = K.rng.pick(reqs), id = K.rng.pick(free), p = { id, st: 'arrive', part: r[0], mat: r[1], ops: r[4] || RT.of(r), oid: null, exp: 0 };
+          S.parts.push(p); spawn(id, p);
+          K.all(`🙋 Un particulier (${name(id)}) arrive au COMPTOIR de l'atelier : il veut une petite pièce urgente (${r[0]}). E sur lui pour prendre la commande !`, 'info'); K.sfx('order');
+        }
+      }
+    }
+    for (const p of S.parts.slice()) {
+      const n = npcs[p.id];
+      if (p.st === 'wait' && S.rt > p.exp) { S.sat = Math.max(0, S.sat - 5); K.all(`🙋 ${name(p.id)} en a eu marre d'attendre au comptoir et repart (satisfaction −5).`, 'warn'); leave(p, "Tant pis, j'irai chez UsiFlash !"); }
+      else if ((p.st === 'order' || p.st === 'arrive') && p.oid && !S.orders.some(o => o.id === p.oid)) leave(p, 'Bon… je repasserai.');
+      if (n && n.active && (p.st === 'wait' || p.st === 'order') && !n.path.length) n.faceYaw = Math.PI;
+    }
+  };
+  mod.brain = n => isP(n.id);
+  mod.bubble = n => {
+    if (!isP(n.id)) return undefined;
+    const p = S.parts.find(x => x.id === n.id); if (!p) return '';
+    if (p.st === 'wait') return `❗ Pièce urgente : ${p.part} (E)`;
+    if (p.st === 'order') { const o = S.orders.find(x => x.id === p.oid); return o ? `⏳ #${o.id} ${o.part} · ${Math.max(0, Math.ceil(o.dl - S.rt))} s` : ''; }
+    return '';
+  };
+  mod.npcUse = (pid, P, ps, sel, held, n) => {
+    if (!isP(n.id)) return false;
+    const p = S.parts.find(x => x.id === n.id); if (!p) return true;
+    if (p.st === 'wait') {
+      const o = makeOrder(p);
+      K.say(n, `Merci ! Je l'attends ici, ${Math.round(o.dur / 6) / 10} minutes max !`);
+      K.all(`📋 ${P.name} a pris la commande de ${name(p.id)} : ticket #${o.id} — ${o.part} (${RT.label(o.ops)}) · à rapporter au COMPTOIR.`, 'good'); K.sfx('order');
+      return true;
+    }
+    if (p.st === 'order') {
+      if (K.isPart(held)) {
+        if (held.d.oid !== p.oid) { K.say(n, "C'est pas la mienne, ça !"); return true; }
+        K.deliver(pid, P, sel, held, 'part', n); return true;
+      }
+      K.say(n, 'Alors, ma pièce ? Ça avance ?'); return true;
+    }
+    return true;
+  };
+  mod.onDeliver = (pid, o) => {
+    if (o.client !== 'part') return;
+    const p = S.parts.find(x => x.oid === o.id);
+    if (!career()) { const b = K.points(15); S.score += b; S.sat = Math.min(100, S.sat + 3); K.all(`🙋 Particulier servi : +${b} points de bonus (pièce urgente) !`, 'good'); }
+    if (p) leave(p, (ML.LINES[p.id] || [])[1] || 'Merci !');
+  };
+  mod.onFail = o => {
+    if (o.client !== 'part') return;
+    const p = S.parts.find(x => x.oid === o.id); if (p && p.st !== 'leave') leave(p, "C'est une honte ! Je le dirai à tout le village !");
+  };
   Sim.mods.push(mod);
 })();
