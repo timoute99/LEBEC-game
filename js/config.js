@@ -145,6 +145,17 @@ ML.WEATHER = {
   neige: { name: 'Neige (routes glissantes)', icon: '❄️', p: 0.03, light: 0.92, fog: 140, wet: 1.3, snow: true, next: { neige: 2, nuageux: 3 } }
 };
 
+/* V5.1 : TYPES DE JOURNÉE (tirés au hasard, sauf le 1er jour). Plus il y a de commandes,
+   moins il y a d'imprévus (et l'inverse) : une journée calme en pièces est pleine de visites.
+   orders : × intervalle entre deux demandes (< 1 = plus de commandes) · dur : × délais · ev : ± événements · part : × attente des particuliers */
+ML.DAYTYPES = {
+  normale: { name: 'Journée normale', icon: '📋', desc: 'Des commandes régulières et quelques imprévus.', p: 0.32, orders: 1, dur: 1, ev: 0, part: 1 },
+  calme: { name: 'Journée calme… en apparence', icon: '😌', desc: 'Peu de commandes, mais BEAUCOUP de visites et d\'imprévus.', p: 0.2, orders: 1.75, dur: 1.15, ev: 2, part: 1.4 },
+  rush: { name: 'COUP DE FEU', icon: '🔥', desc: 'Les commandes pleuvent ! Presque pas d\'imprévus : on usine.', p: 0.2, orders: 0.5, dur: 1.05, ev: -3, part: 0.8 },
+  agitee: { name: 'Journée agitée', icon: '🌀', desc: 'Visiteurs, pannes, audits… et les commandes continuent.', p: 0.17, orders: 1.15, dur: 1, ev: 1, part: 1 },
+  pont: { name: 'Veille de pont', icon: '🗓️', desc: 'Tout le monde veut sa pièce pour hier : délais courts, peu de visites.', p: 0.11, orders: 0.75, dur: 0.8, ev: -1, part: 1.2 }
+};
+
 /* Événements surprise (2 à 4 tirés par journée) */
 ML.EVENTS = {
   audit: 'Audit surprise de Jacky Foucher', coupure: 'Coupure de courant', sabotage: "Sabotage d'UsiFlash",

@@ -44,6 +44,7 @@
         case 'err': N.emit('err', m.m); break;
         case 'accr': { const cb = N.accWait[m.q]; delete N.accWait[m.q]; if (cb) cb(m); break; }
         case 'campr': { const cb = N.accWait['c' + m.q]; delete N.accWait['c' + m.q]; if (cb) cb(m); break; }
+        case 'fbr': { const cb = N.accWait['f' + m.q]; delete N.accWait['f' + m.q]; if (cb) cb(m); break; }
       }
     };
     ws.onclose = () => {
@@ -103,6 +104,12 @@
     if (!N.ws || N.ws.readyState !== 1) return res({ ok: false, m: 'Pas connecté au serveur.' });
     const q = accQ++; N.accWait['c' + q] = res; N.send(Object.assign({ t: 'camp', q, op }, data));
     setTimeout(() => { if (N.accWait['c' + q]) { delete N.accWait['c' + q]; res({ ok: false, m: 'Le serveur ne répond pas.' }); } }, 10000);
+  });
+  /** V5.1 : suggestions / bugs (op 'send' ou 'list') */
+  N.fb = (op, data) => new Promise(res => {
+    if (!N.online) return res({ ok: false, m: 'Pas connecté au serveur.' });
+    const q = accQ++; N.accWait['f' + q] = res; N.send(Object.assign({ t: op === 'list' ? 'fblist' : 'fb', q }, data || {}));
+    setTimeout(() => { if (N.accWait['f' + q]) { delete N.accWait['f' + q]; res({ ok: false, m: 'Le serveur ne répond pas.' }); } }, 10000);
   });
   N.send = o => { if (N.ws && N.ws.readyState === 1) N.ws.send(JSON.stringify(o)); };
   N.relay = (d, to) => N.send({ t: 'relay', d, to });

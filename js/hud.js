@@ -23,6 +23,9 @@
       if (a === 'resume') ML.Input.lock();
       if (a === 'rename') { const v = $('pz-name').value.trim(); if (v) { G.rename(v); H.toast('✏ Pseudo changé : ' + v); } }
       if (a === 'perso') ML.Lobby.inGameProfile();
+      if (a === 'save') ML.Camp.saveNow();
+      if (a === 'news') ML.Lobby.showNews(true);
+      if (a === 'tuto') { ML.Tuto.start(true); ML.Input.lock(); }
       if (a === 'menu') { if (confirm(G.solo ? 'Quitter la partie et revenir au menu principal ? (en campagne, l\'atelier est sauvegardé toutes les minutes)' : G.isHost ? 'Quitter la partie ? Un autre joueur reprendra l\'atelier.' : 'Quitter la partie et revenir au menu principal ?')) ML.Lobby.leaveGame(); }
     };
     H.el.pause.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'pz-name') { e.preventDefault(); $('pz-name').nextElementSibling.click(); } });
@@ -43,6 +46,9 @@
         <button class="go" data-pz="resume">▶ Reprendre</button>
         <div class="pz-row"><input id="pz-name" maxlength="16" value="${U.esc(nm)}" placeholder="Pseudo"><button class="sec" data-pz="rename">✏ Changer de pseudo</button></div>
         <button class="sec" data-pz="perso">👕 Changer mon perso (tenue, chapeau…)</button>
+        ${G.isHost && G.game && ['coop', 'campagne', 'inspection'].includes(G.game.mode) ? `<button class="sec" data-pz="save">💾 Enregistrer la partie${ML.Account.logged() ? ' sur mon compte' : ''}</button>` : ''}
+        <button class="sec" data-pz="news">📰 Nouveautés · idée · signaler un bug</button>
+        <button class="sec" data-pz="tuto">📘 Revoir le tutoriel</button>
         <button class="sec" data-pz="menu">🏠 Menu principal</button>
         <p class="dim small">${G.solo ? 'Le jeu continue de tourner en fond.' : 'En multijoueur, la partie continue pour les autres !'}</p></div>`;
       H.el.pause.classList.toggle('hidden', false); return;
@@ -56,7 +62,8 @@
     const Hm = ML.HUMEURS[S.humeur], W = ML.WEATHER[S.weather];
     const mode = S.campaign ? (S.mode === 'inspection' ? `🎓 ${S.co.name} — INSPECTION de l'Éducation Nationale` : `${S.co.name} — jour ${S.co.day}`) : ({ coop: 'Journée libre', inspection: "INSPECTION de l'Éducation Nationale", course: 'Course de Mégane' }[S.mode] || S.mode);
     const Dd = ML.DIFFS[S.diff] || ML.DIFFS.normal;
-    H.el.daycard.innerHTML = `<div class="dc-mode">${U.esc(mode)} · ${Dd.icon} ${U.esc(Dd.name)}</div><div class="dc-h">😤 ${U.esc(Hm.name)}</div><div class="dim">${U.esc(Hm.desc)}</div><div class="dc-w">${W.icon} ${U.esc(W.name)} <span class="dim">(la météo change pendant la journée)</span></div>` +
+    const DT = ML.DAYTYPES[S.dayType];
+    H.el.daycard.innerHTML = `<div class="dc-mode">${U.esc(mode)} · ${Dd.icon} ${U.esc(Dd.name)}</div>${DT && S.mode !== 'course' ? `<div class="dc-t">${DT.icon} <b>${U.esc(DT.name)}</b> — ${U.esc(DT.desc)}</div>` : ''}<div class="dc-h">😤 ${U.esc(Hm.name)}</div><div class="dim">${U.esc(Hm.desc)}</div><div class="dc-w">${W.icon} ${U.esc(W.name)} <span class="dim">(la météo change pendant la journée)</span></div>` +
       (S.mode === 'inspection' ? '<div class="dc-x">Respecte ses règles absurdes (elles changent !). 5 infractions = échec.</div>' : S.mode === 'course' ? '<div class="dc-x">5 manches : le premier arrivé EN VOITURE devant l\'entreprise indiquée gagne.</div>' : '') +
       (S.traitorMode ? '<div class="dc-x">🕵 Un traître se cache parmi vous…</div>' : '') +
       (S.mode !== 'course' ? `<div class="dc-x">💶 ${S.money.toLocaleString('fr-FR')} € en caisse · les demandes des clients arrivent au 💻 PC de gestion (bureau)</div>` : '');
@@ -113,7 +120,7 @@
     H.renderTickets(S); H.renderTeam(S); H.renderEvents(S); H.renderRace(S);
     const gt = ML.GPS.target ? `📍 Repère : ${Math.round(ML.GPS.dist)} m` : ''; if (gt !== H._gps) { H.el.gps.textContent = gt; H.el.gps.classList.toggle('hidden', !gt); H._gps = gt; }
     // V5 : météo + garde à vue
-    const W = ML.WEATHER[S.weather], wt = W ? `${W.icon} ${W.name}` : ''; if (wt !== H._wx) { H.el.wx.textContent = wt; H._wx = wt; }
+    const W = ML.WEATHER[S.weather], DT2 = S.mode !== 'course' && ML.DAYTYPES[S.dayType], wt = (W ? `${W.icon} ${W.name}` : '') + (DT2 ? ` · ${DT2.icon} ${DT2.name}` : ''); if (wt !== H._wx) { H.el.wx.textContent = wt; H._wx = wt; }
     const jl = G.jailUntil ? Math.ceil((G.jailUntil - performance.now()) / 1000) : 0, jt = jl > 0 ? `🚔 GARDE À VUE : ${jl} s` : '';
     if (jt !== H._jail) { H.el.jail.textContent = jt; H.el.jail.classList.toggle('hidden', !jt); H._jail = jt; }
     H.drawMap(S);

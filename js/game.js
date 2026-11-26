@@ -34,6 +34,7 @@
     if (G.isHost) { ML.Sim.init({ seed: cfg.seed, players: cfg.players, game }); ML.Sim.setPose(G.me, G.myPose()); G.hostTick(0, true); }
     G.sendLook(); setTimeout(G.sendLook, 1500); setTimeout(G.sendLook, 5000);
     ML.HUD.startGame(); ML.Sfx.init(); I.lock();
+    if (ML.Tuto) setTimeout(() => { if (G.on) ML.Tuto.start(); }, 8000);      // V5.1 : après la carte du jour
     G.updateView(0);
   };
   G.cleanup = () => {
@@ -46,7 +47,7 @@
     if (G.rain) { ML.scene.remove(G.rain); G.rain = null; }
     if (G.snow) { ML.scene.remove(G.snow); G.snow = null; }
     if (G.hoses) { ML.scene.remove(G.hoses); G.hoses = null; }
-    ML.Sfx.setEngine(false, 0); if (ML.GPS) ML.GPS.reset();
+    ML.Sfx.setEngine(false, 0); if (ML.GPS) ML.GPS.reset(); if (ML.Tuto) ML.Tuto.stop();
   };
   G.stop = msg => {
     if (!G.on) return;
@@ -251,7 +252,7 @@
     ML.Fx.update(dt, G.S);
     ML.Cars.renderTraffic(dt);
     ML.GPS.update(dt);
-    ML.Dialogue.update(dt);
+    ML.Dialogue.update(dt); if (ML.Tuto) ML.Tuto.update(dt);
     if (!ML.ui.modal && G.p.car === null && !G.p.ride && G.p.stun <= 0 && G.S) G.scan(); else G.cur = null;
     G.updateView(dt);
     G.updateLight(dt);

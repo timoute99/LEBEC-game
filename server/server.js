@@ -25,6 +25,9 @@
 //     → {t:'accr', q, ok, m?, token?, user?, profile?}
 //   {t:'camp', q, op:'create'|'load'|'put', code?, name?, data?}
 //     → {t:'campr', q, ok, m?, code?, data?}
+//   {t:'fb', q, kind:'idee'|'bug', text, name, ver, where}   (V5.1 : suggestions / bugs des joueurs)
+//     → {t:'fbr', q, ok, m?}        {t:'fblist', q} → {t:'fbr', q, ok, list}
+//   Lecture des retours : https://<serveur>/retours (page) ou /retours.txt (fichier texte).
 // =====================================================================
 'use strict';
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
@@ -77,6 +80,24 @@ function makeStore(ghFile, localFile, label) {
 }
 const ACC = makeStore(process.env.GITHUB_PATH || 'lebec-accounts.json', 'accounts.json', 'Comptes');
 const SAVES = makeStore(process.env.GITHUB_SAVES || 'lebec-saves.json', 'saves.json', 'Sauvegardes');
+const FEED = makeStore(process.env.GITHUB_FEEDBACK || 'lebec-retours.json', 'retours.json', 'Retours');   // V5.1 : suggestions et bugs
+
+/* ======================= Retours des joueurs (suggestions, bugs) ======================= */
+const FB_MAX = 3000;
+function fbOp(c, m) {
+  if (!Array.isArray(FEED.data.list)) FEED.data.list = [];
+  const L = FEED.data.list;
+  if (m.op === 'list') return { ok: true, list: L.slice(-40).reverse().map(x => ({ d: x.d, k: x.k, n: x.n, t: x.t.slice(0, 300), v: x.v })) };
+  const now = Date.now(); if (c.fbT && now - c.fbT < 15000) return { ok: false, m: 'Doucement : un message toutes les 15 secondes.' };
+  const text = String(m.text || '').replace(/\r/g, '').trim().slice(0, 1500);
+  if (text.length < 5) return { ok: false, m: 'Écris au moins quelques mots.' };
+  c.fbT = now;
+  L.push({ d: new Date(now).toISOString().slice(0, 16).replace('T', ' '), k: m.kind === 'bug' ? 'bug' : 'idee', n: cleanName(m.name || c.name), t: text, v: String(m.ver || '').slice(0, 10), w: String(m.where || '').slice(0, 40) });
+  if (L.length > FB_MAX) L.splice(0, L.length - FB_MAX);
+  FEED.save(); return { ok: true };
+}
+const fbText = () => (FEED.data.list || []).slice().reverse().map(x => `[${x.d}] ${x.k === 'bug' ? '🐞 BUG' : '💡 IDÉE'} — ${x.n} (${x.v || '?'}${x.w ? ', ' + x.w : ''})\n${x.t}\n`).join('\n');
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 let accounts = {};               // clé = pseudo en minuscules (= ACC.data)
 const scheduleSave = () => ACC.save();
 
@@ -131,7 +152,10 @@ function cleanProfile(p, name) {
     coins: int(p.coins, 1e7),
     owned: Array.isArray(p.owned) ? [...new Set(p.owned.filter(x => ID.test(String(x))).map(String))].slice(0, 300) : [],
     eq, st,
-    ach: Array.isArray(p.ach) ? [...new Set(p.ach.filter(x => ID.test(String(x))).map(String))].slice(0, 100) : []
+    ach: Array.isArray(p.ach) ? [...new Set(p.ach.filter(x => ID.test(String(x))).map(String))].slice(0, 100) : [],
+    tuto: p.tuto ? 1 : 0,
+    // V5.1 : entreprises (campagnes) enregistrées sur le compte
+    camps: Array.isArray(p.camps) ? p.camps.filter(x => x && /^[A-Z0-9]{4,8}$/.test(String(x.code))).slice(0, 12).map(x => ({ code: String(x.code), name: String(x.name || '').replace(/[<>&"`]/g, '').slice(0, 30), day: int(x.day, 9999), t: int(x.t, 1e13) })) : []
   };
 }
 function accountOp(m) {
@@ -170,6 +194,13 @@ const server = http.createServer((req, res) => {
   if (url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ ok: true, v: VERSION, rooms: rooms.size, players: clients.size, accounts: Object.keys(accounts).length, saves: Object.keys(SAVES.data).length, storage: useGitHub ? 'github' : 'fichier' }));
+    return;
+  }
+  if (url === '/retours.txt') { res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end(fbText() || 'Aucun retour pour l\'instant.'); return; }
+  if (url === '/retours') {
+    const L = (FEED.data.list || []).slice().reverse();
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Retours des joueurs — Mécanique Lebec</title><style>body{font-family:Arial,sans-serif;background:#12141c;color:#eee;max-width:900px;margin:auto;padding:20px}h1{color:#ffd257}.r{background:#1d2130;border-radius:10px;padding:10px 14px;margin:10px 0;border-left:5px solid #74b9ff}.r.bug{border-color:#ff6b6b}.m{color:#99a;font-size:13px}pre{white-space:pre-wrap;font-family:inherit;margin:6px 0 0}</style></head><body><h1>Retours des joueurs (${L.length})</h1><p class="m">💡 suggestions · 🐞 bugs — <a style="color:#74b9ff" href="/retours.txt">version texte</a></p>${L.map(x => `<div class="r ${x.k}"><div class="m">${x.k === 'bug' ? '🐞 BUG' : '💡 IDÉE'} — <b>${esc(x.n)}</b> — ${esc(x.d)} — ${esc(x.v || '')} ${esc(x.w || '')}</div><pre>${esc(x.t)}</pre></div>`).join('') || '<p>Aucun retour pour l\'instant.</p>'}</body></html>`);
     return;
   }
   const file = path.normalize(path.join(ROOT, url === '/' ? 'index.html' : url));
@@ -246,6 +277,10 @@ wss.on('connection', ws => {
         let res; try { res = campOp(m); } catch (e) { res = { ok: false, m: 'Erreur serveur.' }; }
         send(c, Object.assign({ t: 'campr', q: m.q }, res)); break;
       }
+      case 'fb': case 'fblist': {
+        let res; try { res = fbOp(c, m.t === 'fblist' ? { op: 'list' } : m); } catch (e) { res = { ok: false, m: 'Erreur serveur.' }; }
+        send(c, Object.assign({ t: 'fbr', q: m.q }, res)); break;
+      }
       case 'list': send(c, { t: 'rooms', list: [...rooms.values()].filter(x => !x.priv).map(x => { const h = clients.get(x.host); return { code: x.code, n: x.players.length, max: MAX_PLAYERS, host: h ? h.name : '?', game: x.state === 'game' }; }) }); break;
       case 'create': { const room = { code: newCode(), host: c.id, players: [], state: 'lobby', priv: !!m.priv, seed: 0, cfg: null }; rooms.set(room.code, room); joinRoom(c, room); break; }
       case 'join': {
@@ -280,4 +315,4 @@ wss.on('connection', ws => {
 });
 setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; try { ws.ping(); } catch (e) { /* ignoré */ } } }, 15000);
 
-Promise.all([ACC.load(), SAVES.load()]).then(() => { accounts = ACC.data; server.listen(PORT, () => console.log(`Mécanique Lebec V4 — serveur prêt : http://localhost:${PORT}/`)); });
+Promise.all([ACC.load(), SAVES.load(), FEED.load()]).then(() => { accounts = ACC.data; server.listen(PORT, () => console.log(`Mécanique Lebec V4 — serveur prêt : http://localhost:${PORT}/`)); });

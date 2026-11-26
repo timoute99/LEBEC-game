@@ -155,7 +155,7 @@
     if (S.mode === 'course') return;
     K.partT -= dt;
     if (K.partT <= 0) {
-      const ev = ECO.part.every; K.partT = (ev[0] + rng() * (ev[1] - ev[0])) * (1.25 - 0.45 * K.lvl);
+      const ev = ECO.part.every; K.partT = (ev[0] + rng() * (ev[1] - ev[0])) * (1.25 - 0.45 * K.lvl) * ((ML.DAYTYPES[S.dayType] || {}).part || 1);
       const free = ML.PARTICULIERS.filter(id => !npcs[id].active), slots = ML.LOC.parkSlots.map((s, i) => i).filter(i => !S.parts.some(p => p.slot === i));
       if (S.rt < C.SHIFT_SEC - 160 && S.parts.length < 2 && free.length && slots.length) spawnPart(rng.pick(free), slots[0]);
     }

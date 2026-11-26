@@ -1,4 +1,4 @@
-MÉCANIQUE LEBEC — usinage en équipe (V5.0, 1 à 6 joueurs)
+MÉCANIQUE LEBEC — usinage en équipe (V5.1, 1 à 6 joueurs)
 ==========================================================
 En ligne : https://lebec-game.onrender.com
 
@@ -38,6 +38,16 @@ MODES
   avec le code peut la reprendre ; l'Inspecteur vient quand l'atelier est prêt, le réussir
   termine le jeu) · Inspection (boss : règles absurdes qui changent) · Course de Mégane
   (5 manches) · Mode traître (3 joueurs minimum : un joueur payé par UsiFlash, vote à la fin).
+
+NOUVEAU EN V5.1
+  - Le créateur du salon ENREGISTRE la partie (Échap → 💾). Avec un compte, ses entreprises sont dans
+    « Mes entreprises » (mode Campagne), sur n'importe quel PC. Une Journée libre devient une entreprise.
+  - Journées différentes : calme (mais pleine d'imprévus), COUP DE FEU, agitée, veille de pont…
+    Plus il y a de commandes, moins il y a d'événements (et l'inverse). Commandes par vagues.
+  - Tutoriel pas à pas pour les invités et débutants (J pour passer, à revoir depuis la pause).
+  - Page 📰 Nouveautés · idées · bugs (accueil + pause) : les joueurs envoient suggestions et bugs.
+    À LIRE ICI : https://lebec-game.onrender.com/retours (ou /retours.txt), et le fichier
+    lebec-retours.json du dépôt GitHub privé des sauvegardes.
 
 NOUVEAU EN V5.0 (grosse mise à jour)
   - La ville : du RELIEF (collines), une RIVIÈRE avec des ponts, plus de passants, des immeubles

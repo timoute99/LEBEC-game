@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mécanique Lebec — en équipe (V5.0)</title>
+<title>Mécanique Lebec — en équipe (V5.1)</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -30,6 +30,7 @@
   <div id="secret" class="hidden"></div>
   <div id="tr"><canvas id="minimap" width="180" height="196"></canvas><div id="gps" class="hidden"></div><div id="team" class="box"></div></div>
   <div id="jail" class="hidden"></div>
+  <div id="tuto" class="hidden"></div>
   <div id="crosshair"></div>
   <div id="prompt"></div>
   <div id="subtitle"></div>
@@ -90,7 +91,7 @@
       <button id="go-solo" class="choice"><span class="ic">🧑‍🔧</span>SOLO<small>toi contre l'atelier</small></button>
       <button id="go-multi" class="choice"><span class="ic">👥</span>MULTIJOUEUR<small>jusqu'à 5 en ligne</small></button>
     </div>
-    <div class="homebar"><button id="go-account" class="link">👤 <span id="acc-mini">Compte</span></button><button id="go-guide" class="link">📖 Guide & astuces</button><button id="go-install" class="link hidden">📲 Installer le jeu</button></div>
+    <div class="homebar"><button id="go-account" class="link">👤 <span id="acc-mini">Compte</span></button><button id="go-guide" class="link">📖 Guide & astuces</button><button id="go-news" class="link">📰 Nouveautés · idées · bugs</button><button id="go-install" class="link hidden">📲 Installer le jeu</button></div>
   </div>
 
   <!-- Compte -->
@@ -101,6 +102,23 @@
       <div class="actions"><button id="btn-login">Se connecter</button><button id="btn-register" class="sec">Créer un compte</button></div>
       <p class="dim small">Sans compte, tu joues en invité : ton perso et tes jetons restent sur ce PC.</p></div>
     <div class="actions"><button id="btn-logout" class="sec hidden">Se déconnecter</button><button class="sec back">Retour</button></div>
+  </div>
+
+  <!-- V5.1 : nouveautés + suggestions / bugs -->
+  <div id="scr-news" class="card wide hidden">
+    <h2>📰 Nouveautés, idées et bugs</h2>
+    <div class="news-grid">
+      <div id="news-list" class="news"></div>
+      <div class="fbbox">
+        <h3>✉ Une idée ? Un bug ?</h3>
+        <div class="fbkind"><label><input type="radio" name="fbk" value="idee" checked> 💡 Suggestion</label> <label><input type="radio" name="fbk" value="bug"> 🐞 Bug</label></div>
+        <textarea id="fb-text" maxlength="1500" placeholder="Explique ton idée… ou ce qui ne marche pas : où, quand, ce que tu faisais."></textarea>
+        <div class="actions"><button id="fb-send" class="go">Envoyer</button></div>
+        <p id="fb-state" class="dim small"></p>
+        <h3>Derniers messages des joueurs</h3><div id="fb-list" class="fblist dim small"></div>
+      </div>
+    </div>
+    <div class="actions"><button id="btn-news-back" class="sec">Retour</button></div>
   </div>
 
   <!-- Guide -->
@@ -181,14 +199,15 @@
   </div>
 </div>
 <div id="toasts"></div>
-<div id="version">V5.0</div>
+<div id="version">V5.1</div>
 
 <!-- Three.js r128 + chargeur glTF (copies locales : marche hors ligne et en double-clic) -->
 <script src="lib/three.min.js"></script>
 <script src="lib/GLTFLoader.js"></script>
 <script src="assets-ville.js"></script>   <!-- décors KayKit en base64 -->
 <script src="js/config.js"></script>      <!-- réglages, entreprises, pièces -->
-<script src="js/persos.js"></script>      <!-- LES PERSONNAGES : fichier à modifier librement -->
+<script src="js/persos.js"></script>
+<script src="js/patchnotes.js"></script>   <!-- nouveautés (page « Patch notes ») -->      <!-- LES PERSONNAGES : fichier à modifier librement -->
 <script src="js/util.js"></script>
 <script src="js/company.js"></script>     <!-- l'entreprise : ce qui est sauvegardé en campagne -->
 <script src="js/textures.js"></script>
@@ -215,6 +234,7 @@
 <script src="js/account.js"></script>     <!-- profil, jetons, succès -->
 <script src="js/dialogue.js"></script>
 <script src="js/hud.js"></script>
+<script src="js/tuto.js"></script>         <!-- V5.1 : tutoriel des débutants -->
 <script src="js/erp.js"></script>         <!-- fenêtre du PC de gestion -->
 <script src="js/game.js"></script>        <!-- session : joueur local + synchro -->
 <script src="js/lobby.js"></script>

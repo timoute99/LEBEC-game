@@ -313,3 +313,23 @@ button.mini.del { background: rgba(231,76,60,.35); } button.mini:disabled { opac
 .erp-filter button.on { background: #ffd257; color: #111; }
 #room-join { margin: 10px 0; padding: 10px; border-radius: 12px; background: rgba(62, 207, 110, .15); border: 1px solid #3ecf6e; }
 #lobby.ingame { background: rgba(10, 12, 18, .55); }
+
+#daycard .dc-t { margin: 6px 0; color: #ffd257; font-size: 15px; }
+
+/* V5.1 : nouveautés, retours, tutoriel */
+.news-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; height: 56vh; text-align: left; }
+#scr-news h3 { text-align: left; margin: 6px 0; }
+.news { overflow-y: auto; padding-right: 6px; max-height: 56vh; }
+.news .pv { margin-bottom: 12px; background: rgba(255,255,255,.04); border-radius: 10px; padding: 8px 12px; }
+.news .pv h4 { margin: 0 0 4px; color: #ffd257; } .news .pv h4 span { color: #99a; font-weight: normal; font-size: 12px; }
+.news .pv ul { margin: 0; padding-left: 18px; } .news .pv li { margin: 3px 0; font-size: 13px; }
+.fbbox { overflow-y: auto; max-height: 56vh; }
+.fbbox textarea { width: 100%; min-height: 110px; box-sizing: border-box; background: #10131c; color: #eee; border: 1px solid #445; border-radius: 8px; padding: 8px; font: inherit; }
+.fbkind label { margin-right: 14px; cursor: pointer; }
+.fblist .f { border-left: 3px solid #74b9ff; padding: 3px 8px; margin: 6px 0; color: #ccd; } .fblist .f.bug { border-color: #ff6b6b; }
+#tuto { position: absolute; left: 10px; top: 230px; width: 330px; background: rgba(16, 30, 60, .93); border: 2px solid #74b9ff; border-radius: 14px; padding: 10px 14px; color: #fff; pointer-events: none; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+#tuto .tt { color: #9fd3ff; font-size: 12px; font-weight: bold; letter-spacing: .5px; }
+#tuto .tx { font-size: 15px; line-height: 1.35; margin: 6px 0; }
+#tuto .tk { font-size: 12px; color: #aab; }
+#tuto.done { border-color: #3ecf6e; background: rgba(16, 60, 30, .93); }
+.campacc { margin-top: 6px; } .campacc button { margin: 2px 4px 2px 0; }

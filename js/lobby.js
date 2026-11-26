@@ -24,7 +24,28 @@
     const r = await N.camp('load', { code }); if (!r.ok) { ML.HUD.toast(r.m || 'Code inconnu.'); return null; }
     const E = Co().clean(r.data); E.code = r.code; Camp.setCur(E); return E;
   };
-  Camp.push = E => { Camp.setCur(E); if (E.code && N.online) N.camp('put', { code: E.code, data: E }).then(r => { if (!r.ok) console.warn('Sauvegarde :', r.m); }); };
+  Camp.push = E => { Camp.setCur(E); Camp.link(E); if (E.code && N.online) N.camp('put', { code: E.code, data: E }).then(r => { if (!r.ok) console.warn('Sauvegarde :', r.m); }); };
+  /** V5.1 : l'entreprise est rangée dans « Mes entreprises » du profil (compte si connecté, sinon ce PC) */
+  Camp.link = E => {
+    if (!E || !E.code) return; const A2 = ML.Account, list = A2.prof.camps = A2.prof.camps || [], old = list.find(c => c.code === E.code);
+    if (old && old.day === E.day && old.name === E.name && list[0] === old) return;
+    A2.prof.camps = [{ code: E.code, name: E.name, day: E.day, t: Date.now() }].concat(list.filter(c => c.code !== E.code)).slice(0, 12); A2.save();
+  };
+  /** V5.1 : le créateur du salon enregistre la partie (menu Pause) */
+  Camp.saveNow = async () => {
+    const G = ML.Game, A2 = ML.Account, T = m => ML.HUD.toast(m);
+    if (!G.on || !G.isHost || !ML.Sim.S) return T('Seul le créateur du salon peut enregistrer la partie.');
+    const snap = ML.Sim.companySnap(), who = A2.logged() ? ` sur ton compte ${A2.user}` : ' sur ce PC (connecte-toi à un compte pour la retrouver partout)';
+    if (G.game.campaign) { Camp.autosave(snap); const E = Camp.get(); return T(`💾 Partie enregistrée${who} : « ${E.name} »${E.code ? ' · code ' + E.code : ''}`); }
+    if (G.game.mode !== 'coop') return T('Ce mode ne s\'enregistre pas : seulement la Journée libre et la Campagne.');
+    // journée libre → elle devient une entreprise (campagne), qu'on pourra reprendre
+    const E = ML.Company.merge(G.game.E, snap); E.day = G.game.E.day || 1; E.code = null;
+    if (!E.name || E.name === 'Journée libre') E.name = ((A2.name() || 'Mon') + ' Usinage').slice(0, 30);
+    if (await L.ensure()) { const r = await N.camp('create', { name: E.name, data: E }); if (r.ok) E.code = r.code; }
+    Camp.setCur(E); Camp.link(E);
+    Object.assign(G.game, { campaign: true, code: E.code, E });                        // la suite (sauvegarde auto, bilan du soir) se fait en campagne
+    T(`💾 Partie enregistrée${who} : « ${E.name} »${E.code ? ' · code ' + E.code : ''}. Pour la reprendre : mode Campagne.`);
+  };
   /** Sauvegarde automatique en cours de journée (hôte) */
   Camp.autosave = snap => { const E = Camp.get(); if (E && snap) Camp.push(Co().merge(E, snap)); };
   /** Fin de journée (hôte) : on enregistre l'entreprise, jour suivant, l'inspecteur viendra-t-il ? */
@@ -56,7 +77,7 @@
   };
 
   /* ======================= Init ======================= */
-  const SCREENS = ['scr-home', 'scr-account', 'scr-guide', 'scr-solo', 'scr-multi', 'scr-profile', 'scr-room'];
+  const SCREENS = ['scr-home', 'scr-account', 'scr-guide', 'scr-solo', 'scr-multi', 'scr-profile', 'scr-room', 'scr-news'];
   L.screen = id => {
     if (id !== 'scr-profile') L.cur = id;
     L.show(); for (const k of SCREENS) $(k).classList.toggle('hidden', k !== id);
@@ -76,6 +97,22 @@
     $('go-account').onclick = () => { L.screen('scr-account'); L.renderAccount(); };
     $('go-guide').onclick = () => { L.screen('scr-guide'); $('guide-tips').innerHTML = ML.TIPS.map(t => `<li>${U.esc(t)}</li>`).join(''); };
     for (const b of L.el.querySelectorAll('.back')) b.onclick = () => L.showHome();
+    // V5.1 : nouveautés + suggestions / bugs (accueil et menu Pause)
+    $('go-news').onclick = () => L.showNews(false);
+    $('btn-news-back').onclick = () => {
+      if (L.ingame === 'news') { L.ingame = false; L.el.classList.remove('ingame'); L.hide(); ML.ui.modal = null; ML.Input.lock(); return; }
+      L.showHome();
+    };
+    $('fb-send').onclick = async () => {
+      const text = $('fb-text').value.trim(), kind = (L.el.querySelector('input[name="fbk"]:checked') || {}).value || 'idee';
+      if (text.length < 5) return ML.HUD.toast('Écris quelques mots d\'abord !');
+      $('fb-state').textContent = 'Envoi…';
+      if (!(await L.ensure())) { $('fb-state').textContent = 'Serveur injoignable, réessaie plus tard.'; return; }
+      const G = ML.Game, where = G.on && G.S ? `en jeu : ${G.game.mode}, jour ${G.S.co.day || G.S.day}` : 'accueil';
+      const r = await N.fb('send', { kind, text, name: A.name() || N.name || 'Anonyme', ver: ($('version') || {}).textContent || '', where });
+      $('fb-state').textContent = r.ok ? '✅ Merci ! Ton message est bien arrivé.' : '❌ ' + (r.m || 'Erreur.');
+      if (r.ok) { $('fb-text').value = ''; L.loadFb(); }
+    };
     $('btn-profile-h').onclick = () => L.showProfile(); $('btn-profile-r').onclick = () => L.showProfile();
     $('btn-prof-back').onclick = () => {
       if (L.ingame) { L.ingame = false; L.el.classList.remove('ingame'); L.hide(); ML.ui.modal = null; ML.Game.sendLook(); ML.Input.lock(); ML.HUD.toast('👕 Perso mis à jour !'); return; }
@@ -208,7 +245,7 @@
     if (!(await L.ensure(user))) return;
     const r = await A.auth(op, user, pass);
     if (!r.ok) return ML.HUD.toast(r.m || 'Erreur.');
-    $('in-pass').value = ''; L.renderAccount();
+    $('in-pass').value = ''; L.renderAccount(); Camp.link(Camp.get()); L.renderModes();
     if (N.name !== A.user) { N.name = A.user; N.send({ t: 'name', name: A.user }); }
     ML.HUD.toast(op === 'register' ? `Compte créé : bienvenue ${A.user} !` : `Re-bonjour ${A.user} !`);
   };
@@ -288,7 +325,10 @@
     for (const p of ['h', 'r']) {
       const mode = $(p + '-mode').value;
       $(p + '-camp').classList.toggle('hidden', mode !== 'campagne');
-      $(p + '-camp-info').innerHTML = c ? `${ML.Company.summary(c)}<br><span class="dim">${ML.Company.goal(c)}</span>` : '<b>Aucune entreprise.</b> Donne-lui un nom et crée-la, ou charge une entreprise avec son code.';
+      const mine = (A.prof.camps || []).filter(x => !c || x.code !== c.code);
+      $(p + '-camp-info').innerHTML = (c ? `${ML.Company.summary(c)}<br><span class="dim">${ML.Company.goal(c)}</span>` : '<b>Aucune entreprise.</b> Donne-lui un nom et crée-la, ou charge une entreprise avec son code.') +
+        (mine.length ? `<div class="campacc">📂 <b>Mes entreprises${A.logged() ? ' (compte ' + U.esc(A.user) + ')' : ' (ce PC)'} :</b> ${mine.map(x => `<button class="sec tiny" data-camp="${x.code}">${U.esc(x.name)} · jour ${x.day}</button>`).join('')}</div>` : '');
+      for (const b of $(p + '-camp-info').querySelectorAll('[data-camp]')) b.onclick = async () => { const E = await Camp.fetch(b.dataset.camp); if (E) { ML.HUD.toast(`Entreprise « ${E.name} » chargée (jour ${E.day}).`); L.renderModes(); if (p === 'r') L.sendCfg(); } };
       const desc = { coop: 'Une journée seule : petit atelier (T1, F1, un opérateur, le vieux Kangoo) et 1 500 € pour investir au PC.', campagne: 'Fais grandir ton atelier jour après jour : argent, machines, embauches, véhicules. Sauvegardé sur le serveur avec un CODE (n\'importe qui peut reprendre). L\'inspecteur vient quand l\'atelier est prêt : le réussir termine le jeu.', inspection: "Boss : l'inspecteur de l'Éducation Nationale impose des règles absurdes qui changent.", course: 'Course de Mégane dans la ville : 5 manches, premier arrivé devant l\'entreprise indiquée !' }[mode];
       const D = ML.DIFFS[$(p + '-diff').value] || ML.DIFFS.normal;
       $(p + '-desc').textContent = desc + ' — ' + D.icon + ' ' + D.name + ' : ' + D.desc;
@@ -342,6 +382,18 @@
     L.renderModes(); L.renderRoles(true); L.renderHostCfg();
   };
   L.backToRoom = () => { if (N.room) L.showRoom(); else L.showHome(); };
+  L.showNews = ingame => {
+    if (ingame) { L.ingame = 'news'; ML.ui.modal = 'profile'; ML.Input.unlock(); ML.HUD.showPause(false); L.el.classList.add('ingame'); }
+    L.screen('scr-news');
+    $('news-list').innerHTML = ML.PATCH.map(p => `<div class="pv"><h4>${U.esc(p.v)} — ${U.esc(p.t)} <span>${U.esc(p.d)}</span></h4><ul>${p.l.map(x => `<li>${U.esc(x)}</li>`).join('')}</ul></div>`).join('');
+    $('fb-state').textContent = ''; L.loadFb();
+  };
+  L.loadFb = async () => {
+    $('fb-list').textContent = 'Chargement…';
+    if (!(await L.ensure())) { $('fb-list').textContent = 'Serveur injoignable.'; return; }
+    const r = await N.fb('list');
+    $('fb-list').innerHTML = r.ok && r.list.length ? r.list.map(x => `<div class="f ${x.k}">${x.k === 'bug' ? '🐞' : '💡'} <b>${U.esc(x.n)}</b> <span class="dim">${U.esc(x.d)}</span><br>${U.esc(x.t)}</div>`).join('') : (r.ok ? 'Aucun message pour l\'instant : sois le premier !' : U.esc(r.m || ''));
+  };
   /** V5 : en pleine partie (menu Pause) — changer de perso, ou revenir au menu principal */
   L.inGameProfile = () => { L.ingame = true; ML.ui.modal = 'profile'; ML.Input.unlock(); ML.HUD.showPause(false); L.el.classList.add('ingame'); L.show(); L.screen('scr-profile'); L.renderProfile(); };
   L.leaveGame = () => {

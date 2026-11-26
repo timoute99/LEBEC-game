@@ -49,6 +49,12 @@
     const D0 = ML.DIFFS[S.diff], lv = K.lvl, pi = K.pi = Math.min(4, Math.max(1, cfg.players.length)) - 1;
     // V4.1 : moins de chaos et d'événements quand on est peu nombreux
     K.D = Object.assign({}, D0, { chaos: D0.chaos * (0.45 + 0.85 * lv) * ML.ECO.playerChaos[pi], events: [Math.max(0, Math.round(D0.events[0] * (0.4 + 0.8 * lv)) - (pi ? 0 : 1)), Math.max(1, Math.round(D0.events[1] * (0.5 + 0.7 * lv)) - (pi ? 0 : 1))] });
+    // V5.1 : type de journée (calme, coup de feu, agitée…) : commandes ↔ imprévus
+    const dk = g.dayType || (S.mode === 'course' || S.mode === 'inspection' || (E.day || g.day || 1) <= 1 ? 'normale' : wpick(Object.fromEntries(Object.keys(ML.DAYTYPES).map(k => [k, ML.DAYTYPES[k].p]))));
+    const DT = ML.DAYTYPES[dk] || ML.DAYTYPES.normale; S.dayType = ML.DAYTYPES[dk] ? dk : 'normale';
+    K.D.interval *= DT.orders; K.D.dur *= DT.dur;
+    K.D.events = [Math.max(0, K.D.events[0] + DT.ev), Math.max(0, K.D.events[1] + DT.ev)];
+    if (DT.ev > 0) K.D.events[0] = Math.max(K.D.events[0], DT.ev);                 // journée calme : il se passe forcément quelque chose
     S.anger = C.LEBEC.base + K.D.base;
     const roles = (g.roles || {});
     for (const p of cfg.players) S.pl[p.id] = { name: p.name, idx: p.idx, inv: [null, null, null], car: null, ride: null, stun: 0, coffee: 0, hp: C.HP.max, ko: false, role: ML.ROLES[roles[p.id]] ? roles[p.id] : 'poly' };
@@ -256,8 +262,10 @@
     const n = Math.max(1, S.n);
     S.nextOrder -= dt;
     if (S.nextOrder <= 0 && S.rt < C.SHIFT_SEC - 60) {
-      if (S.props.length < 3 && S.orders.length + S.props.length < K.maxActive() + 2) genOrder();
-      S.nextOrder = C.ORDER.interval / (1 + 0.25 * (n - 1)) * (0.8 + rng() * 0.4) * (1.45 - 0.65 * K.lvl) * K.D.interval;
+      const busy = S.dayType === 'rush' ? 4 : S.dayType === 'pont' ? 3 : 2;
+      if (S.props.length < (busy > 2 ? 4 : 3) && S.orders.length + S.props.length < K.maxActive() + busy) genOrder();
+      const wave = 1 - 0.3 * Math.sin(S.rt / C.SHIFT_SEC * Math.PI * 4 - 0.6);          // deux « vagues » de commandes dans la journée
+      S.nextOrder = C.ORDER.interval / (1 + 0.25 * (n - 1)) * (0.8 + rng() * 0.4) * (1.45 - 0.65 * K.lvl) * K.D.interval * wave;
     }
     for (const p of S.props.slice()) if (S.rt > p.exp) {
       S.props.splice(S.props.indexOf(p), 1); K.repAdd(-ML.ECO.rep.expire); Sim.dirty = true;
