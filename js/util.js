@@ -61,9 +61,9 @@
   U.addCollider = (minX, maxX, minZ, maxZ, tag) => { const c = { minX, maxX, minZ, maxZ, tag }; ML.colliders.push(c); return c; };
   U.boxCollider = (cx, cz, w, d, tag) => U.addCollider(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, tag);
   /** Repousse le cercle (p, r) hors des boîtes. Renvoie true s'il y a eu contact. */
-  U.resolveCircle = (p, r) => {
+  U.resolveCircle = (p, r, list) => {
     let hit = false;
-    for (const c of ML.colliders) {
+    for (const c of list || ML.colliders) {
       if (p.x < c.minX - r || p.x > c.maxX + r || p.z < c.minZ - r || p.z > c.maxZ + r) continue;
       const nx = U.clamp(p.x, c.minX, c.maxX), nz = U.clamp(p.z, c.minZ, c.maxZ);
       const dx = p.x - nx, dz = p.z - nz, dd = dx * dx + dz * dz;
@@ -75,7 +75,7 @@
         if (m === l) p.x = c.minX - r; else if (m === rr) p.x = c.maxX + r; else if (m === t) p.z = c.minZ - r; else p.z = c.maxZ + r;
       }
     }
-    if (ML.riverPush(p, r)) hit = true;                               // pas de baignade dans la rivière (sauf par les ponts)
+    if (!list && ML.riverPush(p, r)) hit = true;                      // pas de baignade dans la rivière (sauf par les ponts)
     return hit;
   };
   U.inCollider = (x, z, pad) => { pad = pad || 0; for (const c of ML.colliders) if (x > c.minX - pad && x < c.maxX + pad && z > c.minZ - pad && z < c.maxZ + pad) return true; return ML.riverAt(x, z, pad); };

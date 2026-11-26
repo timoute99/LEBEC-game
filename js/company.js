@@ -39,6 +39,8 @@
     if (!E.veh.includes('kangoo')) E.veh.unshift('kangoo');
     for (const k in ML.AI_STAFF) if (d.ai && d.ai[k]) E.ai[k] = true;
     for (const k in ML.CATALOG) if (d.up && d.up[k] && !ML.CATALOG[k].mach && !ML.CATALOG[k].veh) E.up[k] = num(d.up[k], 1, 1, ML.CATALOG[k].max || 1);
+    if (d.up && d.up.sae_bon) E.up.sae_bon = num(d.up.sae_bon, 0, 0, 80);          // V5.2 : bon de réduction gagné à une SAE (sur la prochaine machine)
+    E.wc = num(d.wc, 15, 0, 100);                                                       // V5.2 : saleté des toilettes
     for (const k in ML.CFG.START_STOCK) E.stock[k] = num(d.stock && d.stock[k], F.stock[k] || 0, 0, 999);
     E.mess = Co.cleanMess(d.mess);
     E.hist = Array.isArray(d.hist) ? d.hist.slice(-7).map(h => ({ d: num(h && h.d, 1, 1, 9999), p: (Array.isArray(h && h.p) ? h.p : []).slice(0, 8).map(r => [String(r[0] || '?').replace(/[<>&"`]/g, '').slice(0, 16)].concat([1, 2, 3, 4].map(i => num(r[i], 0, 0, 1e7)))) })) : [];

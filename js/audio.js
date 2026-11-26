@@ -51,6 +51,12 @@
     emote: v => tone(880, 0.08, 'triangle', 0.08 * v, 1320),
     thunder: v => { noise(1.6, 0.55 * v, 180); setTimeout(() => noise(1.1, 0.35 * v, 120), 350); },
     jail: v => { tone(140, 0.4, 'square', 0.18 * v, 90); setTimeout(() => tone(110, 0.5, 'square', 0.16 * v, 70), 300); },
+    // V5.2
+    boom: v => { noise(1.4, 0.9 * v, 260); tone(70, 0.9, 'sine', 0.6 * v, 30); setTimeout(() => noise(0.8, 0.4 * v, 600), 250); },
+    couic: v => tone(1500, 0.18, 'square', 0.12 * v, 2600),
+    grind: v => { noise(0.9, 0.3 * v, 6000); tone(2400, 0.8, 'sawtooth', 0.05 * v, 1900); },
+    flush: v => { noise(1.2, 0.25 * v, 1400); setTimeout(() => tone(300, 0.4, 'sine', 0.06 * v, 120), 500); },
+    run: v => tone(200, 0.05, 'triangle', 0.05 * v),
     horn_base: v => { tone(410, 0.35, 'square', 0.15 * v); tone(520, 0.35, 'square', 0.12 * v); },
     horn_canard: v => { tone(620, 0.12, 'sawtooth', 0.15 * v, 330); setTimeout(() => tone(600, 0.16, 'sawtooth', 0.15 * v, 300), 150); },
     horn_cucaracha: v => [392, 392, 392, 523, 659, 0, 392, 392, 392, 523, 659].forEach((f, i) => f && setTimeout(() => tone(f, 0.11, 'square', 0.1 * v), i * 120)),

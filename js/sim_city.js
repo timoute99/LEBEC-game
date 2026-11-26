@@ -12,7 +12,7 @@
     S = K.S; rng = K.rng; city = ML.World.city;
     const sp = ML.LOC.carSpawn;
     /** Capacité : nombre de caisses ; le camion compte en « places » (palette = 4, caisse = 1) */
-    K.capOf = kind => kind === 'tp' ? C.TP.cap : kind === 'camion' ? C.CAMION.cap : kind === 'fenwick' ? 0 : kind === 'kangoo' ? 2 : kind === 'ducato' ? 6 : S.up.grande_benne ? 6 : C.CAR.cap;
+    K.capOf = kind => kind === 'tp' ? C.TP.cap : kind === 'camion' ? C.CAMION.cap : kind === 'fenwick' ? 0 : kind === 'scooter' ? C.SCOOTER.cap : kind === 'kangoo' ? 2 : kind === 'ducato' ? 6 : S.up.grande_benne ? 6 : C.CAR.cap;
     K.bedUse = c => c.bed.reduce((a, it) => a + (c.kind === 'camion' && it.type === 'palette' ? 4 : 1), 0);
     K.bedFree = c => c.cap - K.bedUse(c);
     const car = (kind, p, extra) => Object.assign({ x: p.x, z: p.z, h: p.h || 0, s: 0, dr: null, pass: [], bed: [], kind, name: ML.VEHICLES[kind].name, cap: K.capOf(kind), fuel: 100, color: ML.VEHICLES[kind].color, frozen: 0, load: null }, extra || {});
@@ -28,6 +28,7 @@
       if (o.includes('tp')) S.cars.push(car('tp', ML.LOC.tpSpawn));
       if (o.includes('fenwick')) S.cars.push(car('fenwick', ML.LOC.fenSpawn));
       if (o.includes('camion')) S.cars.push(car('camion', ML.LOC.camSpawn, { fuel: fuel() }));
+      if (o.includes('scooter')) S.cars.push(car('scooter', sp[3], { fuel: fuel() }));
     }
     // passants sur les trottoirs
     peds = K.peds = [];
@@ -138,11 +139,13 @@
       if (!c.dr || !S.pl[c.dr] || c.kind === 'tp') return;
       const sp = Math.abs(c.s || 0), kmh = Math.round(sp * 3.6), name = S.pl[c.dr].name;
       ML.World.radars.forEach((r, ri) => {
+        if (S.radarsOff.includes(ri)) return;                          // V5.2 : radar découpé à la meuleuse
         const key = c.dr + ':' + ri;
         const lim = city.radars[ri] && city.radars[ri].ring && S.rule !== 'speed30' ? 25 : limit;
         if (sp > lim && Math.hypot(r.x - c.x, r.z - c.z) < 15 && (K.radarCd[key] || 0) < S.rt) {
-          K.radarCd[key] = S.rt + 5; K.fine(ML.ECO.fines.radar, `Flashé·e à ${kmh} km/h`, c.dr);
-          K.ev({ e: 'flash', to: c.dr, r: ri, kmh }); K.all(`📸 ${name} flashé·e à ${kmh} km/h ! (−${ML.ECO.fines.radar} €)`, 'warn');
+          K.radarCd[key] = S.rt + 5; const pass = !!S.up.radarpass;     // V5.2 : « Pass Radar » = pas d'amende
+          if (!pass) K.fine(ML.ECO.fines.radar, `Flashé·e à ${kmh} km/h`, c.dr);
+          K.ev({ e: 'flash', to: c.dr, r: ri, kmh }); K.all(`📸 ${name} flashé·e à ${kmh} km/h ! ${pass ? '(Pass Radar : pas d\'amende 😎)' : `(−${ML.ECO.fines.radar} €)`}`, pass ? 'info' : 'warn');
           if (kmh >= 90) K.stat(c.dr, 'flash90');
         }
       });

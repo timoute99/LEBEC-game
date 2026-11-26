@@ -74,18 +74,33 @@
     c.wing = new THREE.Group(); c.flames = new THREE.Group();
     c.slots = [[0, 1.2, -0.3], [0, 1.2, -2.7]];
   }
+  /** V5.2 : scooter de livraison (top-case de 2 caisses) */
+  function buildScooter(c, spec) {
+    const g = c.group, body = c.bodyMat = new THREE.MeshLambertMaterial({ color: spec.color || 0xe84393 });
+    U.box(0.5, 0.35, 1.0, body, 0, 0.5, -0.15, g); U.box(0.48, 0.12, 0.7, 0x222222, 0, 0.74, -0.25, g);              // coque + selle
+    U.box(0.42, 0.06, 0.5, 0x333333, 0, 0.32, 0.35, g); U.box(0.4, 0.75, 0.12, body, 0, 0.7, 0.62, g);             // plancher + tablier
+    U.cyl(0.025, 0.025, 0.55, 0x555555, 0, 1.1, 0.62, g, 6); U.box(0.7, 0.04, 0.04, 0x222222, 0, 1.38, 0.62, g);       // guidon
+    U.box(0.16, 0.1, 0.06, U.mat(0xffffff, 0xffffaa), 0, 1.15, 0.7, g); U.box(0.15, 0.08, 0.05, U.mat(0xff0000, 0x880000), 0, 0.55, -0.67, g);
+    U.box(0.55, 0.42, 0.5, 0xecf0f1, 0, 1.02, -0.62, g); U.box(0.57, 0.06, 0.52, body, 0, 1.25, -0.62, g);            // top-case
+    const lab = U.label('LEBEC EXPRESS', { size: 0.18, color: '#c0392b', bg: 'rgba(0,0,0,0)' }); lab.position.set(0, 1.05, -0.9); g.add(lab);
+    c.rimMat = new THREE.MeshLambertMaterial({ color: 0xbdc3c7 });
+    for (const z of [0.55, -0.55]) { const p = new THREE.Group(); p.position.set(0, 0.22, z); p.rotation.order = 'YXZ'; g.add(p); U.cyl(0.22, 0.22, 0.12, 0x111111, 0, 0, 0, p, 12).rotation.z = Math.PI / 2; U.cyl(0.12, 0.12, 0.13, c.rimMat, 0, 0, 0, p, 10).rotation.z = Math.PI / 2; p.front = z > 0; c.wheels.push(p); }
+    c.wing = new THREE.Group(); c.flames = new THREE.Group();
+    c.slots = [[0, 1.3, -0.62], [0, 1.6, -0.62]];
+  }
+  const buildAny = (c, spec) => { const k = spec.kind; if (k === 'tp') buildTP(c); else if (k === 'fenwick') buildFenwick(c); else if (k === 'camion') buildCamion(c, spec); else if (k === 'scooter') buildScooter(c, spec); else buildVan(c, spec); };
   /** V5 : modèle seul (showroom du garage), sans l'enregistrer comme véhicule */
   Cars.model = (kind, color) => {
     const g = new THREE.Group(), c = { kind, group: g, wheels: [], bed: new THREE.Group() }, spec = { kind, color };
-    if (kind === 'tp') buildTP(c); else if (kind === 'fenwick') buildFenwick(c); else if (kind === 'camion') buildCamion(c, spec); else buildVan(c, spec);
+    buildAny(c, spec);
     return g;
   };
   Cars.build = (i, spec) => {
     const g = new THREE.Group(); g.rotation.order = 'YXZ';
     const c = { i, kind: spec.kind, group: g, wheels: [], bed: new THREE.Group(), bedKey: '', pos: new THREE.Vector3(spec.x, 0, spec.z), target: new THREE.Vector3(spec.x, 0, spec.z), h: spec.h, th: spec.h, speed: 0, steer: 0, local: false, fuel: spec.fuel, tuneKey: '' };
-    if (spec.kind === 'tp') buildTP(c); else if (spec.kind === 'fenwick') buildFenwick(c); else if (spec.kind === 'camion') buildCamion(c, spec); else buildVan(c, spec);
+    buildAny(c, spec);
     g.add(c.bed);
-    const lab = U.label(spec.name, { size: spec.kind === 'tp' ? 0.3 : 0.4, color: '#ffd257' }); lab.position.set(0, spec.kind === 'tp' ? 2.2 : 2.6, 0); g.add(lab); c.label = lab;
+    const small = spec.kind === 'tp' || spec.kind === 'scooter', lab = U.label(spec.name, { size: small ? 0.3 : 0.4, color: '#ffd257' }); lab.position.set(0, small ? 2.2 : 2.6, 0); g.add(lab); c.label = lab;
     ML.scene.add(g); Cars.list[i] = c;
     return c;
   };
@@ -114,9 +129,24 @@
     const y = gy(c.pos);
     if (c.kind === 'camion') return new THREE.Vector3(c.pos.x + l.x * 1.6 + f.x * 2.6, y + 1.3, c.pos.z + l.z * 1.6 + f.z * 2.6);
     if (c.kind === 'fenwick') return new THREE.Vector3(c.pos.x + l.x * 1.1, y + 1.2, c.pos.z + l.z * 1.1);
+    if (c.kind === 'scooter') return new THREE.Vector3(c.pos.x + l.x * 0.8, y + 0.9, c.pos.z + l.z * 0.8);
     return tp ? new THREE.Vector3(c.pos.x + Cars.fwd(c.h).x * 1.1, y + 1.0, c.pos.z + Cars.fwd(c.h).z * 1.1) : new THREE.Vector3(c.pos.x + l.x * 1.3, y + 1.1, c.pos.z + l.z * 1.3); };
-  Cars.rearPos = c => { const f = Cars.fwd(c.h), k = c.kind === 'tp' ? 1.2 : c.kind === 'camion' ? 4.6 : c.kind === 'fenwick' ? -2.2 : 2.6; return new THREE.Vector3(c.pos.x - f.x * k, gy(c.pos) + (c.kind === 'tp' ? 0.6 : 1.1), c.pos.z - f.z * k); };
-  const R = c => (c.kind === 'tp' ? 0.55 : c.kind === 'camion' ? 1.3 : c.kind === 'fenwick' ? 0.8 : 1.0), OFF = c => (c.kind === 'tp' ? [0.6, -0.6] : c.kind === 'camion' ? [2.8, 1.2, -0.6, -2.4, -3.8] : c.kind === 'fenwick' ? [0.6, -0.6] : [1.2, 0, -1.2]);
+  Cars.rearPos = c => { const f = Cars.fwd(c.h), k = c.kind === 'tp' ? 1.2 : c.kind === 'camion' ? 4.6 : c.kind === 'fenwick' ? -2.2 : c.kind === 'scooter' ? 1.2 : 2.6; return new THREE.Vector3(c.pos.x - f.x * k, gy(c.pos) + (c.kind === 'tp' ? 0.6 : 1.1), c.pos.z - f.z * k); };
+  const R = c => (c.kind === 'tp' ? 0.55 : c.kind === 'camion' ? 1.3 : c.kind === 'fenwick' ? 0.8 : c.kind === 'scooter' ? 0.5 : 1.0), OFF = c => (c.kind === 'tp' || c.kind === 'scooter' ? [0.6, -0.6] : c.kind === 'camion' ? [2.8, 1.2, -0.6, -2.4, -3.8] : c.kind === 'fenwick' ? [0.6, -0.6] : [1.2, 0, -1.2]);
+  /** V5.2 : place du CONDUCTEUR / du passager cabine (pour voir les persos dans les véhicules) → { x, z, hip (hauteur du bassin), moto, stand } */
+  Cars.driverPos = c => {
+    const f = Cars.fwd(c.h), l = Cars.left(c.h);
+    if (c.kind === 'camion') return { x: c.pos.x + l.x * 0.55 + f.x * 2.7, z: c.pos.z + l.z * 0.55 + f.z * 2.7, hip: 1.62 };
+    if (c.kind === 'fenwick') return { x: c.pos.x - f.x * 0.25, z: c.pos.z - f.z * 0.25, hip: 1.22 };
+    if (c.kind === 'scooter') return { x: c.pos.x - f.x * 0.22, z: c.pos.z - f.z * 0.22, hip: 0.92, moto: true };
+    if (c.kind === 'tp') return { x: c.pos.x + f.x * 1.55, z: c.pos.z + f.z * 1.55, stand: true };
+    return { x: c.pos.x + f.x * 0.05 + l.x * 0.42, z: c.pos.z + f.z * 0.05 + l.z * 0.42, hip: 0.66 };
+  };
+  Cars.cabPos = c => {
+    const f = Cars.fwd(c.h), l = Cars.left(c.h);
+    if (c.kind === 'camion') return { x: c.pos.x - l.x * 0.55 + f.x * 2.7, z: c.pos.z - l.z * 0.55 + f.z * 2.7, hip: 1.62 };
+    return { x: c.pos.x + f.x * 0.05 - l.x * 0.42, z: c.pos.z + f.z * 0.05 - l.z * 0.42, hip: 0.66 };
+  };
   /** Place d'un passager (cabine ou benne) */
   Cars.seatPos = (c, seat) => {
     const f = Cars.fwd(c.h), l = Cars.left(c.h), y = gy(c.pos);
@@ -134,7 +164,7 @@
 
   /** Conduite locale (seulement par le conducteur). Renvoie l'accélération latérale. */
   Cars.drive = (c, dt, input, env) => {
-    const I = ML.Input, tp = c.kind === 'tp' || c.kind === 'fenwick', P = c.kind === 'tp' ? ML.CFG.TP : c.kind === 'fenwick' ? ML.CFG.FENWICK : c.kind === 'camion' ? ML.CFG.CAMION : c.kind === 'kangoo' ? ML.CFG.KANGOO : c.kind === 'ducato' ? ML.CFG.DUCATO : CF, S = ML.Game.S;
+    const I = ML.Input, tp = c.kind === 'tp' || c.kind === 'fenwick', P = c.kind === 'tp' ? ML.CFG.TP : c.kind === 'fenwick' ? ML.CFG.FENWICK : c.kind === 'camion' ? ML.CFG.CAMION : c.kind === 'kangoo' ? ML.CFG.KANGOO : c.kind === 'ducato' ? ML.CFG.DUCATO : c.kind === 'scooter' ? ML.CFG.SCOOTER : CF, S = ML.Game.S;
     const turbo = !tp && S && S.buffs.turbo > S.rt ? 1.3 : 1, frozen = env.frozen, dry = !tp && c.fuel <= 0;
     let thr = 0, st = 0;
     if (input && !frozen) {
@@ -165,6 +195,7 @@
     for (const k of OFF(c)) {
       const p = { x: c.pos.x + f.x * k, z: c.pos.z + f.z * k }, ox = p.x, oz = p.z;
       if (U.resolveCircle(p, R(c) - 0.02)) { hit = true; decor = true; c.pos.x += p.x - ox; c.pos.z += p.z - oz; }
+      if (!tp && ML.carBlocks && U.resolveCircle(p, R(c) - 0.02, ML.carBlocks)) { hit = true; c.pos.x += p.x - ox; c.pos.z += p.z - oz; }   // V5.2 : les voitures n'entrent pas dans l'atelier
       const others = Cars.list.filter(o => o !== c).map(o => o.pos).concat(Cars.traffic.filter(t => t.visible).map(t => t.position));
       if (Cars.police && Cars.police.visible) others.push(Cars.police.position);
       for (const o of others) {
@@ -189,7 +220,7 @@
     }
     c.group.position.copy(c.pos); c.group.position.y = gy(c.pos); c.group.rotation.y = c.h;
     { const f = Cars.fwd(c.h), k = c.kind === 'camion' ? 3 : 1.6, d = ML.gy(c.pos.x + f.x * k, c.pos.z + f.z * k) - ML.gy(c.pos.x - f.x * k, c.pos.z - f.z * k); c.group.rotation.x = U.lerp(c.group.rotation.x, -Math.atan2(d, 2 * k), 0.3); }   // tangage en côte
-    c.group.rotation.z = c.local ? U.lerp(c.group.rotation.z, -c.steer * Math.min(1, Math.abs(c.speed) / 20) * 0.12, 0.2) : 0;   // roulis « physique exagérée »
+    c.group.rotation.z = c.local ? U.lerp(c.group.rotation.z, -c.steer * Math.min(1, Math.abs(c.speed) / 20) * (c.kind === 'scooter' ? 0.9 : 0.12), 0.2) : 0;   // roulis « physique exagérée »
     for (const w of c.wheels) { w.rotation.x += roll / 0.38; if (w.front) w.rotation.y = c.steer; }
     const key = JSON.stringify(bedItems || []);
     if (key !== c.bedKey) {
@@ -215,7 +246,12 @@
   }
   Cars.updateTraffic = (list, pol, dt) => {
     list = list || [];
-    while (Cars.traffic.length < list.length) { const t = carModel(MODELS[Cars.traffic.length % 4]); t.userData.t = new THREE.Vector3(); t.userData.h = 0; ML.scene.add(t); Cars.traffic.push(t); }
+    while (Cars.traffic.length < list.length) {
+      const t = carModel(MODELS[Cars.traffic.length % 4]); t.userData.t = new THREE.Vector3(); t.userData.h = 0; ML.scene.add(t); Cars.traffic.push(t);
+      // V5.2 : un conducteur à l'intérieur (tête + épaules)
+      const n = Cars.traffic.length, sk = ML.SKINS[n % ML.SKINS.length], sh = [0x2c3e50, 0xc0392b, 0x27ae60, 0x8e44ad, 0xf39c12][n % 5];
+      U.box(0.42, 0.32, 0.26, sh, 0.38, 1.05, 0.1, t, false); U.box(0.24, 0.26, 0.24, sk, 0.38, 1.36, 0.1, t, false); U.box(0.26, 0.08, 0.26, ML.HAIRS[n % ML.HAIRS.length], 0.38, 1.5, 0.1, t, false);
+    }
     Cars.traffic.forEach((t, i) => {
       const d = list[i]; t.visible = !!d; if (!d) return;
       const tgt = t.userData.t, first = !t.userData.seen; tgt.set(d[0], 0, d[1]); t.userData.h = d[2];
@@ -252,6 +288,7 @@
   Cars.camera = (c, mode, look) => {
     const cam = ML.camera, f = Cars.fwd(c.h), l = Cars.left(c.h), tp = c.kind === 'tp', y = c.group.position.y, px = -c.group.rotation.x;
     if (mode === 'cab' && c.kind === 'camion') { cam.position.set(c.pos.x + f.x * 2.9 + l.x * 0.55, y + 2.75, c.pos.z + f.z * 2.9 + l.z * 0.55); cam.rotation.set(look.p - 0.08 + px, c.h + Math.PI + look.y, 0, 'YXZ'); return; }
+    if (mode === 'cab' && c.kind === 'scooter') { cam.position.set(c.pos.x - f.x * 0.25, y + 1.75, c.pos.z - f.z * 0.25); cam.rotation.set(look.p - 0.12 + px, c.h + Math.PI + look.y, -c.group.rotation.z, 'YXZ'); return; }
     if (mode === 'cab' && c.kind === 'fenwick') { cam.position.set(c.pos.x - f.x * 0.3, y + 2.15, c.pos.z - f.z * 0.3); cam.rotation.set(look.p - 0.2 + px, c.h + Math.PI + look.y, 0, 'YXZ'); return; }
     if (mode === 'cab' && !tp) {
       cam.position.set(c.pos.x + f.x * 0.15 + l.x * 0.38, y + 1.55, c.pos.z + f.z * 0.15 + l.z * 0.38);
@@ -260,7 +297,7 @@
       cam.position.set(c.pos.x + f.x * 1.6, y + 1.65, c.pos.z + f.z * 1.6);
       cam.rotation.set(look.p - 0.25, c.h + look.y, 0, 'YXZ');
     } else {
-      const a = c.h + look.y, dist = tp ? 5 : c.kind === 'camion' ? 13 : c.kind === 'fenwick' ? 6.5 : 8;
+      const a = c.h + look.y, dist = tp ? 5 : c.kind === 'camion' ? 13 : c.kind === 'fenwick' ? 6.5 : c.kind === 'scooter' ? 5.5 : 8;
       cam.position.set(c.pos.x - Math.sin(a) * dist, Math.max(y, ML.gy(c.pos.x - Math.sin(a) * dist, c.pos.z - Math.cos(a) * dist)) + (tp ? 3 : 3.8) - look.p * 3, c.pos.z - Math.cos(a) * dist);
       cam.lookAt(c.pos.x, y + 1.2, c.pos.z);
     }

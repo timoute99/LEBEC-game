@@ -12,7 +12,7 @@
   F.reset = () => {
     if (F.root) ML.scene.remove(F.root);
     F.root = new THREE.Group(); ML.scene.add(F.root);
-    F.fires = {}; F.puds = {}; F.piles = {}; F.pings = []; F.parts = []; F.pigeon = null; F.dog = null;
+    F.fires = {}; F.puds = {}; F.piles = {}; F.pings = []; F.parts = []; F.pigeon = null; F.dog = null; F.qMark = null;
     for (const v of F.peds || []) ML.People.dispose(v); F.peds = [];
     partGeo = partGeo || new THREE.BoxGeometry(0.12, 0.12, 0.12);
     fireMat = fireMat || new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.9 });
@@ -24,7 +24,7 @@
   function pmat(color, op) { const k = color + '_' + op; return MATS[k] || (MATS[k] = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, depthWrite: false })); }
   F.emit = (kind, pos, dir, n) => {
     if (!F.root) return;
-    const cfg = { spray: [0xffffff, 0.8, 9, 0.7], blow: [0xdfe6e9, 0.5, 12, 0.45], smoke: [0x555555, 0.55, 1.5, 1.6], chips: [0xb0b7bf, 1, 5, 0.9], spark: [0xffd23f, 1, 6, 0.4] }[kind];
+    const cfg = { spray: [0xffffff, 0.8, 9, 0.7], blow: [0xdfe6e9, 0.5, 12, 0.45], smoke: [0x555555, 0.55, 1.5, 1.6], chips: [0xb0b7bf, 1, 5, 0.9], spark: [0xffd23f, 1, 6, 0.4], boom: [0xff7a1a, 0.95, 9, 0.8] }[kind];
     for (let i = 0; i < (n || 6); i++) {
       if (F.parts.length > 260) { const o = F.parts.shift(); F.root.remove(o.m); }
       const m = new THREE.Mesh(partGeo, pmat(cfg[0], cfg[1])); m.position.copy(pos);
@@ -33,6 +33,28 @@
       m.scale.setScalar(kind === 'smoke' ? 3 : 1 + Math.random());
       F.root.add(m); F.parts.push({ m, v, t: cfg[3] * (0.7 + Math.random() * 0.6), g: kind === 'chips' ? 12 : kind === 'smoke' ? -0.5 : 2 });
     }
+  };
+
+  /** V5.2 : explosion (Bleuenn) */
+  F.boom = (x, z) => {
+    const p = new THREE.Vector3(x, 1.4, z);
+    F.emit('boom', p, { x: 0, y: 0.6, z: 0 }, 50); F.emit('spark', p, { x: 0, y: 1, z: 0 }, 30); F.emit('smoke', p, { x: 0, y: 1, z: 0 }, 18);
+  };
+  /** V5.2 : colonne verte sur le lieu d'un service (quête) en cours */
+  F.quest = Q => {
+    if (!F.root) return;
+    const on = Q && Q.st === 'go';
+    if (!F.qMark) {
+      const g = F.qMark = new THREE.Group();
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 50, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0x3ecf6e, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+      beam.position.y = 25; g.add(beam);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(1.4, 2.0, 24), new THREE.MeshBasicMaterial({ color: 0x3ecf6e, side: THREE.DoubleSide, transparent: true, opacity: 0.9, fog: false })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.1; g.add(ring);
+      g.tag = ML.U.label('', { size: 0.9, color: '#fff', bg: 'rgba(30,130,70,0.9)', depthTest: false }); g.tag.position.y = 5; g.tag.renderOrder = 12; g.add(g.tag);
+    }
+    if (F.qMark.parent !== F.root) F.root.add(F.qMark);
+    F.qMark.visible = !!on; if (!on) return;
+    F.qMark.position.set(Q.at.x, ML.gy(Q.at.x, Q.at.z), Q.at.z);
+    const t = `🙋 ${Q.at.name} (${Q.who})`; if (F.qMark.tag._t !== t) { F.qMark.tag._t = t; F.qMark.tag.setText(t); }
   };
 
   /* ---------- Ping « viens ici » ---------- */
@@ -74,6 +96,7 @@
   /* ---------- Mise à jour depuis l'état ---------- */
   F.sync = S => {
     if (!F.root || !S) return;
+    F.quest(S.quest);
     // feux
     const seenF = {};
     for (const f of S.fires || []) {

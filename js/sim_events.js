@@ -16,7 +16,7 @@
     S = K.S; rng = K.rng; npcs = K.npcs; const g = cfg.game || {};
     S.evs = {}; K.sched = []; K.vcd = {}; K.lastPos = {};
     if (S.mode !== 'course') {
-      const pool = K.shuffle(['audit', 'coupure', 'sabotage', 'herve', 'fred', 'mathieu', 'panne']);
+      const pool = K.shuffle(['audit', 'coupure', 'sabotage', 'herve', 'fred', 'mathieu', 'panne', 'johan', 'bleuenn']);   // V5.2 : + Johan Bois, Bleuenn (sim_vie.js)
       const ev = K.D.events, n = S.mode === 'inspection' ? Math.max(1, ev[0]) : ev[0] + Math.floor(rng() * (ev[1] - ev[0] + 1));
       const times = []; for (let i = 0; i < n; i++) times.push(60 + rng() * 340);
       times.sort((a, b) => a - b).forEach((t, i) => K.sched.push({ k: pool[i], t: Math.max(t, (K.sched.length ? K.sched[K.sched.length - 1].t : 0) + 45) }));
@@ -59,6 +59,7 @@
 
   /* ---------- Démarrage des événements ---------- */
   function start(k) {
+    if (k !== 'bleuenn' && ML.EVTIPS[k]) K.ev({ e: 'tip', k });        // V5.2 : cadre d'astuces chez tous les joueurs
     switch (k) {
       case 'audit': {
         const n = visit('jacky'); S.evs.audit = { until: S.rt + 110 };
@@ -97,6 +98,7 @@
         if (mid) { K.breakMachine(mid, 'grosse panne'); K.startFire(mid); K.big('💥 GROSSE PANNE !', '#ff7a1a'); }
         break;
       }
+      default: if (K.evStart) K.evStart(k);                       // V5.2 : événements de sim_vie.js
     }
   }
   function grab(n) {

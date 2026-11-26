@@ -60,6 +60,10 @@
         show('🔍 Jacky Foucher — audit', `<p class="mg-q">${U.esc(q[0])}</p><div class="mg-opts col">${opts.map((o, i) => `<span><kbd>${i + 1}</kbd> ${U.esc(o)}</span>`).join('')}</div>`, '1 à 4');
         break;
       }
+      case 'tapis':                                                     // V5.2 : tapis de course (Q / D en alternance)
+        st = { type, cb, t: 0, n: 0, need: data.need || 26, lim: 10, next: 'KeyA', prev: {} };
+        show('🏃 Tapis de course', `<p>Cours ! Appuie sur <b>Q</b> puis <b>D</b> en alternance (ou ← →).</p><div class="mg-tapis"><kbd data-k="KeyA">Q</kbd><kbd data-k="KeyD">D</kbd></div><div class="mg-bar big"><i></i></div><div class="mg-timer"><i></i></div>`, 'Q / D (ou ← →) · Échap : abandonner');
+        break;
       case 'arexis': {
         const Q = [['Entreprise d\'accueil ?', ['Mécanique Lebec', 'Naval Group (Fred insiste)', 'Je sais pas']], ['Numéro SIRET ?', ['12345678900012', 'Le même que l\'an dernier', '42']], ['Avis du tuteur ?', ['« Ça va. »', '« COUP DE PELLE »', '« Il vient le matin »']]];
         st = { type, cb, t: 0, Q, i: 0 };
@@ -123,6 +127,16 @@
         if (st.n >= st.need) { ML.Sfx.play('success'); return close('ok'); }
         if (st.t > st.lim) { ML.Sfx.play('error'); return close('fail'); }
         return;
+      case 'tapis': {
+        const down = k => I.down(k) || (k === 'KeyA' && I.down('ArrowLeft')) || (k === 'KeyD' && I.down('ArrowRight')) || (k === 'KeyA' && I.down('KeyQ'));
+        for (const k of ['KeyA', 'KeyD']) { const d = down(k); if (d && !st.prev[k] && k === st.next) { st.n++; st.next = k === 'KeyA' ? 'KeyD' : 'KeyA'; ML.Sfx.play('run'); } st.prev[k] = d; }
+        el.querySelectorAll('.mg-tapis kbd').forEach(b => b.classList.toggle('on', b.dataset.k === st.next));
+        el.querySelector('.mg-bar i').style.width = Math.min(100, 100 * st.n / st.need) + '%';
+        el.querySelector('.mg-timer i').style.width = Math.max(0, 100 - 100 * st.t / st.lim) + '%';
+        if (st.n >= st.need) { ML.Sfx.play('success'); return close('ok'); }
+        if (st.t > st.lim) { ML.Sfx.play('error'); return close('fail'); }
+        return;
+      }
       case 'pied':
         if (I.pressed('Digit1') || I.pressed('Numpad1')) return close(true);
         if (I.pressed('Digit2') || I.pressed('Numpad2')) return close(false);

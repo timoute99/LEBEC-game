@@ -22,6 +22,7 @@ ML.CFG = {
   CAMION: { accel: 9, brake: 20, max: 24, rev: 5, steer: 0.45, wb: 4.2, cap: 8, fuelUse: 0.05 },   // plateau : 8 places (palette = 4)
   KANGOO: { accel: 9, brake: 20, max: 19, rev: 5, steer: 0.55, wb: 2.5, fuelUse: 0.045 },             // le vieux Kangoo : poussif
   DUCATO: { accel: 11, brake: 22, max: 24, rev: 6, steer: 0.5, wb: 3, fuelUse: 0.05 },
+  SCOOTER: { accel: 8, brake: 18, max: 13.5, rev: 2.5, steer: 0.8, wb: 1.3, cap: 2, fuelUse: 0.018 },     // V5.2 : pas cher, mais lent (≈ 49 km/h)
   ORDER: { base: 250, perStep: 90, far: 35, interval: 44, firstAt: 2 },   // V4.1 : beaucoup plus de temps pour faire les pièces
   PROD_SEC: 14, SUB_SEC: 16,
   COFFEE: { mult: 1.45, sec: 60, secPro: 120 },                           // café : on va beaucoup plus vite
@@ -72,8 +73,10 @@ ML.MACHINES = [
 ML.OPERATORS = ['amaury', 'marius', 'matis', 'brieuc'];
 ML.MACHINE_ORDER = ['T1', 'F1', 'T2', 'F2', 'T3', 'F3', 'T4', 'F4'];
 /* V5 : l'atelier grandit avec les jours (campagne ET journées libres qui s'enchaînent).
-   Les emplacements bloqués sont gris au sol, avec « se débloque dans N jours ». */
+   Les emplacements bloqués sont gris au sol, avec « se débloque dans N jours » (compte à rebours qui
+   descend vraiment pendant la journée). V5.2 : on peut aussi les débloquer TOUT DE SUITE au PC, plus cher (EARLY). */
 ML.PROGRESS = { agrandissement: 3, extension: 8, reno2: 5, reno3: 10 };
+ML.EARLY = { perDay: 450, min: 300 };                                   // supplément pour un achat anticipé : 450 € par jour d'avance (300 € mini)
 
 /* Entreprises : taille du bâtiment, métier. La POSITION est tirée au hasard à chaque partie (citygen.js). */
 ML.COMPANIES = {
@@ -93,16 +96,27 @@ ML.COMPANIES = {
   police: { name: 'Gendarmerie', sub: 'Brigade routière — on entre par la porte', kind: 'police', npc: 'gendarme', w: 22, d: 16, h: 7, wall: 'beton', color: 0xecf0f1, roof: 0x1f3a93, open: true },
   concession: { name: 'Garage Pasquier', sub: 'Concessionnaire — entrez voir le showroom !', kind: 'concession', npc: 'vendeur', w: 30, d: 18, h: 8, wall: 'beton', color: 0xf5f6fa, roof: 0xc0392b, open: true },
   espacil: { name: 'Espacil Habitat', sub: 'Bailleur social — Client', kind: 'client', npc: 'espacil', w: 22, d: 16, h: 13, wall: 'beton', color: 0xf3efe6, roof: 0x13a89e },
-  part: { name: 'Particulier', sub: 'Client au comptoir', kind: 'particulier', npc: null, virtual: true, w: 1, d: 1, h: 1, wall: 'beton', color: 0xffffff, roof: 0xe84393 }
+  // V5.2 : lieux où l'on entre
+  mall: { name: 'Centre commercial Les Copeaux', sub: 'Snack · farces & attrapes · boxe', kind: 'mall', short: 'Centre co.', npc: 'vendeuse', w: 26, d: 17, h: 9, wall: 'beton', color: 0xf5f0e6, roof: 0x8e44ad, open: true, near: true },
+  gym: { name: 'Salle de sport Le Biceps', sub: 'Tapis de course : + endurance', kind: 'gym', short: 'Salle de sport', npc: 'coach', w: 18, d: 13, h: 7, wall: 'beton', color: 0xeaf2f8, roof: 0x16a085, open: true },
+  part: { name: 'Particulier', sub: 'Client au comptoir', kind: 'particulier', npc: null, virtual: true, w: 1, d: 1, h: 1, wall: 'beton', color: 0xffffff, roof: 0xe84393 },
+  sae: { name: 'Jury de SAE', sub: 'IUT — Situation d\'Apprentissage et d\'Évaluation', kind: 'sae', npc: null, virtual: true, w: 1, d: 1, h: 1, wall: 'beton', color: 0xffffff, roof: 0x6c5ce7 }
 };
 ML.CLIENTS = ['aerotech', 'agrimeca', 'novatics', 'ublo', 'espacil'];
+/* V5.2 : maisons des copains (posées parmi les maisons de la ville, avec leur nom). Elles servent aux quêtes. */
+ML.LIEUX = {
+  cardin: { name: 'Maison de Cardin', style: 'maison', who: 'cardin', color: '#c0392b' },
+  trit: { name: 'Appartement de Trit', style: 'immeuble', who: 'eliott', color: '#d35400' },
+  kawa: { name: 'Maison de Jimmy Kawa', style: 'maison', who: 'kawa', color: '#2980b9' }
+};
 for (const k in ML.COMPANIES) if (ML.COMPANIES[k].kind === 'client') ML.COMPANIES[k].open = true;   // V5 : on entre chez les clients (accueil)
 
 /* Véhicules de l'atelier (kind) */
 ML.VEHICLES = {
   megane: { name: 'la Méga Mégane', color: 0xf4c430, seats: 3 }, kangoo: { name: 'le vieux Kangoo', color: 0xecf0f1, seats: 3 },
   ducato: { name: 'le Ducato', color: 0x95a5a6, seats: 3 }, tp: { name: 'le transpalette', color: 0xe67e22, seats: 0 },
-  fenwick: { name: 'le fenwick', color: 0xf39c12, seats: 0, role: 'cariste' }, camion: { name: 'le camion', color: 0x2c6fbb, seats: 1, role: 'livreur' }
+  fenwick: { name: 'le fenwick', color: 0xf39c12, seats: 0, role: 'cariste' }, camion: { name: 'le camion', color: 0x2c6fbb, seats: 1, role: 'livreur' },
+  scooter: { name: 'le scooter', color: 0xe84393, seats: 0 }
 };
 ML.RACE_COLORS = [0xf4c430, 0xe74c3c, 0x3498db, 0x2ecc71, 0x9b59b6, 0xe67e22];
 ML.EMOTES = ['👋', '👍', '😂', '😡', '💤', '🙏'];
@@ -159,7 +173,23 @@ ML.DAYTYPES = {
 /* Événements surprise (2 à 4 tirés par journée) */
 ML.EVENTS = {
   audit: 'Audit surprise de Jacky Foucher', coupure: 'Coupure de courant', sabotage: "Sabotage d'UsiFlash",
-  herve: 'Hervé Lehec et sa convention', fred: 'Fred Castells et Arexis', mathieu: 'Mathieu Riou (il parle lentement)', panne: 'Grosse panne machine'
+  herve: 'Hervé Lehec et sa convention', fred: 'Fred Castells et Arexis', mathieu: 'Mathieu Riou (il parle lentement)', panne: 'Grosse panne machine',
+  johan: 'Johan Bois, voleur de commandes', bleuenn: 'Bleuenn fait tout sauter'
+};
+/* V5.2 : CADRE D'ASTUCES affiché quand un événement commence (titre + que faire) */
+ML.EVTIPS = {
+  audit: ['🔍 Audit surprise', ['Prends une CAISSE usinée.', 'Pose-la au MARBRE (E) devant Jacky.', 'Réponds à sa question MIP/MAP.']],
+  coupure: ['⚡ Coupure de courant', ['Les machines sont à l\'arrêt.', 'Va au TABLEAU ÉLECTRIQUE (mur droit).', 'E puis tape Espace pour réarmer.']],
+  sabotage: ['🕶 Saboteur d\'UsiFlash', ['Il vise une caisse de l\'atelier.', 'Mets-lui une claque (clic gauche) : il lâche tout.', 'Range tes caisses en EXPÉDITION.']],
+  herve: ['📝 Hervé bloque l\'armoire', ['Imprime la convention (imprimante du bureau).', 'Fais-la signer par LEBEC (E sur lui).', 'Rends-la à Hervé.']],
+  fred: ['💼 Fred et Arexis', ['Il te colle et te ralentit.', 'Va au PC de gestion (bureau).', 'Bouton « Remplir ARÉXIS ».']],
+  mathieu: ['🐌 Mathieu Riou', ['Il bloque un opérateur avec ses « du coup ».', 'E sur Mathieu : écoute-le à sa place.', 'L\'opérateur repart travailler.']],
+  panne: ['💥 Grosse panne', ['Éteins le feu : EXTINCTEUR (mur gauche), clic gauche maintenu.', 'Puis CLÉ À MOLETTE + rôle MAINTENANCE : E sur la machine.']],
+  johan: ['🦹 Johan Bois', ['Il vole les caisses PRÊTES (expédition).', 'Claque-le pour qu\'il lâche la caisse !', 'Au PC : un VIGILE l\'empêche d\'entrer.']],
+  bleuenn: ['💣 Bleuenn a tout fait sauter', ['Plus de courant : TABLEAU ÉLECTRIQUE (mur droit).', 'Puis E sur CHAQUE machine pour la redémarrer.', 'Éteins les feux à l\'extincteur.']],
+  wc: ['🚽 Toilettes dégoûtantes', ['Les opérateurs ralentissent (et Lebec râle).', 'Cabine WC à gauche de l\'atelier, dehors.', 'E puis tape Espace pour nettoyer.']],
+  quest: ['🙋 Quelqu\'un demande un service', ['Va le voir (E) au comptoir.', 'Accepte : un repère s\'affiche sur la carte (M).', 'Récompense en euros + réputation.']],
+  sae: ['🎓 SAE du jour', ['Usine les pièces SAE (tickets violets).', 'Contrôle-les au MARBRE (meilleure note).', 'Apporte-les au JURY au marbre avant la fin.']]
 };
 
 /* Règles absurdes de l'inspecteur de l'Éducation Nationale */
@@ -193,7 +223,14 @@ ML.ACH = {
   part3: ['Service client', 'Servir 3 particuliers en une journée', 40],
   game_won: ['Fin du poly', 'Terminer la campagne (avis favorable de l\'inspecteur)', 200],
   inspection: ['Avis favorable', 'Réussir une journée d\'inspection', 80],
-  traitor_win: ['Taupe parfaite', 'Gagner en traître sans être démasqué', 60]
+  traitor_win: ['Taupe parfaite', 'Gagner en traître sans être démasqué', 60],
+  // V5.2
+  radar_cut: ['Casseur de radars', 'Découper un radar à la meuleuse', 40],
+  wc: ['Agent d\'entretien', 'Nettoyer les toilettes', 20],
+  quest: ['Bon samaritain', 'Rendre 3 services (quêtes secondaires)', 50],
+  johan_stop: ['Anti-Johan', 'Faire lâcher une caisse à Johan Bois', 30],
+  sportif: ['Marathonien', 'Monter son endurance au niveau 5 (tapis de course)', 50],
+  sae: ['Félicitations du jury', 'Obtenir 16/20 ou plus à une SAE', 60]
 };
 
 /* Boutique perso (jetons du compte) */
@@ -239,11 +276,18 @@ ML.ECO = {
   sub: { fonderie: 60, chaudro: 70, tth: 45 },                  // sous-traitance en direct
   subPC: { fonderie: 90, chaudro: 100 }, subDelay: [100, 140],  // brut commandé au PC (livré à l'atelier)
   coco: 70,                                                     // caisse d'outils en direct chez Outi'Pro
-  fines: { radar: 5, police: 60, ped: 30, burn: 80, audit: 40, inspect: 10, slapInsp: 30, jail: 100 },
+  fines: { radar: 5, police: 60, ped: 30, burn: 80, audit: 40, inspect: 10, slapInsp: 30, jail: 100, vandal: 150 },
   jail: { peds: 3, sec: 45, bail: 150 },                        // 3 passants renversés → la gendarmerie te poursuit ; prison 45 s (caution 150 €)
   bonus: { audit: 30, mathieu: 10, fred: 10, herve: 20 },
   rep: { ok: 2, late: 1, fail: 3, expire: 1, part: 3, partFail: 3, audit: 3 },
-  stars: [100, 350, 700]                                        // bénéfice du jour pour 1, 2, 3 étoiles (× nb joueurs, machines…)
+  stars: [100, 350, 700],                                       // bénéfice du jour pour 1, 2, 3 étoiles (× nb joueurs, machines…)
+  // --- V5.2 ---
+  black: { every: 5, cat: 0.6, supply: 0.7, dealer: 0.75, mall: 0.5 },    // BLACK FRIDAY un jour sur 5 : multiplicateurs de prix
+  radarWitness: 0.35,                                           // casser un radar : risque d'être vu (amende « vandal »)
+  wc: { rate: 0.12, slow: 70 },                                 // toilettes : salissure par seconde (× joueurs) ; au-delà de 70 % les opérateurs ralentissent
+  gym: 10, enduMax: 10,                                         // séance de tapis (€) ; niveau d'endurance max
+  quest: { every: [130, 220], life: 200, reward: [50, 120] },   // quêtes secondaires
+  sae: { every: 4, parts: 2, bon: 2.5, max: 50 }                // SAE : tous les 4 jours ; 2 pièces ; bon de réduction = note × 2,5 % (50 % max) sur une machine
 };
 /* Produits commandés au PC (prix à l'unité). Tout arrive dans UN colis en réception : on l'ouvre (R) et on range.
    lot = quantité d'une commande « automatique » (Sylvie). En direct chez Eliott : une caisse = 3 barres. */
@@ -276,7 +320,12 @@ ML.CATALOG = {
   babyfoot: { cat: 'deco', name: 'Babyfoot', price: 120, desc: 'Pauses plus courtes.' },
   plantes: { cat: 'deco', name: 'Plantes vertes', price: 80, desc: 'Clients plus satisfaits.' },
   posters: { cat: 'deco', name: 'Posters de Lebec', price: 60, desc: 'Sa colère retombe plus vite.' },
-  antipigeon: { cat: 'abo', name: 'Abonnement Pigeon-Stop', price: 60, daily: 25, desc: 'Filets + effaroucheur : plus aucun pigeon ne vole de plaquettes. 25 €/jour, résiliable.', now: true }
+  antipigeon: { cat: 'abo', name: 'Abonnement Pigeon-Stop', price: 60, daily: 25, desc: 'Filets + effaroucheur : plus aucun pigeon ne vole de plaquettes. 25 €/jour, résiliable.', now: true },
+  // --- V5.2 ---
+  prepa: { cat: 'atelier', name: 'Poste de préparation d\'usinage', price: 1800, desc: 'Prépare tout seul des KITS (brut + bon outil) pour les commandes acceptées : tu prends le kit, tu le donnes à la machine. Prend dans le stock.', now: true },
+  meuleuse: { cat: 'equip', name: 'Meuleuse « casse-radar »', price: 180, desc: 'Sur son crochet (mur gauche). E sur un radar pour le découper… mais si un témoin te voit : 150 € d\'amende.', now: true },
+  vigile: { cat: 'abo', name: 'Vigile anti-Johan Bois', price: 120, daily: 35, desc: 'Raymond garde la porte : Johan Bois ne vole plus rien. 35 €/jour, résiliable.', now: true },
+  radarpass: { cat: 'abo', name: 'Abonnement « Pass Radar »', price: 90, daily: 30, desc: 'Les radars flashent… mais l\'amende est pour l\'abonnement. Plus d\'amende de radar. 30 €/jour.', now: true }
 };
 /* Personnel : embauche (une fois) + salaire (chaque soir) */
 ML.STAFF = {
@@ -296,8 +345,32 @@ ML.AI_STAFF = {
 ML.DEALER = {
   megane: { name: 'Méga Mégane (tunée)', price: 900, desc: 'Rapide, benne de 4 caisses, 3 places.', specs: [['Vitesse max', 'CAR'], ['Benne', '4 caisses (6 avec rehausses)'], ['Places', '3 (+2 dans la benne)'], ['Conso', 'raisonnable'], ['Bonus', 'aileron et flammes possibles']] },
   ducato: { name: 'Ducato', price: 1400, desc: 'Grosse benne (6 caisses), stable.', specs: [['Vitesse max', 'DUCATO'], ['Benne', '6 caisses'], ['Places', '3'], ['Conso', 'moyenne'], ['Bonus', 'très stable dans les virages']] },
+  scooter: { name: 'Scooter de livraison', price: 380, desc: 'Pas cher et sobre, mais lent : un top-case de 2 caisses.', specs: [['Vitesse max', 'SCOOTER'], ['Top-case', '2 caisses'], ['Places', '1 (pilote)'], ['Conso', 'presque rien'], ['Bonus', 'se faufile partout']] },
   camion: { name: 'Camion plateau (poids lourd)', price: 2600, desc: 'Palettes ET caisses, rapide et stable (rôle livreur).', specs: [['Vitesse max', 'CAMION'], ['Plateau', '8 places (palette = 4)'], ['Places', '1 passager'], ['Conso', 'gourmand'], ['Permis', 'rôle 🚚 Livreur']] }
 };
+/* V5.2 : CENTRE COMMERCIAL (stands) : de quoi manger (R : manger) et de quoi se taper (clic gauche) */
+ML.MALL = {
+  kebab: { stand: 'snack', name: 'Kebab sauce blanche', price: 9, icon: '🌯', desc: 'R : manger → +40 PV et tu cours vite 30 s.', eat: { hp: 40, coffee: 30 } },
+  barre: { stand: 'snack', name: 'Barre chocolatée', price: 3, icon: '🍫', desc: 'R : manger → endurance pleine et +15 PV.', eat: { hp: 15, stam: 1 } },
+  baguette: { stand: 'snack', name: 'Baguette', price: 2, icon: '🥖', desc: 'R : manger (+20 PV)… ou s\'en servir d\'épée.', eat: { hp: 20 }, weapon: { reach: 2.9, stun: 1.4, push: 4 } },
+  poisson: { stand: 'farces', name: 'Poisson en caoutchouc', price: 12, icon: '🐟', desc: 'Clic gauche : une baffe qui fait « COUIC » (étourdit 2 s).', weapon: { reach: 2.8, stun: 2, push: 3 } },
+  batte: { stand: 'farces', name: 'Batte en mousse', price: 18, icon: '🏏', desc: 'Clic gauche : frappe de loin et envoie valser.', weapon: { reach: 3.6, stun: 1.6, push: 9 } },
+  gants: { stand: 'boxe', name: 'Gants de boxe (comme Coco)', price: 25, icon: '🥊', desc: 'Clic gauche : crochet du gauche, BAM ! (étourdit 2,5 s).', weapon: { reach: 2.5, stun: 2.5, push: 6 } }
+};
+ML.MALL_STANDS = { snack: ['🌯 Snack Le Petit Creux', '#e67e22'], farces: ['🎭 Farces & Attrapes', '#8e44ad'], boxe: ['🥊 Boxe Shop', '#c0392b'] };
+/* V5.2 : QUÊTES SECONDAIRES (un PNJ vient au comptoir demander un service).
+   need : objet à apporter (consommé) · mg : mini-jeu sur place · carry : objet donné au départ (à déposer) · at : lieu (ML.LIEUX) ou maison au hasard */
+ML.QUESTS = [
+  { giver: 'cardin', at: 'cardin', need: 'cle', mg: 'serrer', ask: 'Mon portail est complètement coincé ! Tu passes chez moi avec une CLÉ À MOLETTE ?', done: 'Il ferme enfin ! Merci, t\'es un chef.' },
+  { giver: 'kawa', at: 'kawa', need: 'viennoiseries', ask: 'J\'ai une de ces dalles… Tu me ramènes des VIENNOISERIES de chez Mimi ? Je suis à la maison.', done: 'Mmmh ! Tu me sauves la vie.' },
+  { giver: 'kawa', at: 'kawa', need: 'jerrican', ask: 'Ma tondeuse est à sec. Un JERRICAN d\'essence de la station, chez moi, s\'il te plaît !', done: 'Ça tond ! Merci beaucoup.' },
+  { giver: 'eliott', at: 'trit', carry: 'cles_trit', ask: 'J\'ai-oublié-mes-CLÉS-à-l\'atelier-tu-me-les-déposes-à-mon-appart-merci-salut !', done: 'Clés déposées dans la boîte aux lettres de Trit.' },
+  { giver: 'part2', at: null, need: 'extincteur', ask: 'Mon barbecue a pris feu chez moi ! Vite, un EXTINCTEUR !', done: 'Ouf ! Il ne reste que les saucisses carbonisées.' },
+  { giver: 'part4', at: null, carry: 'carton', ask: 'Vous pouvez me livrer ce gros CARTON à la maison ? Mon dos ne suit plus.', done: 'Parfait, posez-le là. Merci !' },
+  { giver: 'cardin', at: 'cardin', carry: 'carton', ask: 'Tu peux m\'apporter le CARTON qu\'on m\'a livré par erreur à l\'atelier ?', done: 'Ah, mes figurines ! Merci !' },
+  { giver: 'part1', at: null, need: 'cle', mg: 'serrer', ask: 'Ma remorque a perdu une roue devant chez moi. Une CLÉ À MOLETTE et un coup de main ?', done: 'Elle roule ! Vous êtes des bons, à l\'atelier.' }
+];
+
 /* Pièces urgentes demandées par les particuliers */
 ML.PART_REQ = [['Axe de remorque', 'acier', 'tour', 'plaquette'], ['Bague de tracteur', 'alu', 'tour', 'plaquette'], ['Entretoise de moto', 'alu', 'tour', 'plaquette'],
   ['Platine de portail', 'acier', 'fraiseuse', 'foret'], ['Patte de fixation', 'inox', 'fraiseuse', 'foret'], ['Came de tondeuse', 'acier', 'fraiseuse', 'fraise']];
@@ -347,7 +420,14 @@ ML.TIPS = [
   'Les salaires tombent le soir : garde toujours un peu d\'argent en caisse.',
   'Le Garage Pasquier vend la Méga Mégane, le Ducato et le camion plateau. Le vieux Kangoo, lui, tient avec du scotch.',
   'Campagne : note bien le CODE de sauvegarde. Avec lui, n\'importe qui peut reprendre l\'atelier.',
-  'Jojo le livreur (à embaucher au PC) part en tournée tout seul dès qu\'il y a des caisses à l\'expédition.'
+  'Jojo le livreur (à embaucher au PC) part en tournée tout seul dès qu\'il y a des caisses à l\'expédition.',
+  'Un jour sur cinq, c\'est le BLACK FRIDAY : tout est moins cher au PC et au garage.',
+  'Le tapis de course de la salle Le Biceps augmente ton endurance pour de bon.',
+  'Johan Bois vole les caisses prêtes : un vigile (au PC) l\'empêche d\'entrer.',
+  'Le poste de préparation fait des KITS brut + outil : tu n\'as plus qu\'à les donner à la machine.',
+  'Au centre commercial : un kebab (R pour manger) remet sur pied, une batte en mousse fait voler les collègues.',
+  'Les toilettes (dehors, à gauche de l\'atelier) se salissent : sales, elles ralentissent les opérateurs.',
+  'Tickets du haut : la ligne 👷 dit qui s\'occupe de la commande, la barre bleue l\'avancement.'
 ];
 
 ML.ROLES = {
@@ -403,7 +483,17 @@ ML.PEOPLE = {
   fred: { name: 'Fred Castells', role: 'Recruteur', visitor: true, look: { skin: 0xe6b48d, shirt: 0x34495e, pants: 0x34495e, hair: 0x2a2a2a, height: 1.82, tie: 0xc0392b } },
   mathieu: { name: 'Mathieu Riou', role: 'Visiteur bavard', visitor: true, look: { skin: 0xf0c8a0, shirt: 0x2980b9, pants: 0x2d2d2d, hair: 0x3d2b1f, height: 1.8 } },
   saboteur: { name: 'Gars louche', role: "Saboteur d'UsiFlash", visitor: true, look: { skin: 0xd9a37a, shirt: 0x222222, pants: 0x111111, hair: 0x111111, height: 1.8, cap: 0x6c5ce7 } },
-  inspecteur: { name: "L'Inspecteur", role: "Inspecteur de l'Éducation Nationale", visitor: true, look: { skin: 0xe8c39e, shirt: 0x5d6d7e, pants: 0x5d6d7e, hair: 0xdddddd, height: 1.9, tie: 0x8e44ad, glasses: true, mustache: true } }
+  inspecteur: { name: "L'Inspecteur", role: "Inspecteur de l'Éducation Nationale", visitor: true, look: { skin: 0xe8c39e, shirt: 0x5d6d7e, pants: 0x5d6d7e, hair: 0xdddddd, height: 1.9, tie: 0x8e44ad, glasses: true, mustache: true } },
+  // --- V5.2 ---
+  johan: { name: 'Johan Bois', role: 'Voleur de commandes', visitor: true, look: { skin: 0xeac39b, shirt: 0x2d3436, pants: 0x1e272e, hair: 0x6b4a2b, height: 1.8, cap: 0x2d3436 } },
+  vigile: { name: 'Raymond', role: 'Vigile anti-Johan Bois', visitor: true, look: { skin: 0x8d5524, shirt: 0x111111, pants: 0x111111, hair: 0x111111, height: 1.95, width: 1.3 } },
+  bleuenn: { name: 'Bleuenn', role: 'Bricoleuse explosive', visitor: true, look: { skin: 0xf3cba5, shirt: 0xe67e22, pants: 0x34495e, hair: 0xa0522d, height: 1.66, longHair: true, glasses: true } },
+  garnier: { name: 'Garnier', role: 'Jury de SAE (prof)', visitor: true, look: { skin: 0xe8b98f, shirt: 0x34495e, pants: 0x2c3e50, hair: 0x555555, height: 1.8, glasses: true } },
+  fanfrelat: { name: 'Fanfrelat', role: 'Jury de SAE (prof)', visitor: true, look: { skin: 0xf0c8a0, shirt: 0x8e44ad, pants: 0x2d2d2d, hair: 0x3b2a1a, height: 1.75 } },
+  cardin: { name: 'Cardin', role: 'Un pote de l\'atelier', visitor: true, look: { skin: 0xf0c8a0, shirt: 0xc0392b, pants: 0x2c3e50, hair: 0x3b2a1a, height: 1.8 } },
+  kawa: { name: 'Jimmy Kawa', role: 'Un pote de l\'atelier', visitor: true, look: { skin: 0xd9a37a, shirt: 0x2980b9, pants: 0x34495e, hair: 0x111111, height: 1.76, cap: 0x2980b9 } },
+  vendeuse: { name: 'Sandra', role: 'Caissière — Centre commercial', look: { skin: 0xf3cba5, shirt: 0x8e44ad, pants: 0x2c3e50, hair: 0xe0b050, height: 1.66, longHair: true } },
+  coach: { name: 'Coach Bruno', role: 'Salle de sport Le Biceps', look: { skin: 0xc68642, shirt: 0x16a085, pants: 0x111111, hair: 0x111111, height: 1.85, width: 1.35 } }
 };
 
 ML.LINES = {
@@ -447,7 +537,17 @@ ML.LINES = {
   fred: ["Tu as pensé à l'alternance ? Penses-y... Naval Group recrute !", 'Tu as rempli Arexis ? ARÉXIS !'],
   mathieu: ['Alors... euh... du coup... tu... vois... ?', 'En fait... du coup... voilà... quoi.'],
   saboteur: ['Rien à voir, je passe.', 'Hé hé hé...'],
-  inspecteur: ['Je note. Je note tout.', 'Votre référentiel de compétences, je vous prie.', 'Infraction !']
+  inspecteur: ['Je note. Je note tout.', 'Votre référentiel de compétences, je vous prie.', 'Infraction !'],
+  // --- V5.2 (à personnaliser dans persos.js) ---
+  johan: ['Elle est à qui cette caisse ? À moi maintenant.', 'Je passais par là… par hasard.', 'Hop, emballé, c\'est pesé !'],
+  vigile: ['Pas de Johan ici.', 'Badge ?', 'Je surveille. Je surveille toujours.'],
+  bleuenn: ['T\'inquiète, je sais ce que je fais !', 'Juste un petit branchement…', 'C\'était pas prévu, ça.'],
+  garnier: ['Montrez-moi vos pièces.', 'La démarche compte autant que le résultat.', 'Et la cotation fonctionnelle ?'],
+  fanfrelat: ['Le dossier est où ?', 'Justifiez vos choix d\'outils.', 'C\'est intéressant… mais pourquoi ?'],
+  cardin: ['Salut ! Tu passes à la maison ?', 'T\'as deux minutes ?'],
+  kawa: ['Yo ! Ça usine ?', 'Je passe en coup de vent.'],
+  vendeuse: ['Bonjour, vous avez la carte de fidélité ?', 'C\'est pour offrir ?'],
+  coach: ['Allez, encore un kilomètre !', 'On lâche rien !', 'L\'endurance, ça se travaille.']
 };
 
 /* Tirage des répliques « paquet de cartes » : jamais deux fois la même tant que

@@ -1,4 +1,4 @@
-MÉCANIQUE LEBEC — usinage en équipe (V5.1, 1 à 6 joueurs)
+MÉCANIQUE LEBEC — usinage en équipe (V5.2, 1 à 6 joueurs)
 ==========================================================
 En ligne : https://lebec-game.onrender.com
 
@@ -38,6 +38,27 @@ MODES
   avec le code peut la reprendre ; l'Inspecteur vient quand l'atelier est prêt, le réussir
   termine le jeu) · Inspection (boss : règles absurdes qui changent) · Course de Mégane
   (5 manches) · Mode traître (3 joueurs minimum : un joueur payé par UsiFlash, vote à la fin).
+
+NOUVEAU EN V5.2 (les idées envoyées par les joueurs)
+  - Tickets du haut : barre d'AVANCEMENT + ligne 👷 « qui s'en occupe » (machine, en main, dans un véhicule…).
+  - Zones bloquées : le compte à rebours descend vraiment pendant la journée ; « Débloquer maintenant »
+    au PC (onglet Atelier), plus cher (450 € par jour d'avance).
+  - Johan Bois vole les caisses prêtes (claque = il lâche) ; vigile anti-Johan au PC (abonnement).
+  - Bleuenn branche son engin sur le tableau électrique : BOUM, coupure + machines en arrêt d'urgence
+    (E sur chacune). Une claque avant le branchement l'en empêche.
+  - Toilettes à nettoyer (cabine WC à gauche de l'atelier, dehors) : sales, elles ralentissent les opérateurs.
+  - Quêtes secondaires : un PNJ vient au comptoir demander un service (repère sur la carte, récompense).
+  - Lieux : maison de Cardin, appartement de Trit, maison de Jimmy Kawa, centre commercial Les Copeaux
+    (kebab, barre, baguette : R pour manger ; poisson, batte, gants : clic gauche), salle de sport
+    Le Biceps (tapis de course : +1 endurance, gardée dans le profil, 10 niveaux).
+  - SAE (un jour sur quatre) : pièces à usiner et à présenter au jury (Garnier, Fanfrelat) au marbre :
+    la note donne un bon de réduction sur la prochaine machine (jusqu'à −50 %).
+  - Black Friday un jour sur cinq ; scooter de livraison (Garage Pasquier) ; poste de préparation
+    d'usinage (kits brut + outil) ; meuleuse pour découper les radars, ou abonnement « Pass Radar ».
+  - On voit les persos dans les véhicules ; les voitures n'entrent plus dans l'atelier ; plus de rond
+    gris devant la porte ; cadre d'astuces quand un événement spécial commence.
+  - Pas fait : le bar de strip-tease. Bleuenn est une bricoleuse qui fait tout sauter par accident
+    (pas un « kamikaze »).
 
 NOUVEAU EN V5.1
   - Le créateur du salon ENREGISTRE la partie (Échap → 💾). Avec un compte, ses entreprises sont dans

@@ -41,6 +41,7 @@
     for (const id in G.avatars) ML.People.dispose(G.avatars[id]);
     for (const id in G.npcViews) ML.People.dispose(G.npcViews[id]);
     for (const id in G.itemViews) ML.scene.remove(G.itemViews[id].mesh);
+    if (G.selfAv) { ML.People.dispose(G.selfAv); G.selfAv = null; }
     G.avatars = {}; G.npcViews = {}; G.itemViews = {}; G.remote = {};
     if (ML.Dialogue.open) ML.Dialogue.forceClose();
     ML.Mini.forceClose(); ML.Cars.clear();
@@ -56,13 +57,32 @@
     ML.Main.menuScene();
   };
   G.addAvatar = p => {
-    const c = ML.COLORS[p.idx % 6], L = G.looks[p.id] || {};
     if (G.avatars[p.id]) ML.People.dispose(G.avatars[p.id]);
+    const v = G.buildAvatar(p);
+    const old = G.avatars[p.id]; if (old) { v.pos.copy(old.pos); v.target.copy(old.target); v.seen = old.seen; v.inCar = old.inCar; }
+    v.group.visible = false; G.avatars[p.id] = v; return v;
+  };
+  G.buildAvatar = p => {
+    const c = ML.COLORS[p.idx % 6], L = G.looks[p.id] || {};
     const role = ML.ROLES[(G.S && G.S.pl[p.id] && G.S.pl[p.id].role) || (G.game.roles || {})[p.id]] || ML.ROLES.poly, suit = L.suit !== undefined ? L.suit : 0x1f4e9a;
     const v = ML.People.build({ skin: L.skin !== undefined ? L.skin : ML.SKINS[p.idx % 5], shirt: L.shirt || suit, pants: suit, hair: L.hair !== undefined ? L.hair : ML.HAIRS[p.idx % 6], height: L.height || 1.78, width: L.width || 1, beard: L.beard, glasses: L.glasses },
       { name: role.icon + ' ' + p.name, nameColor: c.css, helmet: L.hat ? null : 0xf5f5f5, hat: L.hat, vest: role.color });
-    const old = G.avatars[p.id]; if (old) { v.pos.copy(old.pos); v.target.copy(old.target); v.seen = old.seen; v.inCar = old.inCar; }
-    v.group.visible = false; G.avatars[p.id] = v; return v;
+    return v;
+  };
+  /** V5.2 : on VOIT les persos dans les véhicules (conducteur, passager cabine), et soi-même en vue extérieure */
+  G.seat = (a, c, role) => {
+    const P = role === 'driver' ? ML.Cars.driverPos(c) : ML.Cars.cabPos(c), y0 = c.group ? c.group.position.y : ML.gy(c.pos.x, c.pos.z);
+    if (P.stand) { a.target.set(P.x, y0, P.z); a.tYaw = c.h; return false; }                 // transpalette : on marche derrière
+    ML.People.sit(a, P.x, y0 + P.hip - 0.9 * (a.h / 1.86), P.z, c.h, P.moto); return true;
+  };
+  G.renderSelfInCar = dt => {
+    const c = G.p.car !== null ? ML.Cars.list[G.p.car] : null, show = !!c && (G.camMode === 'chase' || c.kind === 'tp');
+    const me = G.players[G.me], key = me ? JSON.stringify(G.looks[G.me] || {}) + me.name : '';
+    if (show && me && (!G.selfAv || G.selfAv._key !== key)) { if (G.selfAv) ML.People.dispose(G.selfAv); G.selfAv = G.buildAvatar(me); G.selfAv._key = key; G.selfAv.label.visible = false; }
+    if (!G.selfAv) return;
+    G.selfAv.group.visible = show; if (!show) return;
+    if (!G.seat(G.selfAv, c, 'driver')) { if (G.selfAv.pos.distanceToSquared(G.selfAv.target) > 9) G.selfAv.pos.copy(G.selfAv.target); ML.People.animate(G.selfAv, dt, null); }
+    G.selfAv.label.visible = false;
   };
   /** V5 : changer de pseudo en pleine partie (menu Pause) */
   G.rename = name => {
@@ -219,8 +239,28 @@
       case 'vote': ML.HUD.showVote(e.players, e.until); break;
       case 'voted': ML.HUD.notify(`🗳 ${e.n} vote(s) reçu(s)…`); break;
       case 'end': G.onEnd(e.res); break;
+      // --- V5.2 ---
+      case 'tip': ML.HUD.evTip(e.k); break;
+      case 'boom': {
+        ML.Fx.boom(e.x, e.z); ML.Sfx.at('boom', e.x, e.z);
+        const d = Math.hypot(G.p.pos.x - e.x, G.p.pos.z - e.z); if (d < 40) { ML.HUD.flash('rgba(255,180,60,0.7)'); G.shake = Math.max(G.shake || 0, 1.2 * (1 - d / 40)); }
+        break;
+      }
+      case 'eat': if (e.to === G.me) { const F = ML.MALL[e.k]; if (e.stam) G.p.stamina = G.staminaMax(); ML.HUD.notify(`${F ? F.icon : '😋'} Miam ! ${F && F.eat.hp ? '+' + F.eat.hp + ' PV' : ''}${F && F.eat.coffee ? ' · tu cours vite ' + F.eat.coffee + ' s' : ''}${e.stam ? ' · endurance à fond' : ''}`, 'good'); } break;
+      case 'endu':
+        if (e.to === G.me) {
+          const A = ML.Account, lv = (A.prof.st.endu || 0);
+          if (lv < ML.ECO.enduMax) { A.stat('endu'); A.save(); ML.HUD.big(`🏃 ENDURANCE NIVEAU ${lv + 1}/${ML.ECO.enduMax}`, '#3ecf6e'); ML.HUD.notify(`🏃 Endurance ${lv + 1}/${ML.ECO.enduMax} : tu sprintes ${G.staminaMax().toFixed(1)} s (gardé dans ton profil).`, 'good'); }
+          else ML.HUD.notify('🏃 Endurance déjà au maximum. Le coach est fier de toi.', 'good');
+          G.p.stamina = G.staminaMax();
+        }
+        break;
+      case 'radarOff': { const r = ML.World.radars[e.r]; if (r) ML.Fx.emit('spark', new THREE.Vector3(r.x, 3, r.z), { x: 0, y: 1, z: 0 }, 20); break; }
+      case 'quest': if (!e.to || e.to === G.me) { ML.GPS.set(e.x, e.z); ML.HUD.notify('📍 Repère posé sur le lieu du service (le trajet s\'affiche au sol).', 'info'); } break;
     }
   };
+  /** V5.2 : endurance du joueur (tapis de course de la salle de sport, gardée dans son profil) */
+  G.staminaMax = () => C.PLAYER.stamina + 0.8 * Math.min(ML.ECO.enduMax, (ML.Account.prof && ML.Account.prof.st && ML.Account.prof.st.endu) || 0);
   G.onEnd = res => {
     if (G.endShown) return; G.endShown = true;
     G.ended = true; if (ML.Dialogue.open) ML.Dialogue.forceClose(); ML.Mini.forceClose();
@@ -341,7 +381,7 @@
     const ko = !!(S && S.pl[G.me] && S.pl[G.me].ko);
     let speed = ko ? C.HP.koSpeed : PC.walk, sprint = false;
     if (!ko && (I.down('ShiftLeft') || I.down('ShiftRight')) && len > 0 && (p.stamina > 0 || unlimited)) { speed = PC.sprint; sprint = true; if (!unlimited) p.stamina -= dt * (coffee ? 0.3 : 1); }
-    else p.stamina = Math.min(PC.stamina, p.stamina + dt * 0.8);
+    else p.stamina = Math.min(G.staminaMax(), p.stamina + dt * (0.8 + 0.06 * Math.min(ML.ECO.enduMax, (ML.Account.prof.st || {}).endu || 0)));
     if (coffee && !ko) speed *= C.COFFEE.mult;                           // café : beaucoup plus vite
     // auras : Fred (Arexis) et Mathieu (du coup…) ralentissent
     if (G.npcDist('fred') < 3.5 || (G.npcDist('mathieu') < 4 && (G.npcViews.mathieu || {}).group)) { speed *= 0.6; G.auraT -= dt; if (G.auraT <= 0) { G.auraT = 8; ML.HUD.notify(G.npcDist('fred') < 3.5 ? '💼 Fred te tient la jambe : « ARÉXIS ! » (tu ralentis)' : '🐌 Mathieu te parle… tu ralentis…'); } }
@@ -379,6 +419,7 @@
     if (I.pressed('KeyR')) {                                             // R : ouvrir un colis (visé par terre, ou en main)
       if (G.cur && G.cur.id.startsWith('item:') && G.itemViews[G.cur.id.slice(5)] && G.itemViews[G.cur.id.slice(5)].type === 'colis') G.intent({ a: 'open', id: +G.cur.id.slice(5) });
       else if (h && h.type === 'colis') G.intent({ a: 'open' });
+      else if (h && ML.Items.food(h)) G.intent({ a: 'eat' });                   // V5.2 : R = manger (kebab, barre, baguette)
     }
     if (h && h.type === 'extincteur') {
       if (I.leftDown) {
@@ -404,7 +445,7 @@
   };
   G.punch = () => {
     G.p.punchT = 0.25; ML.Sfx.play('whoosh');
-    const e = G.eye(), f = G.forward(); let best = null, bd = 2.4;
+    const W = ML.Items.weapon(G.held()), e = G.eye(), f = G.forward(); let best = null, bd = W ? W.reach : 2.4;
     const test = (id, pos, h) => { const dx = pos.x - e.x, dy = h - e.y, dz = pos.z - e.z, d = Math.hypot(dx, dy, dz); if (d < bd && (dx * f.x + dy * f.y + dz * f.z) / d > 0.7) { bd = d; best = id; } };
     for (const id in G.npcViews) if (G.npcViews[id].seen) test('npc:' + id, G.npcViews[id].pos, G.npcViews[id].h * 0.72);
     for (const id in G.avatars) if (G.avatars[id].group.visible) test('pl:' + id, G.avatars[id].pos, 1.34);
@@ -424,7 +465,7 @@
   G.enterCar = (i, sc) => {
     const c = ML.Cars.list[i]; G.p.car = i; c.local = true; G.enterAt = performance.now(); c.speed = 0; c.steer = 0;
     c.pos.set(sc.x, 0, sc.z); c.h = sc.h; c.target.copy(c.pos); c.th = c.h; c.fuel = sc.fuel;
-    G.p.look = { y: 0, p: 0 }; G.camMode = sc.kind === 'tp' ? 'chase' : 'cab';
+    G.p.look = { y: 0, p: 0 }; G.camMode = sc.kind === 'tp' || sc.kind === 'scooter' ? 'chase' : 'cab';
     ML.Sfx.horn(G.looks[G.me].klaxon);
     if (!G.driveHint) { G.driveHint = true; ML.HUD.notify('Z/S accélérer-freiner · Q/D tourner · Espace frein · V vue · H klaxon · E descendre'); }
   };
@@ -484,8 +525,10 @@
     for (const id in G.npcViews) { const v = G.npcViews[id]; if (v.seen) ML.People.animate(v, dt, v.st === 'c' ? 'chase' : v.st === 's' ? 'stun' : v.st === 'b' ? 'box' : null); }
     for (const id in G.avatars) {
       const a = G.avatars[id], r = G.remote[id];
-      a.group.visible = !!a.seen && !a.inCar && !!(G.S && G.S.pl[id]);
+      const vc = a.inCar && r ? (r.car && ML.Cars.list[r.car.i] ? [ML.Cars.list[r.car.i], 'driver'] : r.ride && r.ride.seat === 'cab' && ML.Cars.list[r.ride.i] ? [ML.Cars.list[r.ride.i], 'cab'] : null) : null;
+      a.group.visible = !!a.seen && (!a.inCar || !!vc) && !!(G.S && G.S.pl[id]);
       if (!a.group.visible) continue;
+      if (vc && G.seat(a, vc[0], vc[1])) continue;
       ML.People.animate(a, dt, r && r.st ? 'stun' : null);
       if (r && r.fx && Math.random() < dt * 20) {
         const f = { x: -Math.sin(r.yaw), y: 0.05, z: -Math.cos(r.yaw) };
@@ -499,7 +542,7 @@
       m.rotation.y = U.lerpAngle(m.rotation.y, iv.ry, Math.min(1, dt * 10));
       if (m.userData.spin) { m.userData.spin.rotation.y = t * 2; m.userData.spin.position.y = 0.45 + Math.sin(t * 3) * 0.12; }
     }
-    G.renderHoses();
+    G.renderHoses(); G.renderSelfInCar(dt);
     ML.Cars.list.forEach((c, i) => {
       const sc = G.S && G.S.cars[i];
       if (sc && sc.dr && G.looks[sc.dr]) ML.Cars.tune(c, G.looks[sc.dr].tune, sc.color);
@@ -544,6 +587,7 @@
       G.view = new THREE.Group(); cam.add(G.view);
       G.fist = U.box(0.12, 0.12, 0.22, 0xe2b48c, 0.28, -0.32, -0.5, G.view, false); G.fist.visible = false;
     }
+    if (ML.debug && ML.debugCam) { const D = ML.debugCam; G.view.visible = false; cam.position.set(D.p[0], D.p[1], D.p[2]); cam.lookAt(D.t[0], D.t[1], D.t[2]); return; }   // outil de dev (captures)
     if (p.car !== null && ML.Cars.list[p.car]) { G.view.visible = false; ML.Cars.camera(ML.Cars.list[p.car], G.camMode, p.look); return; }
     if (p.ride && ML.Cars.list[p.ride.car]) { G.view.visible = true; cam.position.set(p.pos.x, p.pos.y + (p.ride.seat === 'cab' ? 0.8 : 1.45), p.pos.z); cam.rotation.set(p.pitch, p.yaw, 0, 'YXZ'); return; }
     G.view.visible = !p.rag;
@@ -552,10 +596,13 @@
     if (p.rag) { const k = Math.min(1, (2.6 - p.rag.t) * 3); eyeY = U.lerp(eyeY, 0.35, k); roll = U.lerp(0, 1.35, k) + Math.sin(p.rag.t * 7) * 0.1; pitch = U.lerp(p.pitch, 0.6, k); }
     cam.position.set(p.pos.x, eyeY, p.pos.z);
     cam.rotation.set(pitch, p.yaw, roll, 'YXZ');
+    if (G.shake > 0) { G.shake -= dt; const k = G.shake * 0.25; cam.position.x += (Math.random() - 0.5) * k; cam.position.y += (Math.random() - 0.5) * k; cam.position.z += (Math.random() - 0.5) * k; }   // V5.2 : explosion
     const h = G.held(), key = h ? h.type + JSON.stringify(h.d) : null;
     if (key !== G.viewKey) {
       if (G.heldMesh) G.view.remove(G.heldMesh); G.heldMesh = null;
-      if (h) { G.heldMesh = ML.Items.mesh(h, { noLabel: true }); G.heldMesh.traverse(o => { o.castShadow = false; }); if (ML.Items.bulky(h)) G.heldMesh.position.set(0, -0.85, -0.95); else G.heldMesh.position.set(0.3, -0.36, -0.55); G.view.add(G.heldMesh); }
+      if (h) { G.heldMesh = ML.Items.mesh(h, { noLabel: true }); G.heldMesh.traverse(o => { o.castShadow = false; }); if (ML.Items.bulky(h)) G.heldMesh.position.set(0, -0.85, -0.95); else G.heldMesh.position.set(0.3, -0.36, -0.55);
+        if (['batte', 'baguette', 'meuleuse'].includes(h.type)) { G.heldMesh.rotation.set(0.5, Math.PI / 2, 0); G.heldMesh.position.set(0.32, -0.32, -0.75); G.heldMesh.scale.setScalar(0.75); }   // V5.2 : objets longs tenus vers l'avant
+        G.view.add(G.heldMesh); }
       G.viewKey = key;
     }
     G.fist.visible = p.punchT > 0;

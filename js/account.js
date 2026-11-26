@@ -9,7 +9,7 @@
   const A = ML.Account = { prof: null, token: null, user: null, day: {} };
   const N = ML.Net, SHOP = ML.SHOP;
   /* succès : [statistique, nombre, compté sur la journée ?] */
-  const RULE = { pelle3: ['pelle', 3, 1], fires3: ['fire', 3, 1], slip5: ['slip', 5, 1], spill4: ['spill', 4, 1], origine5: ['origine', 5, 1] };
+  const RULE = { pelle3: ['pelle', 3, 1], fires3: ['fire', 3, 1], slip5: ['slip', 5, 1], spill4: ['spill', 4, 1], origine5: ['origine', 5, 1], quest: ['quest', 3, 0], sportif: ['endu', 5, 0] };
 
   const fresh = name => ({ v: 2, name: name || '', look: { skin: ML.SKINS[0], hair: ML.HAIRS[0] }, coins: 60, owned: [], eq: {}, st: {}, ach: [] });
   A.load = () => {

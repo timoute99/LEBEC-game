@@ -21,10 +21,12 @@
   R.myRole = myRole;
   const isPart = it => !!it && (it.type === 'caisse' || it.type === 'piece');
   const inv = () => { const S = S_(); return S && S.pl[ML.Game.me] ? S.pl[ML.Game.me].inv : []; };
+  const dprice = D => Math.round(D.price * (S_() && S_().black ? ML.ECO.black.dealer : 1));     // V5.2 : Black Friday au garage
 
   function machineLabel(mid, held) {
     const S = S_(), M = S.machines[mid], def = ML.MACHINES.find(m => m.id === mid);
     if (!M) return null;
+    if (M.stopped) return S.power ? `▶ Redémarrer ${mid} (arrêt d'urgence)` : `⏹ ${mid} : arrêt d'urgence — remets d'abord le courant (tableau électrique)`;
     if (!M.op) return `${mid} : SANS OPÉRATEUR — embauche au PC de gestion (onglet Personnel)`;
     if (fireAt(mid)) return held && held.type === 'extincteur' ? `🔥 Éteindre : maintiens le CLIC GAUCHE vers le feu` : `🔥 FEU sur ${mid} ! Prends un extincteur (mur gauche)`;
     if (M.broken) return held && held.type === 'cle' ? (myRole() === 'maintenance' ? `🔧 Réparer ${mid} (clé à molette)` : `${mid} en panne : réservé MAINTENANCE 🔧`) : `${mid} EN PANNE : clé à molette (maintenance)`;
@@ -32,6 +34,7 @@
     if (M.worn && M.job) return held && IT.def(held).kind === 'tool' ? `Changer l'outil usé de ${mid}` : `${mid} : outil usé → ${ML.TOOLS[M.job.need].label} neuf(ve)`;
     if (held) {
       const t = IT.def(held);
+      if (t.kind === 'kit') return M.job ? `${mid} est occupée` : `🧰 Lancer le KIT #${held.d.oid} sur ${mid} (brut + outil d'un coup) — prise d'origine`;
       if (t.kind === 'brut') return M.job ? `${mid} est occupée` : `Lancer « ${IT.name(held)} » sur ${mid} (${ML.MTYPE[def.type]}) — prise d'origine${M.plan ? ` · prévu : #${M.plan}` : ''}`;
       if (t.kind === 'tool') return !M.job ? `${mid} : donne d'abord un brut` : M.job.tool ? `${mid} a déjà son outil` : `Donner « ${IT.name(held)} » à ${mid}`;
     }
@@ -78,7 +81,7 @@
         if (c.kind === 'fenwick') return null;
         if (c.kind === 'camion') return c.bed.length ? `Camion : ${c.bed.length} palette(s)` : null;
         if (!held && !c.bed.length && ML.VEHICLES[c.kind].seats > 1 && (c.pass || []).filter(x => x.seat !== 'cab').length < 2) return '🛻 Monter dans la benne';
-        if (held && (IT.bulky(held) || held.type === 'piece') && !IT.heavy(held)) return c.bed.length >= c.cap ? (c.kind === 'tp' ? 'Transpalette plein' : 'Benne pleine') : `Charger ${c.kind === 'tp' ? 'sur le transpalette' : 'dans la benne'} (${c.bed.length}/${c.cap})`;
+        if (held && (IT.bulky(held) || held.type === 'piece') && !IT.heavy(held)) return c.bed.length >= c.cap ? (c.kind === 'tp' ? 'Transpalette plein' : 'Benne pleine') : `Charger ${c.kind === 'tp' ? 'sur le transpalette' : c.kind === 'scooter' ? 'dans le top-case' : 'dans la benne'} (${c.bed.length}/${c.cap})`;
         return c.bed.length ? `Décharger une caisse (${c.bed.length} chargée${c.bed.length > 1 ? 's' : ''})` : null;
       }
       case 'pl': {
@@ -90,7 +93,18 @@
       case 'npc': return npcLabel(a, held);
       case 'show': {                                                // V5 : véhicule exposé au showroom du Garage Pasquier
         const D = ML.DEALER[a]; if (!D) return null;
-        return S.owned.includes(a) ? `✔ ${D.name} : déjà à vous (il attend devant le garage ou à l'atelier)` : `🚗 ${D.name} — ${D.price.toLocaleString('fr-FR')} € : voir la fiche et acheter`;
+        return S.owned.includes(a) ? `✔ ${D.name} : déjà à vous (il attend devant le garage ou à l'atelier)` : `🚗 ${D.name} — ${dprice(D).toLocaleString('fr-FR')} €${S.black ? ' (BLACK FRIDAY)' : ''} : voir la fiche et acheter`;
+      }
+      // --- V5.2 ---
+      case 'prepa': return S.up && S.up.prepa ? `🧰 Poste de préparation : ${S.prepaMsg ? '⚠ ' + S.prepaMsg : 'il prépare les kits tout seul'}` : `🔒 Poste de préparation : à acheter au PC (${Math.round(ML.CATALOG.prepa.price * (S.black ? ML.ECO.black.cat : 1)).toLocaleString('fr-FR')} €)`;
+      case 'wc': return (S.wc || 0) >= 12 ? `🚽 Nettoyer les toilettes (sales à ${Math.round(S.wc)} %)` : '🚽 Les toilettes sont propres';
+      case 'radar': return (S.radarsOff || []).includes(+a) ? '🪚 Radar hors service' : held && held.type === 'meuleuse' ? '🪚 Découper le radar (attention : un témoin = −150 €)' : null;
+      case 'mall': { const M2 = ML.MALL[a]; if (!M2) return null; const pr = Math.round(M2.price * (S.black ? ML.ECO.black.mall : 1)); return `${M2.icon} Acheter : ${M2.name} — ${pr} €${S.black ? ' (Black Friday)' : ''} · ${M2.desc}`; }
+      case 'gym': { const lv = (ML.Account.prof.st || {}).endu || 0; return lv >= ML.ECO.enduMax ? `🏃 Tapis de course (endurance au max : ${lv}/${ML.ECO.enduMax})` : `🏃 Tapis de course : +1 endurance (${Math.round(ML.ECO.gym * (S.black ? ML.ECO.black.mall : 1))} €) — niveau ${lv}/${ML.ECO.enduMax}`; }
+      case 'quest': {
+        const Q = S.quest; if (!Q || Q.st !== 'go') return null; const want = Q.need || Q.carry, T = want && IT.TYPES[want];
+        if (want && (!held || held.type !== want)) return `🙋 ${Q.at.name} : il faut ${T.icon} ${typeof T.name === 'function' ? T.name({ to: Q.at.name }) : T.name} en main`;
+        return `🙋 ${Q.mg ? 'Donner un coup de main' : Q.carry ? 'Déposer' : 'Donner'} à ${Q.who} (+${Q.reward} €)`;
       }
     }
     return null;
@@ -102,7 +116,7 @@
       if (!mid) return null;
       if (st === 'p' || st === 'f') return `Secouer ${opName(n)} (« au boulot ! »)`;
       if (held && held.type === 'viennoiseries' && n === 'matis') return 'Donner les viennoiseries à Matis (+40 % vitesse)';
-      if (held && ['brut', 'tool'].includes(IT.def(held).kind)) return machineLabel(mid, held);
+      if (held && ['brut', 'tool', 'kit'].includes(IT.def(held).kind)) return machineLabel(mid, held);
       return `Parler à ${opName(n)}`;
     }
     switch (n) {
@@ -117,7 +131,16 @@
       case 'mathieu': return '🐌 Écouter Mathieu à la place de l\'opérateur';
       case 'saboteur': return 'Gars louche… (une claque le ferait fuir)';
       case 'inspecteur': return 'Parler à l\'inspecteur';
+      // --- V5.2 ---
+      case 'johan': return (G.npcViews.johan || {}).st === 'r' ? '🦹 Johan Bois file avec une caisse : une CLAQUE (clic gauche) !' : '🦹 Johan Bois… (une claque le ferait fuir)';
+      case 'vigile': return '🛡 Raymond, le vigile anti-Johan';
+      case 'bleuenn': return '💣 Bleuenn bricole… une CLAQUE (clic gauche) l\'arrêterait !';
+      case 'garnier': case 'fanfrelat': return isPart(held) ? `🎓 Présenter la pièce #${held.d.oid} au jury de SAE` : `🎓 ${P_(n).name} (jury de SAE)`;
+      case 'vendeuse': return '🛍 Sandra : les stands sont au fond (E sur un article pour l\'acheter)';
+      case 'coach': return '🏃 Coach Bruno : E sur un tapis de course pour s\'entraîner';
+      case 'cardin': case 'kawa': { const Q = S.quest; return Q && Q.giver === n && Q.st === 'ask' ? `🙋 ${P_(n).name} : écouter sa demande (${Q.reward} €)` : `Parler à ${P_(n).name}`; }
     }
+    { const Q = S.quest; if (Q && Q.giver === n && Q.st === 'ask') return `🙋 ${P_(n).name} : écouter sa demande (${Q.reward} €)`; }
     if (ML.PARTICULIERS.includes(n)) {
       const p = (S.parts || []).find(x => x.id === n); if (!p) return null;
       if (p.st === 'wait') return `🙋 ${P_(n).name} : écouter sa demande (${p.price} €)`;
@@ -153,7 +176,7 @@
         const M = S.machines[a]; if (!M) return;
         if (M.broken && held && held.type === 'cle' && !fireAt(a)) return Mini.run('serrer', { title: `🔧 Réparation de ${a}` }, r => { if (r === 'ok') G.intent({ a: 'repair', mid: a }); else if (r) ML.HUD.notify('Trop lent ! Recommence (E).', 'warn'); });
         if (!M.broken && !fireAt(a) && M.worn && held && held.type === 'plaquette' && M.job && M.job.need === 'plaquette') return Mini.run('plaquette', {}, r => { if (r) G.intent({ a: 'use', id, mg: r }); });
-        if (!M.broken && !fireAt(a) && !M.job && held && IT.def(held).kind === 'brut') return Mini.run('origine', {}, r => G.intent({ a: 'use', id, mg: r || 'meh' }));
+        if (!M.broken && !M.stopped && !fireAt(a) && !M.job && held && ['brut', 'kit'].includes(IT.def(held).kind)) return Mini.run('origine', {}, r => G.intent({ a: 'use', id, mg: r || 'meh' }));
         break;
       }
       case 'marbre': {
@@ -163,12 +186,17 @@
         return Mini.run('pied', { mes: held.d.mes }, r => { if (r !== null) G.intent({ a: 'use', id, ctl: r }); });
       }
       case 'pc': return ML.ERP.open();
+      // --- V5.2 ---
+      case 'wc': if ((S.wc || 0) >= 12) return Mini.run('serrer', { title: '🚽 Nettoyage des toilettes', text: 'Brosse, serpillière, désodorisant : tape <b>Espace</b> le plus vite possible !', need: 14 }, r => { if (r === 'ok') G.intent({ a: 'use', id, mg: 'ok' }); else if (r) ML.HUD.notify('Trop lent… ça sent encore. Recommence (E).', 'warn'); }); break;
+      case 'radar': if (held && held.type === 'meuleuse' && !(S.radarsOff || []).includes(+a)) return Mini.run('serrer', { title: '🪚 Découpe du radar', text: 'Tiens bien la meuleuse : tape <b>Espace</b> !', need: 12 }, r => { if (r === 'ok') G.intent({ a: 'use', id, mg: 'ok' }); }); break;
+      case 'gym': return Mini.run('tapis', {}, r => { if (r === 'ok') G.intent({ a: 'use', id, mg: 'ok' }); else if (r) ML.HUD.notify('🥵 Tu as craqué avant la fin. Réessaie (E) !', 'warn'); });
+      case 'quest': { const Q = S.quest; if (Q && Q.st === 'go' && Q.mg && held && held.type === Q.need) return Mini.run('serrer', { title: `🔧 Coup de main à ${Q.who}`, text: 'Allez, on serre : tape <b>Espace</b> !', need: 12 }, r => { if (r === 'ok') G.intent({ a: 'use', id, mg: 'ok' }); }); break; }
       case 'show': {
         const D = ML.DEALER[a]; if (!D) return;
         if (S.owned.includes(a)) return ML.Dialogue.info(P_('vendeur').name, `${D.name} ? Vous l'avez déjà ! ${ML.line('vendeur')}`);
-        const spec = (D.specs || []).map(([k, v]) => `${k} : ${v === 'CAR' || v === 'DUCATO' || v === 'CAMION' ? Math.round(ML.CFG[v].max * 3.6) + ' km/h' : v}`).join(' · ');
-        return ML.Dialogue.choice(`${D.name} — ${D.price.toLocaleString('fr-FR')} €`, `${D.desc} ${spec}. Dans la caisse : ${S.money.toLocaleString('fr-FR')} €.`,
-          [{ label: S.money >= D.price ? `✅ Acheter (${D.price.toLocaleString('fr-FR')} €)` : `💸 Pas assez d'argent (${D.price.toLocaleString('fr-FR')} €)`, fn: S.money >= D.price ? () => G.intent({ a: 'buycar', k: a }) : null }, { label: 'Juste regarder', fn: null }]);
+        const spec = (D.specs || []).map(([k, v]) => `${k} : ${ML.CFG[v] && ML.CFG[v].max ? Math.round(ML.CFG[v].max * 3.6) + ' km/h' : v}`).join(' · '), pr = dprice(D);
+        return ML.Dialogue.choice(`${D.name} — ${pr.toLocaleString('fr-FR')} €${S.black ? ' (BLACK FRIDAY)' : ''}`, `${D.desc} ${spec}. Dans la caisse : ${S.money.toLocaleString('fr-FR')} €.`,
+          [{ label: S.money >= pr ? `✅ Acheter (${pr.toLocaleString('fr-FR')} €)` : `💸 Pas assez d'argent (${pr.toLocaleString('fr-FR')} €)`, fn: S.money >= pr ? () => G.intent({ a: 'buycar', k: a }) : null }, { label: 'Juste regarder', fn: null }]);
       }
       case 'panel': if (!S.power) return Mini.run('serrer', { title: '⚡ Réarmer le disjoncteur', text: 'Remonte le levier : tape <b>Espace</b> !', need: 8 }, r => { if (r === 'ok') G.intent({ a: 'use', id, mg: 'ok' }); }); break;
       case 'pl': {
@@ -177,7 +205,8 @@
         break;
       }
       case 'npc': {
-        if (P_(a).op && held && ['brut', 'tool'].includes(IT.def(held).kind) && midOf(a)) return R.use('mach:' + midOf(a));
+        if (P_(a).op && held && ['brut', 'tool', 'kit'].includes(IT.def(held).kind) && midOf(a)) return R.use('mach:' + midOf(a));
+        { const Q = S.quest; if (Q && Q.giver === a && Q.st === 'ask') return ML.Dialogue.choice(P_(a).name, `${Q.ask} (${Q.at.name}) — je te donne ${Q.reward} € !`, [{ label: `✅ D'accord (${Q.reward} €)`, fn: () => G.intent({ a: 'quest', ok: 1 }) }, { label: 'Désolé, pas le temps', fn: () => G.intent({ a: 'quest', ok: 0 }) }, { label: 'Je réfléchis…', fn: null }]); }
         if (ML.PARTICULIERS.includes(a)) {
           const p = (S.parts || []).find(x => x.id === a);
           if (p && p.st === 'wait') return ML.Dialogue.choice(P_(a).name, `${ML.line(a, 'demande', 'Bonjour !')} Il me faudrait : « ${p.part} » en ${ML.MATERIALS[p.mat].label} (${ML.MTYPE[p.mtype]}, ${ML.TOOLS[p.tool].label.toLowerCase()}). C'est urgent : ${Math.round(p.dur / 60 * 10) / 10} min maximum. Je paie ${p.price} € !`,
@@ -185,7 +214,7 @@
           break;
         }
         if (a === 'vendeur') {
-          const opts = Object.keys(ML.DEALER).map(k => { const D = ML.DEALER[k], own = S.owned.includes(k); return { label: own ? `✔ ${D.name} (déjà à vous)` : `${D.name} — ${D.price.toLocaleString('fr-FR')} € : ${D.desc}`, fn: own ? null : () => G.intent({ a: 'buycar', k }) }; });
+          const opts = Object.keys(ML.DEALER).map(k => { const D = ML.DEALER[k], own = S.owned.includes(k); return { label: own ? `✔ ${D.name} (déjà à vous)` : `${D.name} — ${dprice(D).toLocaleString('fr-FR')} € : ${D.desc}`, fn: own ? null : () => G.intent({ a: 'buycar', k }) }; });
           return ML.Dialogue.choice(P_('vendeur').name, `${ML.line('vendeur')} Dans la caisse de l'atelier, vous avez ${S.money.toLocaleString('fr-FR')} €.`, opts.concat([{ label: 'Juste regarder', fn: null }]));
         }
         if (a === 'gendarme') {

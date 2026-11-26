@@ -18,6 +18,8 @@
     ML.colliders.length = 0; W.targets = []; W.machines = {}; W.radars = []; W.lights = []; W.lampHeads = null;
     ML.mapRects = []; W.up = upgrades || {}; W.owned = mach || ML.MACHINES.filter(m => !m.ext).map(m => m.id); W.partCars = [];
     W.day = (opts && opts.day) || 1; W.ext = !!W.up.extension; W.staff = []; W.interiors = []; W.show = {}; W.reels = [];
+    W.black = !(opts && opts.race) && W.day % ML.ECO.black.every === 0;                // V5.2 : Black Friday (prix affichés au centre commercial)
+    ML.carBlocks = [{ minX: -5.4, maxX: 5.4, minZ: 13.1, maxZ: 15.2 }];                 // V5.2 : voitures interdites dans l'atelier (transpalette et fenwick : oui)
     W.reno = W.day >= ML.PROGRESS.reno3 ? 3 : W.day >= ML.PROGRESS.reno2 ? 2 : 1;      // l'atelier se refait une beauté avec les jours
     rng = U.rng(seed ^ 0x5bd1e995);
     ML.Decor.begin(seed, root);                                     // détails graphiques fusionnés (decor.js)
@@ -25,7 +27,7 @@
     ML.LOC = { comp: city.companies, hides: city.hides.slice(), perches: city.perches, radars: city.radars };
     W.terrain(city); W.ground(city); W.atelier(); W.furniture(); ML.Decor.atelier(W); W.machinesBuild();
     for (const k in city.companies) W.company(k, ML.COMPANIES[k], city.companies[k]);
-    W.decor(city); W.bounds();
+    W.decor(city); W.bounds(); W.vie52(city);
     ML.Decor.end();
     ML.LOC.hides = ML.LOC.hides.filter(h => !U.inCollider(h.x, h.z, 0.5) && !ML.riverAt(h.x, h.z, 1));
   };
@@ -174,7 +176,9 @@
       for (let t = RW + 3; t < e.len - RW - 3; t += 8) dashes.push([A1.x + dx * t, A1.z + dz * t, ang]);
       ML.mapRects.push({ line: [A1.x, A1.z, B.x, B.z] });
     });
-    for (const n of N) { const c = new THREE.Mesh(new THREE.CircleGeometry(n.cul ? RW + 3.5 : RW + 0.4, 20), asph); c.rotation.x = -Math.PI / 2; c.position.set(n.x, 0.03, n.z); c.receiveShadow = true; add(c); }
+    for (const n of N) {
+      if (Math.abs(n.x) < 16 && n.z > 12 && n.z < 29) continue;            // V5.2 : pas de rond d'asphalte gris dans la cour (devant la porte)
+      const c = new THREE.Mesh(new THREE.CircleGeometry(n.cul ? RW + 3.5 : RW + 0.4, 20), asph); c.rotation.x = -Math.PI / 2; c.position.set(n.x, 0.03, n.z); c.receiveShadow = true; add(c); }
     const dm = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.2, 0.22).rotateX(-Math.PI / 2), U.mat(0xeeeeee), dashes.length), o = new THREE.Object3D();
     dashes.forEach(([x, z, a], i) => { o.position.set(x, 0.04, z); o.rotation.set(0, a, 0); o.updateMatrix(); dm.setMatrixAt(i, o.matrix); }); add(dm);
     plane(30, 14, T.mat('beton', 7, 3), 0, 21, 0.025);
@@ -194,7 +198,15 @@
   /** Texte peint au sol (zones bloquées, emplacements) */
   W.floorText = (text, sub, w, h, x, z, opt) => {
     opt = opt || {};
-    const c = document.createElement('canvas'); c.width = 512; c.height = Math.round(512 * h / w); const g2 = c.getContext('2d');
+    const c = document.createElement('canvas'); c.width = 512; c.height = Math.round(512 * h / w);
+    const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+    const draw = (text2, sub2, o2) => { drawFloor(c, text2, sub2, Object.assign({}, opt, o2 || {})); t.needsUpdate = true; };
+    draw(text, sub);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: t, transparent: true, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; m.rotation.z = opt.rot || 0; m.position.set(x, opt.y || 0.05, z); m.receiveShadow = true; add(m); m.userData.redraw = draw; return m;
+  };
+  function drawFloor(c, text, sub, opt) {
+    const g2 = c.getContext('2d'); g2.clearRect(0, 0, c.width, c.height);
     g2.fillStyle = opt.bg || 'rgba(0,0,0,0)'; g2.fillRect(0, 0, c.width, c.height);
     if (opt.hatch) { g2.strokeStyle = opt.hatch; g2.lineWidth = 6; for (let i = -c.height; i < c.width; i += 34) { g2.beginPath(); g2.moveTo(i, c.height); g2.lineTo(i + c.height, 0); g2.stroke(); } }
     if (opt.border) { g2.strokeStyle = opt.border; g2.lineWidth = 14; g2.strokeRect(7, 7, c.width - 14, c.height - 14); }
@@ -203,10 +215,7 @@
     g2.font = `bold ${fs}px Arial`; while (lines.some(l => g2.measureText(l).width > c.width - 50) && fs > 12) { fs -= 2; g2.font = `bold ${fs}px Arial`; }
     lines.forEach((l, i) => g2.fillText(l, c.width / 2, c.height / 2 - (sub ? fs * 0.5 : 0) + (i - (lines.length - 1) / 2) * fs * 1.1));
     if (sub) { g2.font = `${Math.round(fs * 0.55)}px Arial`; g2.fillText(sub, c.width / 2, c.height / 2 + fs * (lines.length * 0.55 + 0.2)); }
-    const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: t, transparent: true, depthWrite: false }));
-    m.rotation.x = -Math.PI / 2; m.rotation.z = opt.rot || 0; m.position.set(x, opt.y || 0.05, z); m.receiveShadow = true; add(m); return m;
-  };
+  }
   const inDays = d => { const n = d - W.day; return n <= 0 ? null : n === 1 ? 'demain' : `dans ${n} jours`; };
   W.atelier = () => {
     const P = W.pal = W.PAL[W.reno];
@@ -226,14 +235,15 @@
     if (W.reno >= 2) { const l = U.label(W.reno >= 3 ? '✨ ATELIER FLAMBANT NEUF (jour 10) ✨' : '🎨 ATELIER RÉNOVÉ (jour 5)', { size: 0.45, color: '#ffd257', bg: 'rgba(26,35,64,0.85)' }); l.position.set(-4, 6.1, -13.2); add(l); }
     // --- zones bloquées / emplacements libres (sol gris + texte) ---
     const agr = !!W.up.agrandissement, dA = inDays(ML.PROGRESS.agrandissement);
-    if (!agr) W.floorText(dA ? `🔒 AGRANDISSEMENT\nse débloque ${dA}` : '🔓 AGRANDISSEMENT\ndisponible au PC', dA ? 'emplacements T3 et F3' : `${ML.CATALOG.agrandissement.price} € — onglet Atelier`, 7.2, 16, 4, -1, { bg: 'rgba(120,124,130,0.92)', hatch: 'rgba(80,84,90,0.9)', color: dA ? '#ffffff' : '#ffd257', border: '#f1c40f', y: 0.045 });
+    W.lockTexts = [];
+    if (!agr) W.lockTexts.push({ k: 'agrandissement', label: 'AGRANDISSEMENT', what: 'emplacements T3 et F3', m: W.floorText(dA ? `🔒 AGRANDISSEMENT\nse débloque ${dA}` : '🔓 AGRANDISSEMENT\ndisponible au PC', dA ? 'emplacements T3 et F3' : `${ML.CATALOG.agrandissement.price} € — onglet Atelier`, 7.2, 16, 4, -1, { bg: 'rgba(120,124,130,0.92)', hatch: 'rgba(80,84,90,0.9)', color: dA ? '#ffffff' : '#ffd257', border: '#f1c40f', y: 0.045 }) });
     else for (const id of ['T3', 'F3']) if (!W.owned.includes(id)) { const d = ML.MACHINES.find(m => m.id === id); W.floorText(`EMPLACEMENT ${id}`, `${ML.MTYPE[d.type]} — à acheter au PC`, 3.6, 1.6, d.x, d.z + (d.type === 'tour' ? 2.4 : -2.6), { bg: 'rgba(40,40,40,0.55)', color: '#ffd257' }); }
     // --- extension Est (après achat : construite pendant la nuit) ---
     if (W.ext) W.extension(P, wm);
     else {
       const dE = inDays(ML.PROGRESS.extension);
       plane(12.6, 20, T.mat('beton', 3, 5, 0x9da3a8), 26.7, -2, 0.028);
-      W.floorText(dE ? `🔒 EXTENSION EST\nse débloque ${dE}` : '🔓 EXTENSION EST\ndisponible au PC', dE ? 'un hall de plus : T4 + F4' : `${ML.CATALOG.extension.price} € — construite la nuit`, 11, 18, 26.7, -2, { bg: 'rgba(110,114,120,0.85)', hatch: 'rgba(70,74,80,0.85)', color: dE ? '#fff' : '#ffd257', border: '#f1c40f', y: 0.06, rot: Math.PI / 2 });
+      W.lockTexts.push({ k: 'extension', label: 'EXTENSION EST', what: 'un hall de plus : T4 + F4', m: W.floorText(dE ? `🔒 EXTENSION EST\nse débloque ${dE}` : '🔓 EXTENSION EST\ndisponible au PC', dE ? 'un hall de plus : T4 + F4' : `${ML.CATALOG.extension.price} € — construite la nuit`, 11, 18, 26.7, -2, { bg: 'rgba(110,114,120,0.85)', hatch: 'rgba(70,74,80,0.85)', color: dE ? '#fff' : '#ffd257', border: '#f1c40f', y: 0.06, rot: Math.PI / 2 }) });
       for (const [x, z] of [[20.6, -12], [32.8, -12], [32.8, 7.9], [20.6, 7.9]]) { U.cyl(0.08, 0.08, 1.1, 0xe67e22, x, 0.55, z, root); U.box(0.25, 0.25, 0.25, 0xffffff, x, 1.15, z, root); }
     }
     W.inLights = [new THREE.PointLight(0xfff4e0, 0.35, 34), new THREE.PointLight(0xfff4e0, 0.25, 30)];
@@ -424,7 +434,12 @@
     // feux tricolores (cycle calculé à partir du temps de jeu : identique chez tous)
     for (const L of W.lights) { const g = W.lightGreen(L.node, 0, rt || 0); L.red.material = g ? W.lightOff : W.lightRed; L.green.material = g ? W.lightGreenMat : W.lightOff; }
     // radars : flash
-    for (const r of W.radars) { r.flash = Math.max(0, (r.flash || 0) - dt); r.lamp.material = r.flash > 0 ? W.flashOn : W.flashOff; }
+    for (let i = 0; i < W.radars.length; i++) {
+      const r = W.radars[i], off = (S.radarsOff || []).includes(i);
+      if (off !== !!r.off) { r.off = off; r.head.rotation.z = off ? 1.2 : 0; r.head.position.y = off ? 2.3 : 3.3; r.lamp.visible = !off; r.label.setText(off ? '🪚 RADAR HS' : 'RADAR 60'); }
+      r.flash = Math.max(0, (r.flash || 0) - dt); r.lamp.material = r.flash > 0 ? W.flashOn : W.flashOff;
+    }
+    W.vieVisuals(dt, S);
     // showroom : « VENDU » sur les véhicules déjà achetés
     for (const k in W.show) { const t2 = (S.owned || []).includes(k) ? '✔ DÉJÀ À VOUS' : ''; if (W.show[k].label._t !== t2) { W.show[k].label._t = t2; W.show[k].label.setText(t2); } }
   };
@@ -460,7 +475,7 @@
       U.box(C.w, C.h, C.d, tex, 0, C.h / 2, 0, g); U.box(C.w + 0.8, 0.5, C.d + 0.8, C.roof, 0, C.h + 0.25, 0, g); U.box(C.w + 0.2, 0.6, C.d + 0.2, 0x555555, 0, 0.3, 0, g);
       U.addCollider(P.x - P.hx, P.x + P.hx, P.z - P.hz, P.z + P.hz, 'building');
     }
-    ML.mapRects.push({ x: P.x, z: P.z, w: P.hx * 2, d: P.hz * 2, c: '#' + new THREE.Color(C.roof).getHexString(), name: C.name.split(' ')[0] === 'Boulangerie' ? 'Boulangerie' : C.name.split(' ')[0], comp: key });
+    ML.mapRects.push({ x: P.x, z: P.z, w: P.hx * 2, d: P.hz * 2, c: '#' + new THREE.Color(C.roof).getHexString(), name: C.short || (C.name.split(' ')[0] === 'Boulangerie' ? 'Boulangerie' : C.name.split(' ')[0]), comp: key });
     const fz = C.d / 2 + 0.06;
     U.box(6, 4.6, 0.12, T.mat('tole', 3, 1, 0x95a5a6), -C.w / 2 + 5, 2.3, fz, g); if (!C.open) U.box(1.2, 2.2, 0.12, 0x5d4037, C.w / 2 - 3, 1.1, fz, g);
     for (let x = -C.w / 2 + 10; x < C.w / 2 - 4.5; x += 2.6) U.box(1.6, 1.2, 0.08, U.mat(0x9fd3ff, 0x1d3b50), x, C.h * 0.55, fz, g, false);
@@ -519,13 +534,13 @@
   }
   W.shell = (key, C, P, g, tex) => {
     const t = 0.35, hw = C.w / 2, hd = C.d / 2, h = C.h, dx = hw - 3, d0 = dx - DOOR / 2, d1 = dx + DOOR / 2, Fr = frameOf(P), F = ML.Decor.frame(P.x, P.z, P.rot);
-    const inner = { client: 0xf4f1ea, concession: 0xffffff, police: 0xe8eef5 }[C.kind] || 0xf0f0f0;
+    const inner = { client: 0xf4f1ea, concession: 0xffffff, police: 0xe8eef5, mall: 0xfdf6ec, gym: 0xeef7f4 }[C.kind] || 0xf0f0f0;
     const wl = (lx, lz, w, d) => { U.box(w, h, d, tex, lx, h / 2, lz, g); Fr.col(lx, lz, w, d); };
     wl(0, -hd + t / 2, C.w, t); wl(-hw + t / 2, 0, t, C.d); wl(hw - t / 2, 0, t, C.d);
     wl((-hw + d0) / 2, hd - t / 2, d0 + hw, t); wl((d1 + hw) / 2, hd - t / 2, hw - d1, t);
     U.box(DOOR, h - 3, t, tex, dx, 3 + (h - 3) / 2, hd - t / 2, g);                                   // linteau
     const roof = U.box(C.w + 0.8, 0.5, C.d + 0.8, C.roof, 0, h + 0.25, 0, g); roof.castShadow = false;
-    U.box(C.w - 2 * t, 0.06, C.d - 2 * t, C.kind === 'concession' ? 0xf2f2f2 : C.kind === 'police' ? 0x9aa7b4 : 0xc8b9a6, 0, 0.03, 0, g).castShadow = false;
+    U.box(C.w - 2 * t, 0.06, C.d - 2 * t, C.kind === 'concession' ? 0xf2f2f2 : C.kind === 'police' ? 0x9aa7b4 : C.kind === 'mall' ? 0xe8dcc8 : C.kind === 'gym' ? 0x3d4a52 : 0xc8b9a6, 0, 0.03, 0, g).castShadow = false;
     W.ceilMat = W.ceilMat || new THREE.MeshLambertMaterial({ color: 0xf2f2f2, emissive: 0x9a9a9a });
     U.box(C.w - 2 * t, 0.1, C.d - 2 * t, W.ceilMat, 0, h - 0.06, 0, g).castShadow = false;            // plafond (éclairé)
     // peinture intérieure (sinon on voit la tôle / la brique dedans)
@@ -542,6 +557,8 @@
     if (C.kind === 'client') W.inClient(key, C, P, F, Fr);
     else if (C.kind === 'concession') W.inShowroom(key, C, P, F, Fr, g);
     else if (C.kind === 'police') W.inGendarmerie(key, C, P, F, Fr);
+    else if (C.kind === 'mall') W.inMall(key, C, P, F, Fr);
+    else if (C.kind === 'gym') W.inGym(key, C, P, F, Fr);
   };
   /** Employé de décor (assis à son bureau ou debout) */
   W.addStaff = (Fr, lx, lz, ry, look, seated) => {
@@ -611,19 +628,19 @@
     P.npc = Object.assign(Fr.L(dx - 4.5, 1.4), { yaw: Fr.a });
     const ad = Fr.L(0, -hd + 0.45); ML.Decor.sign('GARAGE PASQUIER', 'occasions garanties*  (*garanties d\'avoir 4 roues)', '#c0392b', '#fff', 9, 1.8, ad.x, 4.6, ad.z, Fr.a, { glow: true, border: '#fff' });
     // véhicules exposés sur podium
-    const spots = { megane: { x: -hw + 5, z: -1.5, ry: 0.55, r: 3.1 }, ducato: { x: -hw + 12.5, z: -2, ry: 0.35, r: 3.4 }, camion: { x: 4.5, z: -hd + 3.6, ry: Math.PI / 2, r: 0 } };
+    const spots = { megane: { x: -hw + 5, z: -1.5, ry: 0.55, r: 3.1 }, ducato: { x: -hw + 12.5, z: -2, ry: 0.35, r: 3.4 }, camion: { x: 4.5, z: -hd + 3.6, ry: Math.PI / 2, r: 0 }, scooter: { x: -hw + 5.5, z: hd - 4.3, ry: 0.9, r: 1.5 } };
     for (const k in spots) {
       const s2 = spots[k], D = ML.DEALER[k], V = ML.VEHICLES[k];
       if (s2.r) { F.sh('cyl', s2.r * 2, 0.16, s2.r * 2, s2.x, 0.08, s2.z, 0xdfe6e9); F.sh('cyl', s2.r * 2 - 0.2, 0.02, s2.r * 2 - 0.2, s2.x, 0.17, s2.z, 0xb2bec3); }
       else { F.box(9.4, 0.16, 3.4, s2.x, 0.08, s2.z, 0xdfe6e9); }
       const m = ML.Cars.model(k, V.color); const wp = Fr.L(s2.x, s2.z); m.position.set(wp.x, 0.17, wp.z); m.rotation.y = Fr.a + s2.ry; root.add(m); W.staff.push({ group: m });
-      const bw = k === 'camion' ? 9 : 2.4, bd = k === 'camion' ? 2.8 : 4.8, ca = Math.abs(Math.cos(s2.ry)), sa = Math.abs(Math.sin(s2.ry));
+      const bw = k === 'camion' ? 9 : k === 'scooter' ? 0.8 : 2.4, bd = k === 'camion' ? 2.8 : k === 'scooter' ? 1.9 : 4.8, ca = Math.abs(Math.cos(s2.ry)), sa = Math.abs(Math.sin(s2.ry));
       Fr.col(s2.x, s2.z, bw * ca + bd * sa, bw * sa + bd * ca, 'vitrine');
       // panneau de caractéristiques (face à l'entrée)
-      const spec = (D.specs || []).map(([a2, b2]) => `${a2} : ${b2 === 'CAR' || b2 === 'DUCATO' || b2 === 'CAMION' ? Math.round(ML.CFG[b2].max * 3.6) + ' km/h' : b2}`);
+      const spec = (D.specs || []).map(([a2, b2]) => `${a2} : ${ML.CFG[b2] && ML.CFG[b2].max ? Math.round(ML.CFG[b2].max * 3.6) + ' km/h' : b2}`);
       const pz = s2.r ? s2.z + s2.r + 0.6 : s2.z + 2.3, px = s2.r ? s2.x : s2.x - 2.5;
       F.box(0.08, 1.1, 0.08, px, 0.55, pz, 0x7f8c8d); F.box(0.7, 0.04, 0.4, px, 0.02, pz, 0x7f8c8d);
-      const sp = Fr.L(px, pz + 0.05); const pan = ML.Decor.sign(`${D.name}\n${D.price.toLocaleString('fr-FR')} €`, spec.join('  ·  '), '#1a2340', '#ffd257', 2.4, 1.3, sp.x, 1.55, sp.z, Fr.a, { border: '#ffd257', glow: true });
+      const sp = Fr.L(px, pz + 0.05); const pan = ML.Decor.sign(`${D.name}\n${Math.round(D.price * (W.black ? ML.ECO.black.dealer : 1)).toLocaleString('fr-FR')} €${W.black ? ' (Black Friday)' : ''}`, spec.join('  ·  '), '#1a2340', '#ffd257', 2.4, 1.3, sp.x, 1.55, sp.z, Fr.a, { border: '#ffd257', glow: true });
       W.show[k] = { pan, label: null };
       const tp = Fr.L(px, pz + 1.0); W.targets.push({ id: 'show:' + k, x: tp.x, y: 1.2, z: tp.z, r: 3.2 });
       const sold = U.label('', { size: 0.5, color: '#3ecf6e', bg: 'rgba(0,0,0,0.75)' }); sold.position.set(sp.x, 2.6, sp.z); add(sold); W.show[k].label = sold;
@@ -673,7 +690,8 @@
         const b = place(f.model, 7.5, f.x, f.z, f.rot * Math.PI / 2, false);
         if (!b) U.box(14, 12, 14, T.mat('brique', 3, 3, 0xf6e58d), f.x, 6, f.z, root);
       }
-      U.boxCollider(f.x, f.z, 15, 15, 'city'); ML.mapRects.push({ x: f.x, z: f.z, w: 15, d: 15, c: f.espacil ? '#13a89e' : '#8e7f74', name: f.espacil ? 'Espacil' : undefined });
+      const LI = f.lieu && ML.LIEUX[f.lieu];
+      U.boxCollider(f.x, f.z, 15, 15, 'city'); ML.mapRects.push({ x: f.x, z: f.z, w: 15, d: 15, c: f.espacil ? '#13a89e' : LI ? LI.color : '#8e7f74', name: f.espacil ? 'Espacil' : LI ? LI.name.replace(/^(Maison|Appartement) de /, '🏠 ') : undefined });
     }
     for (const c of city.parked) place(c.model, 4.6, c.x, c.z, c.ry, 'small', 0.33);
     const heads = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.12, 0.3), new THREE.MeshLambertMaterial({ color: 0xfff3c4, emissive: 0x000000 }), city.lamps.length);
@@ -687,10 +705,12 @@
     // radars
     W.flashOn = U.mat(0xffffff, 0xffffff); W.flashOff = U.mat(0x333333);
     for (const r of city.radars) {
-      U.box(0.2, 3, 0.2, 0x7f8c8d, r.x, 1.5, r.z, root); U.box(0.7, 0.9, 0.7, 0x95a5a6, r.x, 3.3, r.z, root);
+      U.box(0.2, 3, 0.2, 0x7f8c8d, r.x, 1.5, r.z, root);
+      const head = U.box(0.7, 0.9, 0.7, 0x95a5a6, r.x, 3.3, r.z, root);
       const lamp = U.box(0.3, 0.3, 0.75, W.flashOff, r.x, 3.3, r.z, root, false);
       const l = U.label('RADAR 60', { size: 0.3, color: '#fff', bg: 'rgba(192,57,43,0.9)' }); l.position.set(r.x, 4.3, r.z); add(l);
-      U.boxCollider(r.x, r.z, 0.7, 0.7, 'radar'); W.radars.push({ x: r.x, z: r.z, lamp, flash: 0 });
+      U.boxCollider(r.x, r.z, 0.7, 0.7, 'radar'); W.targets.push({ id: 'radar:' + W.radars.length, x: r.x, y: 1.4, z: r.z, r: 2.2 });
+      W.radars.push({ x: r.x, z: r.z, lamp, head, label: l, flash: 0 });
     }
     // feux tricolores
     W.lightRed = U.mat(0xff2222, 0xff0000); W.lightGreenMat = U.mat(0x22ff44, 0x00cc22); W.lightOff = U.mat(0x222222);
@@ -727,6 +747,112 @@
     add(trunks); add(leaves);
     for (const b of city.bushes) place('city_bush', b.s, b.x, b.z, b.ry, false, ML.gy(b.x, b.z));
     ML.Decor.streets(city); ML.Decor.nature(city, pines);
+  };
+
+  /* ---------- V5.2 : poste de préparation, toilettes, meuleuse, maisons des copains ---------- */
+  W.vie52 = city => {
+    ML.LOC.houses = []; ML.LOC.lieux = {};
+    for (const f of city.fillers) {
+      const a = f.rot * Math.PI / 2, d = { x: f.x + 9.2 * Math.sin(a), z: f.z + 9.2 * Math.cos(a) };
+      if (f.lieu && ML.LIEUX[f.lieu]) {
+        ML.LOC.lieux[f.lieu] = Object.assign(d, { name: ML.LIEUX[f.lieu].name });
+        const l = U.label('🏠 ' + ML.LIEUX[f.lieu].name, { size: 0.9, color: '#fff', bg: 'rgba(0,0,0,0.55)' }); l.position.set(f.x, 16, f.z); add(l);
+      } else if (!f.espacil) ML.LOC.houses.push(d);
+    }
+    // poste de préparation d'usinage (allumé quand il est acheté au PC)
+    const PX = -5.5, PZ = 9.6, g = add(new THREE.Group()); g.position.set(PX, 0, PZ);
+    U.box(3.4, 0.85, 1.1, 0x5d6d7e, 0, 0.425, 0, g); U.box(3.5, 0.08, 1.2, 0x2e86de, 0, 0.89, 0, g);
+    U.box(3.4, 1.5, 0.08, 0x34495e, 0, 1.65, 0.56, g); U.box(3.5, 0.3, 0.3, 0x2e86de, 0, 2.5, 0.45, g);
+    for (let i = 0; i < 7; i++) U.box(0.08, 0.32, 0.04, [0xffd23f, 0x3fa7ff, 0xff7a3f][i % 3], -1.3 + i * 0.43, 1.75, 0.5, g, false);
+    for (const x of [-1.2, 0, 1.2]) U.box(0.85, 0.02, 0.6, 0x1b4f8a, x, 0.935, 0.05, g, false);
+    U.boxCollider(PX, PZ, 3.4, 1.1, 'prepa');
+    W.prepaLabel = U.label('', { size: 0.34, color: '#9fd0ff' }); W.prepaLabel.position.set(PX, 3.1, PZ); add(W.prepaLabel);
+    W.targets.push({ id: 'prepa', x: PX, y: 1, z: PZ - 1.1, r: 2.2 });
+    ML.LOC.prepa = { x: PX, z: PZ, spots: [-1.2, 0, 1.2].map(dx => ({ x: PX + dx, y: 0.95, z: PZ + 0.05 })) };
+    W.floorText('POSTE DE PRÉPARATION', 'kits brut + outil', 3.6, 1.0, PX, PZ - 1.3, { bg: 'rgba(46,134,222,0.55)', color: '#fff', y: 0.046 });
+    // toilettes : cabine de chantier, dehors à gauche de l'atelier
+    const TX = -24, TZ = 10, tg = add(new THREE.Group()); tg.position.set(TX, 0, TZ);
+    U.box(2.2, 2.5, 2.2, 0x2e86de, 0, 1.25, 0, tg); U.box(2.4, 0.15, 2.4, 0x1b4f8a, 0, 2.58, 0, tg); U.box(2.3, 0.2, 2.3, 0x1b4f8a, 0, 0.1, 0, tg);
+    U.box(0.06, 2.1, 1.0, 0x1b4f8a, 1.12, 1.15, 0, tg); U.box(0.04, 0.32, 0.5, 0xffffff, 1.16, 1.95, 0, tg); U.box(0.05, 0.08, 0.08, 0xbdc3c7, 1.17, 1.1, -0.35, tg);
+    U.boxCollider(TX, TZ, 2.3, 2.3, 'wc');
+    W.wcLabel = U.label('🚽 WC', { size: 0.4, color: '#fff', bg: 'rgba(46,134,222,0.85)' }); W.wcLabel.position.set(TX, 3.4, TZ); add(W.wcLabel);
+    W.wcDirt = new THREE.Mesh(new THREE.SphereGeometry(1.7, 10, 8), new THREE.MeshBasicMaterial({ color: 0x8bc34a, transparent: true, opacity: 0, depthWrite: false })); W.wcDirt.position.set(TX + 0.4, 1.6, TZ); add(W.wcDirt);
+    W.targets.push({ id: 'wc', x: TX + 1.7, y: 1.2, z: TZ, r: 2.2 }); ML.LOC.wc = { x: TX + 1.8, z: TZ };
+    ML.mapRects.push({ x: TX, z: TZ, w: 2.3, d: 2.3, c: '#2e86de', name: 'WC' });
+    W.floorText('🚽 TOILETTES →', '', 3, 0.8, -21.5, 13.2, { color: '#ffffff', bg: 'rgba(46,134,222,0.6)', y: 0.05, rot: Math.PI / 2 });
+    // crochet de la meuleuse (mur gauche, à côté des clés)
+    ML.LOC.grinder = { x: -19.2, y: 0.95, z: 3.6 };
+  };
+  /** V5.2 : étiquettes du poste de prépa et des WC, compte à rebours des zones bloquées */
+  W.vieVisuals = (dt, S) => {
+    W.vieT = (W.vieT || 0) - dt; if (W.vieT > 0) return; W.vieT = 0.5;
+    const up = S.up || {}, blk = S.black ? ML.ECO.black.cat : 1;
+    if (W.prepaLabel) {
+      const t = up.prepa ? `🧰 POSTE DE PRÉPA${S.prepaMsg ? ' — ' + S.prepaMsg : ' : prends un kit'}` : `🔒 POSTE DE PRÉPA — au PC (${Math.round(ML.CATALOG.prepa.price * blk)} €)`;
+      if (W.prepaLabel._t !== t) { W.prepaLabel._t = t; W.prepaLabel.setText(t, up.prepa ? (S.prepaMsg ? '#ffb86b' : '#9fd0ff') : '#bbbbbb'); }
+    }
+    if (W.wcLabel) {
+      const w = Math.round(S.wc || 0), t = w >= 100 ? '🤢 WC : ÇA DÉBORDE !' : w >= ML.ECO.wc.slow ? `🤢 WC : sales (${w} %)` : `🚽 WC (${w} %)`;
+      if (W.wcLabel._t !== t) { W.wcLabel._t = t; W.wcLabel.setText(t, w >= ML.ECO.wc.slow ? '#c8ff8a' : '#fff'); }
+      W.wcDirt.material.opacity = w >= 45 ? (w - 45) / 55 * 0.38 : 0; W.wcDirt.visible = w >= 45;
+    }
+    for (const L of W.lockTexts || []) {
+      const it = ML.CATALOG[L.k], day = (S.co && S.co.day) || S.day || 1, rem = Math.max(0, it.day - day - (S.rt || 0) / ML.CFG.SHIFT_SEC);
+      let t, sub, col;
+      if (up[L.k]) { t = `✔ ${L.label}\nACHETÉ`; sub = L.k === 'extension' ? 'construite cette nuit' : 'achète T3 / F3 au PC'; col = '#3ecf6e'; }
+      else if (rem > 0) {
+        const d = Math.floor(rem), h = Math.floor((rem - d) * 12), fee = Math.round(Math.max(ML.EARLY.min, ML.EARLY.perDay * rem) / 10) * 10;
+        t = `🔒 ${L.label}\nse débloque dans ${d ? d + ' j ' : ''}${h ? h + ' h' : d ? '' : 'moins d\'1 h'}`; sub = `ou tout de suite au PC : ${Math.round(it.price * blk) + fee} €`; col = '#ffffff';
+      } else { t = `🔓 ${L.label}\ndisponible au PC`; sub = `${Math.round(it.price * blk)} € — onglet Atelier`; col = '#ffd257'; }
+      if (L._k !== t + sub) { L._k = t + sub; L.m.userData.redraw(t, sub, { color: col }); }
+    }
+  };
+  /* ---------- V5.2 : centre commercial et salle de sport ---------- */
+  W.inMall = (key, C, P, F, Fr) => {
+    const hw = C.w / 2, hd = C.d / 2, dx = hw - 3, r = U.rng(4242 + Math.round(P.x * 7));
+    // caisse principale près de l'entrée (Sandra)
+    F.box(2.6, 1.0, 0.9, dx - 3.6, 0.5, hd - 4, 0x8e44ad); F.box(2.7, 0.08, 1.0, dx - 3.6, 1.04, hd - 4, 0xf5f0e6); F.box(0.5, 0.35, 0.4, dx - 4.3, 1.25, hd - 4, 0x222222); F.col(dx - 3.6, hd - 4, 2.6, 0.9);
+    P.npc = Object.assign(Fr.L(dx - 3.6, hd - 4.9), { yaw: Fr.a });
+    // allée : fontaine, bancs, plantes
+    F.sh('cyl', 2.6, 0.5, 2.6, -2, 0.25, 2, 0xbdc3c7); F.sh('cyl', 2.2, 0.06, 2.2, -2, 0.5, 2, 0x5dade2); F.sh('cyl', 0.25, 1.2, 0.25, -2, 0.9, 2, 0xbdc3c7); F.col(-2, 2, 2.4, 2.4);
+    for (const x of [-9, 5]) { F.box(2.4, 0.45, 0.6, x, 0.23, 2.6, 0x8d6e63); F.col(x, 2.6, 2.4, 0.6); F.sh('cyl', 0.35, 0.55, 0.35, x + 1.8, 0.28, 2.6, 0xffffff); F.sh('ball', 0.9, 1.3, 0.9, x + 1.8, 1.1, 2.6, 0x27ae60); }
+    if (W.black) { const bf = Fr.L(-2, hd - 0.5); ML.Decor.sign('BLACK FRIDAY', 'tout à −50 % aujourd\'hui !', '#111111', '#ffd257', 6, 1.4, bf.x, C.h - 2.2, bf.z, Fr.a + Math.PI, { glow: true, border: '#ffd257' }); }
+    // stands contre le mur du fond
+    const stands = { snack: -8.5, farces: 0, boxe: 7.6 }, z0 = -hd + 2.2;
+    for (const st in stands) {
+      const sx = stands[st], [title, col] = ML.MALL_STANDS[st], hex = parseInt(col.slice(1), 16), items = Object.keys(ML.MALL).filter(k => ML.MALL[k].stand === st);
+      F.box(6.2, 1.0, 1.0, sx, 0.5, z0 + 1.2, hex); F.box(6.4, 0.08, 1.1, sx, 1.04, z0 + 1.2, 0xffffff); F.col(sx, z0 + 1.2, 6.2, 1.0);
+      F.box(6.4, 2.8, 0.12, sx, 1.4, -hd + 0.5, hex); F.box(6.6, 0.12, 2.4, sx, 2.85, z0 + 0.2, hex);
+      for (let i = 0; i < 4; i++) F.box(1.2, 0.06, 0.4, sx - 2.2 + i * 1.45, 1.9, -hd + 0.75, 0xffffff);
+      W.addStaff(Fr, sx + 2.2, z0 + 0.25, 0, randLook(r), false);
+      const sg = Fr.L(sx, -hd + 0.6); ML.Decor.sign(title, '', col, '#ffffff', 5.4, 1.0, sg.x, 3.5, sg.z, Fr.a, { glow: true, border: '#ffffff' });
+      items.forEach((k, i) => {
+        const M2 = ML.MALL[k], ix = sx - (items.length - 1) + i * 2, price = Math.round(M2.price * (W.black ? ML.ECO.black.mall : 1));
+        const mesh = ML.Items.mesh({ type: k, d: {} }, { noLabel: true }), wp = Fr.L(ix, z0 + 1.2); mesh.position.set(wp.x, 1.09, wp.z); mesh.rotation.y = Fr.a; mesh.scale.setScalar(['batte', 'baguette'].includes(k) ? 1.1 : 1.6); add(mesh); W.staff.push({ group: mesh });
+        const tp = Fr.L(ix, z0 + 2.25); W.targets.push({ id: 'mall:' + k, x: tp.x, y: 1.1, z: tp.z, r: 1.2 });
+        const ps2 = Fr.L(ix, z0 + 1.73); ML.Decor.sign(`${M2.icon} ${price} €`, M2.name, '#ffffff', '#222222', 1.7, 0.62, ps2.x, 0.6, ps2.z, Fr.a, { border: col });
+      });
+    }
+    const ad = Fr.L(-hw + 0.45, 0); ML.Decor.sign('LES COPEAUX', 'votre centre commercial', '#8e44ad', '#fff', 5, 1.4, ad.x, 3.2, ad.z, Fr.a + Math.PI / 2, { glow: true });
+  };
+  W.inGym = (key, C, P, F, Fr) => {
+    const hw = C.w / 2, hd = C.d / 2, dx = hw - 3, r = U.rng(777 + Math.round(P.z * 5));
+    F.box(2.4, 1.0, 0.8, dx, 0.5, hd - 4.2, 0x16a085); F.box(2.5, 0.08, 0.9, dx, 1.04, hd - 4.2, 0xffffff); F.col(dx, hd - 4.2, 2.4, 0.8);
+    P.npc = Object.assign(Fr.L(dx, hd - 5.1), { yaw: Fr.a });
+    F.glass(C.w - 3, 2.2, 0.04, 0, 1.7, -hd + 0.42, 0xdff1ff);                                   // miroir
+    for (let i = 0; i < 3; i++) {                                                                  // tapis de course
+      const x = -hw + 3 + i * 3, z = -hd + 3;
+      F.box(1.0, 0.25, 2.2, x, 0.13, z, 0x222222); F.box(0.86, 0.03, 1.9, x, 0.27, z + 0.05, 0x111111);
+      for (const s2 of [-0.45, 0.45]) F.box(0.07, 1.2, 0.07, x + s2, 0.85, z - 0.95, 0x95a5a6);
+      F.box(1.0, 0.35, 0.25, x, 1.45, z - 0.95, 0x2c3e50); F.glass(0.5, 0.2, 0.02, x, 1.5, z - 0.82, 0x7fffb0); F.col(x, z - 0.95, 1.0, 0.3);
+      const tp = Fr.L(x, z + 1.5); W.targets.push({ id: 'gym:' + i, x: tp.x, y: 1.1, z: tp.z, r: 1.4 });
+    }
+    // haltères, banc, sac de frappe
+    F.box(3, 0.9, 0.5, 4, 0.45, -hd + 0.9, 0x555555); for (let i = 0; i < 6; i++) F.sh('cyl', 0.16, 0.5, 0.16, 2.8 + i * 0.48, 1.0, -hd + 0.9, 0x222222, { rz: Math.PI / 2 }); F.col(4, -hd + 0.9, 3, 0.5);
+    F.box(0.5, 0.45, 1.6, 0, 0.45, 1, 0x2c3e50); F.box(1.6, 0.05, 0.05, 0, 1.3, 0.6, 0x95a5a6); F.col(0, 1, 0.5, 1.6);
+    F.sh('cyl', 0.02, 1.2, 0.02, -6, C.h - 0.7, 2, 0x333333); F.sh('cyl', 0.35, 1.3, 0.35, -6, C.h - 2, 2, 0xc0392b); F.col(-6, 2, 0.7, 0.7);
+    const p1 = Fr.L(-hw + 0.45, 1); ML.Decor.sign('NO PAIN NO GAIN', 'l\'endurance, ça se travaille', '#16a085', '#fff', 3.6, 1.2, p1.x, 2.6, p1.z, Fr.a + Math.PI / 2, { border: '#fff' });
+    W.addStaff(Fr, 4, 1.6, Math.PI, randLook(r), false);
   };
 
   W.bounds = () => {

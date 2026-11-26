@@ -6,6 +6,20 @@
    serveur : https://lebec-game.onrender.com/retours (et /retours.txt).
    ===================================================================== */
 ML.PATCH = [
+  { v: 'V5.2', d: 'novembre 2026', t: 'Vos idées : Johan Bois, Bleuenn, SAE, centre commercial, quêtes…', l: [
+    '📋 Tickets du haut : une barre d\'AVANCEMENT et une ligne 👷 qui dit QUI s\'occupe de la commande (et où elle en est : machine, en main, dans la Mégane…).',
+    '🔒 Zones bloquées : le compte à rebours descend VRAIMENT pendant la journée, et on peut les débloquer TOUT DE SUITE au PC (plus cher).',
+    '🦹 Johan Bois vole parfois les commandes prêtes (une claque et il lâche tout). Au PC : un VIGILE anti-Johan.',
+    '💣 Bleuenn branche son engin sur le tableau électrique… BOUM : coupure et machines en arrêt d\'urgence (E sur chacune). Une claque avant, et l\'atelier est sauvé.',
+    '🚽 Les toilettes se salissent (cabine à gauche de l\'atelier) : sales, elles ralentissent les opérateurs. À nettoyer !',
+    '🙋 Quêtes secondaires : des gens viennent demander un service ailleurs sur la carte (Cardin, Jimmy Kawa, Trit, les voisins…). Repère sur la carte, récompense en euros.',
+    '🏠 Nouveaux lieux : maison de Cardin, appartement de Trit, maison de Jimmy Kawa, CENTRE COMMERCIAL (manger, de quoi se taper) et SALLE DE SPORT (tapis de course = endurance pour de bon).',
+    '🎓 SAE comme en BUT : des pièces à présenter au jury (Garnier et Fanfrelat). Bonne note = bon de réduction sur une machine.',
+    '🛍 BLACK FRIDAY un jour sur cinq : tout est moins cher. 🛵 Scooter de livraison au garage (pas cher, mais lent).',
+    '🧰 Poste de préparation d\'usinage (PC) : il prépare tout seul des kits brut + outil. 🪚 Meuleuse pour découper les radars… ou « Pass Radar » pour ne plus payer.',
+    '🚗 On VOIT les persos dans les véhicules, et les voitures ne rentrent plus dans l\'atelier. Le rond gris devant la porte a disparu.',
+    '💡 Un cadre d\'astuces s\'affiche quand un événement spécial arrive (que faire ?).'
+  ] },
   { v: 'V5.1', d: 'novembre 2026', t: 'Sauvegardes sur le compte, journées variées, tutoriel', l: [
     '💾 Le créateur du salon peut ENREGISTRER la partie sur son compte (menu Pause). Ses entreprises apparaissent dans « Mes entreprises », sur n\'importe quel PC.',
     '🎲 Chaque jour est différent : journée calme (mais pleine d\'imprévus), COUP DE FEU (les commandes pleuvent), journée agitée, veille de pont… Plus il y a de commandes, moins il y a de visites, et l\'inverse.',

@@ -91,7 +91,7 @@
     o.anim += dt * (moving ? Math.min(16, 3 + o.speed * 2) : 2);
     const sw = moving ? Math.sin(o.anim) * Math.min(0.9, 0.3 + o.speed * 0.1) : 0;
     o.legL.rotation.x = sw; o.legR.rotation.x = -sw; o.armL.rotation.x = -sw * 0.8; o.armR.rotation.x = sw * 0.8;
-    o.armL.rotation.z = 0; o.armR.rotation.z = 0;
+    o.armL.rotation.z = 0; o.armR.rotation.z = 0; o.legL.rotation.z = 0; o.legR.rotation.z = 0;
     if (o.heldKey) { o.armL.rotation.x = o.armR.rotation.x = -1.1; }
     if (pose === 'chase') o.armR.rotation.x = -2.6 + Math.sin(o.anim * 1.5) * 0.6;
     if (pose === 'box') { o.armL.rotation.x = -1.4 + Math.sin(o.anim * 3) * 0.5; o.armR.rotation.x = -1.4 - Math.sin(o.anim * 3) * 0.5; }
@@ -112,6 +112,15 @@
     if (far) o.bubble.visible = false;
   };
 
+  /** V5.2 : assis dans un véhicule (jambes devant, mains au volant / au guidon) */
+  P.sit = (o, x, y, z, yaw, moto) => {
+    o.pos.set(x, y, z); o.target.copy(o.pos); o.yaw = o.tYaw = yaw; o.speed = 0;
+    o.group.position.set(x, y, z); o.group.rotation.set(moto ? -0.12 : 0, yaw, 0);
+    o.legL.rotation.x = o.legR.rotation.x = moto ? -1.15 : -1.45; o.legL.rotation.z = moto ? 0.22 : 0; o.legR.rotation.z = moto ? -0.22 : 0;
+    o.armL.rotation.x = o.armR.rotation.x = moto ? -1.3 : -1.1; o.armL.rotation.z = o.armR.rotation.z = 0;
+    const far = ML.camera && Math.hypot(x - ML.camera.position.x, z - ML.camera.position.z) > 40;
+    o.label.visible = !far && !!o.label._k && o.label._k[0] !== '|'; if (far) o.bubble.visible = false;
+  };
   /** Affiche l'objet tenu (type) dans les mains */
   P.setHeld = (o, it) => {
     const key = it ? it.type + JSON.stringify(it.d || {}) : null;

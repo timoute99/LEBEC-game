@@ -333,3 +333,31 @@ button.mini.del { background: rgba(231,76,60,.35); } button.mini:disabled { opac
 #tuto .tk { font-size: 12px; color: #aab; }
 #tuto.done { border-color: #3ecf6e; background: rgba(16, 60, 30, .93); }
 .campacc { margin-top: 6px; } .campacc button { margin: 2px 4px 2px 0; }
+
+/* ===================== V5.2 ===================== */
+.tk-prog { height: 5px; background: #d6dde6; border-radius: 3px; overflow: hidden; margin-top: 3px; }
+.tk-prog i { display: block; height: 100%; background: linear-gradient(90deg, #2e86de, #54a0ff); transition: width .6s; }
+.tk-who { font-size: 11px; font-weight: 700; color: #2c3e50; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-who i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.tk-who .dim { color: #95a5a6; font-weight: 400; }
+#evbar .ev.quest { background: rgba(20, 110, 60, .9); border-color: #3ecf6e; animation: none; }
+#evbar .ev.sae { background: rgba(60, 40, 130, .9); border-color: #c39bff; animation: none; }
+#evbar .ev.black { background: #111; border-color: #ffd257; color: #ffd257; font-weight: 800; animation: none; letter-spacing: 1px; }
+#evtip { position: absolute; right: 14px; bottom: 130px; width: 310px; background: rgba(16, 20, 34, .95); border: 2px solid #ffd257; border-radius: 12px; padding: 10px 14px 8px; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.5); pointer-events: none; z-index: 6; }
+#evtip.hidden { display: none; }
+#evtip .et-h { font-size: 15px; font-weight: 800; color: #ffd257; margin-bottom: 4px; }
+#evtip ol { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.45; }
+#evtip .et-bar { height: 3px; background: rgba(255,255,255,.15); border-radius: 2px; margin-top: 7px; overflow: hidden; }
+#evtip .et-bar i { display: block; height: 100%; width: 100%; background: #ffd257; }
+#evtip.go { animation: etin .35s ease-out; }
+#evtip.go .et-bar i { animation: etbar 16s linear forwards; }
+@keyframes etin { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes etbar { from { width: 100%; } to { width: 0%; } }
+.erp-item .old { text-decoration: line-through; color: #888; margin-right: 4px; font-size: 11px; }
+.erp-item .bf { color: #ffd257; background: #111; border-radius: 4px; padding: 0 5px; font-size: 10px; font-weight: 800; margin-left: 4px; }
+.erp-item .early { display: block; margin-top: 4px; }
+.erp-black { background: #111; color: #ffd257; border: 2px solid #ffd257; border-radius: 8px; padding: 6px 10px; font-weight: 800; margin: 6px 0; text-align: center; letter-spacing: 1px; }
+.erp-sae { background: rgba(108, 92, 231, .18); border: 1px solid #a29bfe; border-radius: 8px; padding: 6px 10px; margin: 6px 0; }
+.mg-tapis { display: flex; gap: 18px; justify-content: center; margin: 10px 0; }
+.mg-tapis kbd { font-size: 28px; padding: 8px 18px; border-radius: 8px; background: #2c3e50; border: 2px solid #555; color: #fff; }
+.mg-tapis kbd.on { background: #27ae60; border-color: #3ecf6e; transform: scale(1.12); }

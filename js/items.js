@@ -28,8 +28,22 @@
     casque: { kind: 'equip', name: 'Casque de sécurité', icon: '⛑️' },
     convention: { kind: 'paper', name: d => d.signee ? 'Convention SIGNÉE' : 'Convention (à faire signer)', icon: '📝' },
     find: { name: d => ML.FINDS[d.k].name, icon: '⭐' },
-    colis: { bulky: d => d.sz !== 's', name: d => `Colis fournisseurs (${d.n || '?'} articles)`, icon: '📦', hint: 'R : ouvrir (tout tombe par terre), puis range les produits' }
+    colis: { bulky: d => d.sz !== 's', name: d => `Colis fournisseurs (${d.n || '?'} articles)`, icon: '📦', hint: 'R : ouvrir (tout tombe par terre), puis range les produits' },
+    // --- V5.2 ---
+    kit: { kind: 'kit', name: d => `KIT #${d.oid} (brut ${M[d.mat] ? M[d.mat].label : '?'} + ${T[d.tool] ? T[d.tool].label.toLowerCase() : 'outil'})`, icon: '🧰', hint: 'E sur la bonne machine : brut ET outil d\'un coup' },
+    meuleuse: { kind: 'equip', name: 'Meuleuse « casse-radar »', icon: '🪚', hint: 'E sur un radar pour le découper (gare aux témoins !)' },
+    carton: { bulky: true, name: d => `Carton pour ${d.to || '?'}`, icon: '📦', hint: 'À livrer : suis le repère (carte M)' },
+    cles_trit: { name: 'Clés de Trit', icon: '🔑', hint: 'À déposer à l\'appartement de Trit (repère sur la carte)' },
+    kebab: { kind: 'food', name: 'Kebab sauce blanche', icon: '🌯', hint: 'R : manger' },
+    barre: { kind: 'food', name: 'Barre chocolatée', icon: '🍫', hint: 'R : manger' },
+    baguette: { kind: 'food', name: 'Baguette', icon: '🥖', hint: 'R : manger · clic gauche : frapper' },
+    poisson: { kind: 'weapon', name: 'Poisson en caoutchouc', icon: '🐟', hint: 'Clic gauche : baffe « COUIC »' },
+    batte: { kind: 'weapon', name: 'Batte en mousse', icon: '🏏', hint: 'Clic gauche : frappe de loin' },
+    gants: { kind: 'weapon', name: 'Gants de boxe', icon: '🥊', hint: 'Clic gauche : crochet du gauche' }
   };
+  /** V5.2 : objet qui sert d'arme (clic gauche) → { reach, stun, push } ou null */
+  I.weapon = it => (it && ML.MALL[it.type] && ML.MALL[it.type].weapon) || null;
+  I.food = it => (it && ML.MALL[it.type] && ML.MALL[it.type].eat) || null;
   I.def = it => I.TYPES[it.type];
   I.name = it => { const n = I.def(it).name; return typeof n === 'function' ? n(it.d || {}) : n; };
   I.icon = it => I.def(it).icon;
@@ -73,6 +87,24 @@
       case 'casque': { const m = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), U.mat(0xf1c40f)); g.add(m); break; }
       case 'convention': U.box(0.34, 0.012, 0.24, 0xffffff, 0, 0.01, 0, g); U.box(0.08, 0.016, 0.04, d.signee ? 0x27ae60 : 0xc0392b, 0.1, 0.012, 0.08, g); break;
       case 'viennoiseries': U.box(0.24, 0.3, 0.15, 0xc8a165, 0, 0.15, 0, g); U.box(0.12, 0.08, 0.1, 0xe1a95f, 0, 0.32, 0, g); break;
+      // --- V5.2 ---
+      case 'kit': {                                                                    // bac bleu : barre + outil
+        U.box(0.62, 0.12, 0.34, 0x2e86de, 0, 0.06, 0, g); U.box(0.6, 0.02, 0.32, 0x1b4f8a, 0, 0.125, 0, g);
+        const b = U.cyl(0.07, 0.07, 0.55, (M[d.mat] || M.acier).color, -0.04, 0.17, -0.05, g, 10); b.rotation.z = Math.PI / 2;
+        U.box(0.12, 0.06, 0.1, (T[d.tool] || T.plaquette).color, 0.18, 0.17, 0.09, g);
+        if (!opts.noLabel) { const l = U.label(`🧰 KIT #${d.oid}`, { size: 0.22, fontSize: 40, color: '#9fd0ff' }); l.position.y = 0.6; g.add(l); }
+        break;
+      }
+      case 'meuleuse': U.cyl(0.05, 0.05, 0.32, 0x2c3e50, 0, 0.05, 0, g, 8).rotation.z = Math.PI / 2; U.cyl(0.11, 0.11, 0.015, 0xbdc3c7, 0.16, 0.08, 0, g, 16); U.box(0.08, 0.06, 0.1, 0xe67e22, -0.05, 0.1, 0, g); break;
+      case 'carton': { const b = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.55, 0.55), U.mat(0xc69c6d)); b.position.y = 0.28; b.castShadow = true; g.add(b); U.box(0.71, 0.05, 0.1, 0xe8d3a6, 0, 0.56, 0, g);
+        if (!opts.noLabel) { const l = U.label(`📦 → ${d.to || '?'}`, { size: 0.22, fontSize: 40, color: '#ffd257' }); l.position.y = 0.95; g.add(l); } break; }
+      case 'cles_trit': U.cyl(0.04, 0.04, 0.01, 0xd4af37, 0, 0.01, 0, g, 10); U.box(0.12, 0.01, 0.025, 0xbdc3c7, 0.07, 0.01, 0, g); U.box(0.07, 0.03, 0.05, 0xd35400, -0.06, 0.02, 0, g); break;
+      case 'kebab': U.cyl(0.06, 0.07, 0.24, 0xe1c699, 0, 0.12, 0, g, 10); U.cyl(0.075, 0.075, 0.08, 0xffffff, 0, 0.05, 0, g, 10); U.box(0.09, 0.05, 0.09, 0x8b4513, 0, 0.25, 0, g); break;
+      case 'barre': U.box(0.18, 0.03, 0.06, 0x6d3b1f, 0, 0.02, 0, g); U.box(0.08, 0.032, 0.062, 0xc0392b, 0.06, 0.02, 0, g); break;
+      case 'baguette': U.cyl(0.04, 0.035, 0.7, 0xd9a35f, 0, 0.04, 0, g, 8).rotation.z = Math.PI / 2; break;
+      case 'poisson': { const b = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), U.mat(0xf39c12)); b.scale.set(2.2, 0.8, 0.6); b.position.y = 0.08; g.add(b); const t2 = U.box(0.12, 0.14, 0.03, 0xe67e22, -0.27, 0.08, 0, g); t2.rotation.z = 0.6; U.box(0.03, 0.03, 0.03, 0x111111, 0.15, 0.11, 0.04, g); break; }
+      case 'batte': U.cyl(0.05, 0.03, 0.75, 0xff6b81, 0, 0.05, 0, g, 10).rotation.z = Math.PI / 2; U.cyl(0.032, 0.032, 0.16, 0x2c3e50, -0.42, 0.05, 0, g, 8).rotation.z = Math.PI / 2; break;
+      case 'gants': for (const s2 of [-0.09, 0.09]) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), U.mat(0xc0392b)); b.scale.set(1, 0.9, 1.3); b.position.set(s2, 0.09, 0); g.add(b); U.box(0.1, 0.06, 0.08, 0xffffff, s2, 0.04, -0.12, g); } break;
       case 'find': {
         const f = ML.FINDS[d.k];
         const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.22), new THREE.MeshLambertMaterial({ color: f.color, emissive: f.color, emissiveIntensity: 0.5 }));

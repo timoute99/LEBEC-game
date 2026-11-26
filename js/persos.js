@@ -880,6 +880,113 @@ infraction:
 - Je note : non-respect du règlement.
 - Inacceptable. Je l'écris en rouge.
 - Ça, c'est un point en moins. Au moins.
+
+
+# ======================= V5.2 : NOUVEAUX PERSONNAGES =======================
+#  Personnalise-les (nom, répliques…) : ils ont des répliques de base.
+
+[johan]
+nom: Johan Bois
+rôle: Voleur de commandes
+personnalité: Rôde autour de l'atelier et pique les caisses PRÊTES (zone expédition).
+dans le jeu: Une claque lui fait lâcher la caisse. Le vigile (abonnement au PC) le refoule à l'entrée.
+idées:
+répliques:
+- Elle est à qui cette caisse ? À moi maintenant.
+- Je passais par là… par hasard.
+- Hop, emballé, c'est pesé !
+refoule:
+- Bon, bon… je repasserai.
+
+[vigile]
+nom: Raymond
+rôle: Vigile anti-Johan Bois
+personnalité: Grand, calme, lunettes de soleil même sous la pluie.
+dans le jeu: Garde la porte de l'atelier (abonnement au PC de gestion).
+idées:
+répliques:
+- Pas de Johan ici.
+- Badge ?
+- Je surveille. Je surveille toujours.
+refoule:
+- Toi, Johan, tu fais demi-tour.
+
+[bleuenn]
+nom: Bleuenn
+rôle: Bricoleuse explosive
+personnalité: Arrive avec une rallonge et un appareil bizarre, le branche sur le tableau électrique… et tout saute.
+dans le jeu: BOUM : plus de courant, toutes les machines en arrêt d'urgence (E sur chacune). Une claque avant le branchement l'arrête.
+idées:
+répliques:
+- T'inquiète, je sais ce que je fais !
+- Juste un petit branchement…
+- C'était pas prévu, ça.
+boum:
+- C'était pas prévu, ça.
+- Oups.
+
+[garnier]
+nom: Garnier
+rôle: Jury de SAE (prof)
+personnalité: (à compléter)
+dans le jeu: Jury de SAE avec Fanfrelat : on lui présente les pièces au marbre.
+idées:
+répliques:
+- Montrez-moi vos pièces.
+- La démarche compte autant que le résultat.
+- Et la cotation fonctionnelle ?
+
+[fanfrelat]
+nom: Fanfrelat
+rôle: Jury de SAE (prof)
+personnalité: (à compléter)
+dans le jeu: Jury de SAE avec Garnier : on lui présente les pièces au marbre.
+idées:
+répliques:
+- Le dossier est où ?
+- Justifiez vos choix d'outils.
+- C'est intéressant… mais pourquoi ?
+
+[cardin]
+nom: Cardin
+rôle: Un pote de l'atelier
+personnalité: (à compléter)
+dans le jeu: Habite la « Maison de Cardin » en ville. Vient parfois demander un service (quête).
+idées:
+répliques:
+- Salut ! Tu passes à la maison ?
+- T'as deux minutes ?
+
+[kawa]
+nom: Jimmy Kawa
+rôle: Un pote de l'atelier
+personnalité: (à compléter)
+dans le jeu: Habite la « Maison de Jimmy Kawa » en ville. Vient parfois demander un service (quête).
+idées:
+répliques:
+- Yo ! Ça usine ?
+- Je passe en coup de vent.
+
+[vendeuse]
+nom: Sandra
+rôle: Caissière — Centre commercial
+personnalité: Connaît tous les clients par leur prénom.
+dans le jeu: Centre commercial Les Copeaux (snack, farces & attrapes, boxe).
+idées:
+répliques:
+- Bonjour, vous avez la carte de fidélité ?
+- C'est pour offrir ?
+
+[coach]
+nom: Coach Bruno
+rôle: Salle de sport Le Biceps
+personnalité: Motivé à 200 %, sifflet autour du cou.
+dans le jeu: Le tapis de course augmente ton endurance (gardée dans ton profil).
+idées:
+répliques:
+- Allez, encore un kilomètre !
+- On lâche rien !
+- L'endurance, ça se travaille.
 `;
 
 /* ======================= NE PAS MODIFIER EN DESSOUS (lecture du texte) ======================= */

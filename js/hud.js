@@ -57,6 +57,15 @@
     H.el.pause.classList.toggle('hidden', !b);
   };
 
+  /** V5.2 : CADRE D'ASTUCES quand un événement spécial commence (que faire ?) */
+  H.evTip = k => {
+    const T = ML.EVTIPS[k]; if (!T || !H.el) return;
+    const now = performance.now(); H._tips = H._tips || {}; if (H._tips[k] && now - H._tips[k] < 25000) return; H._tips[k] = now;
+    let el = document.getElementById('evtip'); if (!el) { el = document.createElement('div'); el.id = 'evtip'; document.getElementById('hud').appendChild(el); }
+    el.innerHTML = `<div class="et-h">💡 ${U.esc(T[0])}</div><ol>${T[1].map(x => `<li>${U.esc(x)}</li>`).join('')}</ol><div class="et-bar"><i></i></div>`;
+    el.classList.remove('hidden'); el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+    clearTimeout(H._et); H._et = setTimeout(() => el.classList.add('hidden'), 16000);
+  };
   /** Carte de début de journée : mode, humeur de Lebec, météo */
   H.dayCard = S => {
     const Hm = ML.HUMEURS[S.humeur], W = ML.WEATHER[S.weather];
@@ -66,6 +75,7 @@
     H.el.daycard.innerHTML = `<div class="dc-mode">${U.esc(mode)} · ${Dd.icon} ${U.esc(Dd.name)}</div>${DT && S.mode !== 'course' ? `<div class="dc-t">${DT.icon} <b>${U.esc(DT.name)}</b> — ${U.esc(DT.desc)}</div>` : ''}<div class="dc-h">😤 ${U.esc(Hm.name)}</div><div class="dim">${U.esc(Hm.desc)}</div><div class="dc-w">${W.icon} ${U.esc(W.name)} <span class="dim">(la météo change pendant la journée)</span></div>` +
       (S.mode === 'inspection' ? '<div class="dc-x">Respecte ses règles absurdes (elles changent !). 5 infractions = échec.</div>' : S.mode === 'course' ? '<div class="dc-x">5 manches : le premier arrivé EN VOITURE devant l\'entreprise indiquée gagne.</div>' : '') +
       (S.traitorMode ? '<div class="dc-x">🕵 Un traître se cache parmi vous…</div>' : '') +
+      (S.black && S.mode !== 'course' ? '<div class="dc-x">🛍 <b>BLACK FRIDAY</b> : tout est moins cher aujourd\'hui (PC, garage, centre commercial) !</div>' : '') +
       (S.mode !== 'course' ? `<div class="dc-x">💶 ${S.money.toLocaleString('fr-FR')} € en caisse · les demandes des clients arrivent au 💻 PC de gestion (bureau)</div>` : '');
     H.el.daycard.classList.remove('hidden'); clearTimeout(H._dc); H._dc = setTimeout(() => H.el.daycard.classList.add('hidden'), 7500);
   };
@@ -73,7 +83,7 @@
   /* ---------- Mise à jour ---------- */
   H.update = dt => {
     const G = ML.Game, S = G.S, p = G.p;
-    H.el.stamina.style.width = (100 * p.stamina / ML.CFG.PLAYER.stamina) + '%';
+    H.el.stamina.style.width = Math.max(0, Math.min(100, 100 * p.stamina / G.staminaMax())) + '%';
     const me = S && S.pl[G.me];
     if (me) {
       H.el.hp.style.width = me.hp + '%'; H.el.hp.style.background = me.hp < 30 ? '#e74c3c' : me.hp < 60 ? '#f39c12' : '#3ecf6e';
@@ -133,17 +143,38 @@
     if (st === 'tth') return o.q ? 'au four...' : 'caisse → TTH Ouest';
     return o.client === 'part' ? `rapporter au COMPTOIR (${ML.PEOPLE[o.who].name})` : `livrer à ${ML.COMPANIES[o.client].name}`;
   }
+  /** V5.2 : où en est la commande (barre d'avancement) et qui s'en occupe */
+  function progress(o, S) {
+    const st = o.steps[o.si], M = o.m && S.machines[o.m], G = ML.Game;
+    let holder = null, where = null;
+    for (const pid in S.pl) if (S.pl[pid].inv.some(x => x && x.d && x.d.oid === o.id)) holder = S.pl[pid];
+    for (const c of S.cars || []) if ((c.bed || []).some(x => x.d && x.d.oid === o.id)) where = c;
+    const kit = (S.items || []).some(it => it[1] === 'kit' && it[2] && it[2].oid === o.id);
+    let pct = 0, txt = '';
+    if (st === 'usinage') {
+      if (M && M.job && M.job.oid === o.id) {
+        const p2 = M.job.tool ? Math.floor(100 * M.job.prog / M.job.total) : 0, op = M.op ? ML.PEOPLE[M.op].name.split(' ')[0] : '?';
+        pct = 25 + p2 * 0.55; txt = M.status === 'run' ? `🛠 ${o.m} (${op}) : ${p2} %` : M.job.tool ? `⏸ ${o.m} à l'arrêt (${{ off: 'courant', panne: 'panne', bac: 'bac plein', arret: 'arrêt d\'urgence', stop: op + ' absent' }[M.status] || M.status})` : `🧰 ${o.m} attend : ${ML.TOOLS[M.job.need].label}`;
+      } else { pct = holder || kit ? 12 : 4; txt = holder ? `🤲 ${holder.name} apporte le brut` : kit ? '🧰 kit prêt (poste de prépa)' : o.src ? '🧱 brut prêt → machine' : `🔩 brut ${ML.MATERIALS[o.mat].label} → ${ML.MTYPE[o.mtype]}`; }
+    } else if (st === 'fonderie' || st === 'chaudro') { pct = o.q ? 12 : 3; txt = o.q ? '🧱 brut en route…' : `🧱 brut : PC ou ${ML.COMPANIES[st].name.split(' ')[0]}`; }
+    else if (st === 'tth') { pct = o.q ? 85 : 80; txt = o.q ? '♨️ au four…' : holder ? `🤲 ${holder.name} → TTH Ouest` : '♨️ caisse → TTH Ouest'; }
+    else { pct = holder || where ? 92 : 82; txt = holder ? `🤲 ${holder.name} la livre` : where ? `🚚 dans ${where.name}${where.dr && S.pl[where.dr] ? ' (' + S.pl[where.dr].name + ')' : ''}` : o.client === 'part' ? `📦 prête → COMPTOIR (${ML.PEOPLE[o.who].name})` : o.client === 'sae' ? '📦 prête → JURY au marbre' : `📦 prête → ${ML.COMPANIES[o.client].name}`; }
+    const who = holder ? holder : o.by ? { name: o.by, idx: o.byI } : null;
+    return { pct, txt, who };
+  }
   H.renderTickets = S => {
     const html = S.mode === 'course' ? '' : S.orders.slice().sort((a, b) => a.dl - b.dl).map(o => {
-      const left = Math.max(0, o.dl - S.rt), frac = left / o.dur, C = ML.COMPANIES[o.client], st = o.steps[o.si];
+      const left = Math.max(0, o.dl - S.rt), frac = left / o.dur, C = ML.COMPANIES[o.client], st = o.steps[o.si], pr = progress(o, S);
       const col = frac > 0.5 ? '#3ecf6e' : frac > 0.25 ? '#f39c12' : '#e74c3c';
       const steps = o.steps.map((s, i) => `<span class="${i < o.si ? 'done' : i === o.si ? 'cur' : ''}">${STEP_ICON[s]}</span>`).join('<i>›</i>');
       return `<div class="ticket ${frac < 0.25 ? 'urgent' : ''}" style="--c:#${new THREE.Color(C.roof).getHexString()}">
         <div class="tk-head"><b>#${o.id}</b> ${U.esc(o.client === 'part' ? '🙋 ' + ML.PEOPLE[o.who].name : C.name)}<span>${Math.ceil(left)} s</span></div>
-        <div class="tk-part">${U.esc(o.part)} <span class="tk-price">${o.price} €</span>${o.plan && !o.m ? ` <span class="tk-plan">→ ${o.plan}</span>` : ''}</div>
+        <div class="tk-part">${U.esc(o.part)} <span class="tk-price">${o.client === 'sae' ? '🎓 SAE' : o.price + ' €'}</span>${o.plan && !o.m ? ` <span class="tk-plan">→ ${o.plan}</span>` : ''}</div>
         <div class="tk-chips"><span style="background:${ML.MATERIALS[o.mat].css};color:#111">${ML.MATERIALS[o.mat].label}</span><span>${ML.MTYPE[o.mtype]}</span><span style="background:${ML.TOOLS[o.tool].css};color:#111">${ML.TOOLS[o.tool].label}</span></div>
         <div class="tk-steps">${steps}</div>
-        <div class="tk-now">${U.esc(stepState(o, st))}</div>
+        <div class="tk-now">${U.esc(pr.txt)}</div>
+        <div class="tk-prog" title="avancement"><i style="width:${pr.pct.toFixed(0)}%"></i></div>
+        <div class="tk-who">${pr.who ? `<i style="background:${ML.COLORS[(pr.who.idx || 0) % 6].css}"></i>👷 ${U.esc(pr.who.name)}` : '<span class="dim">👷 personne pour l\'instant</span>'}</div>
         <div class="tk-bar"><i style="width:${(frac * 100).toFixed(1)}%;background:${col}"></i></div></div>`;
     }).join('') || (S.mode === 'course' ? '' : `<div class="ticket empty">${(S.props || []).length ? '📥 Des demandes attendent au PC de gestion : accepte-les !' : 'Pas de commande pour l\'instant…'}</div>`);
     if (html !== H._tk) { H.el.tickets.innerHTML = html; H._tk = html; }
@@ -162,7 +193,7 @@
   /** Bandeau : événements en cours, courant, règle de l'inspecteur */
   H.renderEvents = S => {
     const out = [], left = e => (e.until && e.until - S.rt < 900 ? ` <b>${Math.max(0, Math.ceil(e.until - S.rt))} s</b>` : '');
-    const T = { audit: '🔍 Audit : une caisse au MARBRE', herve: '📝 Hervé bloque l\'armoire : convention signée !', fred: '💼 Fred : remplis Arexis (PC)', mathieu: '🐌 Mathieu bavarde avec un opérateur', sabotage: '🕶 Saboteur dans l\'atelier !', coupure: '⚡ Coupure : tableau électrique' };
+    const T = { johan: '🦹 Johan Bois rôde : protège les caisses prêtes !', bleuenn: '💥 Après l\'explosion : E sur chaque machine', wc: `🚽 Toilettes sales (${Math.round(S.wc || 0)} %) : à nettoyer`, audit: '🔍 Audit : une caisse au MARBRE', herve: '📝 Hervé bloque l\'armoire : convention signée !', fred: '💼 Fred : remplis Arexis (PC)', mathieu: '🐌 Mathieu bavarde avec un opérateur', sabotage: '🕶 Saboteur dans l\'atelier !', coupure: '⚡ Coupure : tableau électrique' };
     for (const k in S.evs || {}) out.push(`<span class="ev">${T[k] || k}${left(S.evs[k])}</span>`);
     if ((S.fires || []).length) out.push(`<span class="ev hot">🔥 Feu sur ${S.fires.map(f => f.mid).join(', ')}</span>`);
     for (const id in S.machines) if (S.machines[id].broken) out.push(`<span class="ev">🔧 ${id} en panne</span>`);
@@ -170,6 +201,15 @@
     for (const d of (S.deliv || []).slice(0, 3)) out.push(`<span class="ev info">🚚 ${U.esc(d.name)} : ${Math.max(0, Math.ceil(d.eta - S.rt))} s</span>`);
     if (S.tour) out.push(`<span class="ev info">🚚 Jojo en tournée (${S.tour.n} colis) : ${Math.max(0, Math.ceil(S.tour.end - S.rt))} s</span>`);
     for (const p of (S.parts || [])) if (p.st === 'wait') out.push(`<span class="ev part">🙋 Client au COMPTOIR : ${Math.max(0, Math.ceil(p.exp - S.rt))} s</span>`);
+    // V5.2 : service (quête), SAE, arrêts d'urgence, Black Friday
+    const Q = S.quest;
+    if (Q && Q.st === 'ask') out.push(`<span class="ev part">🙋 ${U.esc(Q.who)} demande un service à l'entrée (${Q.reward} €)</span>`);
+    if (Q && Q.st === 'go') out.push(`<span class="ev quest">🙋 Service pour ${U.esc(Q.who)} : ${Q.need ? 'apporter ' + ML.Items.TYPES[Q.need].icon : Q.carry ? 'livrer ' + ML.Items.TYPES[Q.carry].icon : ''} → ${U.esc(Q.at.name)} <b>${Math.max(0, Math.ceil(Q.until - S.rt))} s</b></span>`);
+    const A = S.sae;
+    if (A && A.st === 'prod') out.push(`<span class="ev sae">🎓 ${U.esc(A.code)} : ${A.oids.length} × ${U.esc(A.part)} · jury vers ${ML.Sim.K.clockAt ? ML.Sim.K.clockAt(A.jury) : ''}</span>`);
+    if (A && A.st === 'jury') out.push(`<span class="ev sae">🎓 JURY au marbre : ${A.got.length}/${A.oids.length} pièces <b>${Math.max(0, Math.ceil(A.end - S.rt))} s</b></span>`);
+    const stopped = Object.keys(S.machines).filter(id => S.machines[id].stopped); if (stopped.length) out.push(`<span class="ev hot">⏹ Arrêt d'urgence : ${stopped.join(', ')} (E pour redémarrer)</span>`);
+    if (S.black && S.mode !== 'course') out.push('<span class="ev black">🛍 BLACK FRIDAY</span>');
     const html = out.join('');
     if (html !== H._ev) { H.el.evbar.innerHTML = html; H._ev = html; }
   };

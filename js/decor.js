@@ -411,6 +411,13 @@
   D.building = f => {
     const r = rng();
     if (f.espacil) { f.style = 'espacil'; espacil(frame(f.x, f.z, f.rot), f); return true; }
+    if (f.lieu && ML.LIEUX[f.lieu]) {                                     // V5.2 : maison / appartement d'un copain, avec son nom
+      const L = ML.LIEUX[f.lieu], F = frame(f.x, f.z, f.rot); f.style = L.style;
+      if (L.style === 'immeuble') flats(F); else house(F);
+      const p = F.L(2.6, 5.62); sign(L.name, L.style === 'immeuble' ? 'interphone : sonnez fort' : 'propriété privée', L.color, '#ffffff', 4.4, 1.1, p.x, 1.9, p.z, F.a, { border: '#ffffff', glow: true });
+      F.box(0.12, 1.9, 0.12, 0.5, 0.95, 5.55, 0x555555); F.box(0.12, 1.9, 0.12, 4.7, 0.95, 5.55, 0x555555);
+      return true;
+    }
     if (r < 0.32) return false;
     const F = frame(f.x, f.z, f.rot);
     f.style = r < 0.55 ? 'maison' : r < 0.78 ? 'boutique' : 'immeuble';

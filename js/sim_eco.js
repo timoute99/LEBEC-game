@@ -33,7 +33,7 @@
   /** Commande « automatique » d'un lot (Sylvie) : rangée directement en stock à l'arrivée */
   K.supplyOrder = (pid, k, n, who) => {
     const L = ML.SUPPLY[k]; if (!L) return false;
-    const q = L.lot * U.clamp(n | 0, 1, 5), price = L.price * q + ECO.fee;
+    const q = L.lot * U.clamp(n | 0, 1, 5), price = K.price(L.price, 'supply') * q + ECO.fee;
     if (!K.spend(pid, price, 'achat', L.name)) return false;
     const d = ECO.supplierDelay, eta = S.rt + d[0] + rng() * (d[1] - d[0]);
     S.deliv.push({ id: S.nextId++, k, q, eta, from: L.from, name: `${L.name} ×${q}` });
@@ -43,7 +43,7 @@
   /** Commande du panier du PC : tout arrive dans UN colis en réception */
   K.cartOrder = (pid, cart) => {
     const c = {}; let units = 0, price = 0;
-    for (const k in ML.SUPPLY) { const q = U.clamp((cart && cart[k]) | 0, 0, ML.CART_MAX); if (q) { c[k] = q; units += q; price += q * ML.SUPPLY[k].price; } }
+    for (const k in ML.SUPPLY) { const q = U.clamp((cart && cart[k]) | 0, 0, ML.CART_MAX); if (q) { c[k] = q; units += q; price += q * K.price(ML.SUPPLY[k].price, 'supply'); } }
     if (!units) return false;
     if (units > ML.CART_MAX) { K.note(pid, `Un colis contient au plus ${ML.CART_MAX} articles.`, 'warn'); return false; }
     price += ECO.fee;
@@ -60,6 +60,11 @@
     return (S.up[k] || 0) >= (it.max || 1);
   };
   K.isCatOwned = isCatOwned;
+  /** V5.2 : prix d'un article du catalogue (Black Friday, bon de SAE sur une machine) */
+  K.catPrice = k => { const it = ML.CATALOG[k]; let p = K.price(it.price, 'cat'); if (it.mach && S.saeBon) p = Math.round(p * (1 - S.saeBon / 100)); return p; };
+  /** V5.2 : jours (fractionnaires) avant le déblocage d'un article à jour minimum, et supplément pour l'avoir tout de suite */
+  K.daysLeft = it => Math.max(0, (it.day || 0) - (S.co.day || S.day) - S.rt / C.SHIFT_SEC);
+  K.earlyFee = it => Math.round(Math.max(ML.EARLY.min, ML.EARLY.perDay * K.daysLeft(it)) / 10) * 10;
 
   /* ---------- Personnel ---------- */
   function opArrive(id) {
@@ -94,24 +99,29 @@
         const k = String(m.k), it = ML.CATALOG[k]; if (!it) return;
         if (isCatOwned(k)) return K.note(pid, `${it.name} : déjà acheté.`, 'warn');
         if (it.need && !S.up[it.need]) return K.note(pid, `Il faut d'abord : ${ML.CATALOG[it.need].name}.`, 'warn');
-        if (it.day && (S.co.day || S.day) < it.day) return K.note(pid, `${it.name} : se débloque au jour ${it.day}.`, 'warn');
+        const early = it.day && (S.co.day || S.day) < it.day;
+        if (early && !m.early) return K.note(pid, `${it.name} : se débloque au jour ${it.day} (ou tout de suite, plus cher : bouton « Débloquer maintenant »).`, 'warn');
         if (it.mach && ML.MACHINES.find(x => x.id === it.mach).ext && !S.ext) return K.note(pid, `${it.name} : l'extension sera construite cette nuit, achète la machine demain !`, 'warn');
-        if (!K.spend(pid, it.price, 'invest', it.name)) return;
+        const fee = early ? K.earlyFee(it) : 0, price = K.catPrice(k) + fee;
+        if (!K.spend(pid, price, 'invest', it.name + (early ? ' (déblocage anticipé)' : '') + (S.black ? ' — Black Friday' : ''))) return;
+        if (it.mach && S.saeBon) { K.all(`🎓 Bon de SAE utilisé : −${S.saeBon} % sur ${it.name} !`, 'good'); S.saeBon = 0; S.up.sae_bon = 0; delete S.up.sae_bon; }
+        if (early) K.all(`🔓 ${name(pid)} a débloqué « ${it.name} » en avance (supplément ${fee} €).`, 'good');
         if (it.mach) {
           S.machines[it.mach] = { status: 'idle', job: null, op: null, wear: 0, broken: false, plan: null, bin: true, chips: 0 };
           ML.World.syncMachines(S); K.assignOps();
           const def = ML.MACHINES.find(x => x.id === it.mach);
           K.big(`🏭 ${it.mach} installée !`, '#ffd257'); K.sfx('success', def.x, def.z);
-          K.all(`🏭 ${name(pid)} a acheté ${it.name} (${it.price} €). ${S.staff.filter(id => ML.PEOPLE[id].op).length < Object.keys(S.machines).length ? 'Pas assez d\'opérateurs : ils vont jongler (ou embauche au PC, onglet RH).' : ''}`, 'good');
+          K.all(`🏭 ${name(pid)} a acheté ${it.name} (${price} €). ${S.staff.filter(id => ML.PEOPLE[id].op).length < Object.keys(S.machines).length ? 'Pas assez d\'opérateurs : ils vont jongler (ou embauche au PC, onglet RH).' : ''}`, 'good');
         } else if (it.veh) {
           S.owned.push(it.veh);
           const p = it.veh === 'tp' ? ML.LOC.tpSpawn : ML.LOC.fenSpawn;
           K.addCar(it.veh, { x: p.x, z: p.z, h: p.h });
-          K.all(`🚜 ${name(pid)} a acheté : ${it.name} (${it.price} €). Il attend ${it.veh === 'tp' ? 'dans l\'atelier' : 'devant le quai gros colis'}.`, 'good');
+          K.all(`🚜 ${name(pid)} a acheté : ${it.name} (${price} €). Il attend ${it.veh === 'tp' ? 'dans l\'atelier' : 'devant le quai gros colis'}.`, 'good');
         } else {
           S.up[k] = (S.up[k] || 0) + 1;
           if (k === 'frigo') npcs.matis.hunger = -999;
-          K.all(`🛠 ${name(pid)} a acheté : ${it.name} (${it.price} €)${it.now ? '' : ' — installé demain matin'}.`, 'good');
+          if (K.onBuy) K.onBuy(k, pid);                                  // V5.2 : meuleuse, vigile, poste de préparation…
+          K.all(`🛠 ${name(pid)} a acheté : ${it.name} (${price} €)${it.now ? '' : ' — installé demain matin'}.`, 'good');
         }
         K.sfx('cash'); Sim.dirty = true; return;
       }
@@ -193,7 +203,7 @@
   }
 
   /* ---------- Personnel IA ---------- */
-  const deliverable = it => { if (!K.isPart(it) && it.type !== 'palette') return null; const o = S.orders.find(x => x.id === it.d.oid); return o && o.client !== 'part' && (K.stage(o) === 'livraison' || K.stage(o) === 'tth') ? o : null; };
+  const deliverable = it => { if (!K.isPart(it) && it.type !== 'palette') return null; const o = S.orders.find(x => x.id === it.d.oid); return o && o.client !== 'part' && o.client !== 'sae' && (K.stage(o) === 'livraison' || K.stage(o) === 'tth') ? o : null; };
   const atHomeZone = o => (Math.abs(o.x) < 34 && o.z > -15 && o.z < 32);
   function tonyStep(dt) {
     if (!S.ai.cariste) return;
@@ -297,13 +307,14 @@
         const k = String(m.k), D = ML.DEALER[k], n = npcs.vendeur; if (!D || !n || !n.active) return true;
         if (!K.near(ps, n.x, n.z, 9) && !K.near(ps, n.x, n.z, 26)) return true;           // V5 : on achète aussi depuis le showroom
         if (S.owned.includes(k)) { K.say(n, 'Vous l\'avez déjà, celle-là !'); return true; }
-        if (!K.spend(pid, D.price, 'invest', D.name)) { K.say(n, 'Revenez avec des sous, jeune homme.'); return true; }
+        const dp = K.price(D.price, 'dealer');
+        if (!K.spend(pid, dp, 'invest', D.name + (S.black ? ' — Black Friday' : ''))) { K.say(n, 'Revenez avec des sous, jeune homme.'); return true; }
         S.owned.push(k); const L = ML.LOC.comp.concession, h = Math.atan2(L.tan.x, L.tan.z);
         let spot = null;                                // une place libre devant le garage (pas deux voitures au même endroit)
         for (const off of [5, 10, 0, -5, 15, -10]) { const x = L.dock.x + L.tan.x * off + L.dir.x * 3, z = L.dock.z + L.tan.z * off + L.dir.z * 3; if (!S.cars.some(c => Math.hypot(c.x - x, c.z - z) < 4.5) && !U.inCollider(x, z, 1.2)) { spot = { x, z, h }; break; } }
         K.addCar(k, spot || { x: L.dock.x + L.dir.x * 3, z: L.dock.z + L.dir.z * 3, h });
         K.say(n, `Félicitations ! ${D.name}, les clés sont dessus !`, true); K.big(`🚗 ${D.name} achetée !`, '#ffd257'); K.sfx('cash');
-        K.all(`🚗 ${name(pid)} a acheté : ${D.name} (${D.price} €) au Garage Pasquier. Le véhicule attend devant le garage : allez le chercher !`, 'good');
+        K.all(`🚗 ${name(pid)} a acheté : ${D.name} (${dp} €) au Garage Pasquier. Le véhicule attend devant le garage : allez le chercher !`, 'good');
         return true;
       }
     }

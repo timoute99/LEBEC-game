@@ -350,6 +350,13 @@
     });
     city.riverDist = rDist; city.RIV = RIV;
     city.RW = RW;
+    /* V5.2 : maisons des copains (Cardin, Trit, Jimmy Kawa) : des maisons de la ville portent leur nom (tirage à part, le reste de la ville ne change pas) */
+    const r2 = ML.U.rng((seed * 31 + 977) >>> 0), pool2 = city.fillers.filter(f => !f.espacil && Math.hypot(f.x, f.z) > 55);
+    for (const k of Object.keys(ML.LIEUX || {})) {
+      let best = null, bs = -1;
+      for (const f of pool2) { if (f.lieu) continue; const sep = city.fillers.filter(o => o.lieu).reduce((m2, o) => Math.min(m2, Math.hypot(o.x - f.x, o.z - f.z)), 400); const sc = Math.min(sep, 150) + r2() * 70; if (sc > bs) { bs = sc; best = f; } }
+      if (best) best.lieu = k;
+    }
     return city;
   };
 })();
