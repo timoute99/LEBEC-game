@@ -40,7 +40,7 @@
   /* ---------- Vie ---------- */
   K.damage = (pid, amt, why) => {
     const P = S.pl[pid]; if (!P || P.ko || amt <= 0) return;
-    amt = Math.round(amt * K.D.dmg); P.hp = Math.max(0, P.hp - amt); Sim.dirty = true;
+    P.hp = Math.max(0, P.hp - amt); Sim.dirty = true;
     K.ev({ e: 'hurt', to: pid, hp: P.hp, why });
     if (P.hp <= 0) {
       P.ko = true; K.koT[pid] = S.rt; K.dropAll(pid, 2);
@@ -93,27 +93,27 @@
   function sylvieStep(dt) {
     if (K.hasRole('magasinier')) return;
     for (const k of ['acier', 'alu', 'inox', 'plaquette', 'fraise', 'foret']) {
-      if (S.stock[k] > 0 || S.deliv.some(d => d.k === k)) { delete K.stockT[k]; continue; }
+      if (S.stock[k] > 0) { delete K.stockT[k]; continue; }
       K.stockT[k] = K.stockT[k] || S.rt;
-      if (S.rt - K.stockT[k] > 40) {                       // Sylvie (agence) passe commande… au prix normal, livrée par camion
-        delete K.stockT[k];
-        if (!K.supplyOrder(null, k, 1, 'Sylvie (agence)')) { K.stockT[k] = S.rt; K.all(`📦 Sylvie voudrait recommander du ${ML.MATERIALS[k] ? ML.MATERIALS[k].label : ML.TOOLS[k].label}… mais la caisse est vide !`, 'warn'); }
+      if (S.rt - K.stockT[k] > 40) {
+        delete K.stockT[k]; S.stock[k] += 3; Sim.dirty = true;
+        K.all(`📦 Sylvie (agence) a fini par recommander : +3 ${ML.MATERIALS[k] ? ML.MATERIALS[k].label : ML.TOOLS[k].label}.`, 'good');
       }
     }
   }
   function momoStep(dt) {
     const cam = S.cars.find(c => c.kind === 'camion');
     // cariste absent : Momo charge les palettes du quai dans le camion
-    if (!K.hasRole('cariste') && !S.ai.cariste) for (const o of S.items) {
+    if (!K.hasRole('cariste')) for (const o of S.items) {
       if (o.type !== 'palette' || !o.rest) continue;
       K.momoT[o.id] = K.momoT[o.id] || S.rt;
-      if (S.rt - K.momoT[o.id] > 25 && cam && !cam.dr && K.bedFree(cam) >= 4 && Math.hypot(cam.x - o.x, cam.z - o.z) < 35) {
+      if (S.rt - K.momoT[o.id] > 25 && cam && !cam.dr && cam.bed.length < cam.cap && Math.hypot(cam.x - o.x, cam.z - o.z) < 35) {
         delete K.momoT[o.id]; cam.bed.push(K.strip(o)); K.removeItem(o);
         K.all(`🚜 Momo a chargé la palette #${o.d.oid} dans le camion (enfin).`, 'good');
       }
     }
     // livreur absent : Momo livre ce qu'il y a dans le camion
-    if (cam && !K.hasRole('livreur') && !S.ai.livreur && !cam.dr && cam.bed.length) {
+    if (cam && !K.hasRole('livreur') && !cam.dr && cam.bed.length) {
       cam.momo = cam.momo || S.rt;
       if (S.rt - cam.momo > 35) {
         cam.momo = 0;
@@ -121,7 +121,7 @@
           const o = S.orders.find(x => x.id === it.d.oid);
           if (!o || o.steps[o.si] !== 'livraison') continue;
           cam.bed.splice(cam.bed.indexOf(it), 1);
-          K.deliver(null, null, 0, Object.assign({}, it, { d: Object.assign({}, it.d, { npc: 0.6 }) }), o.client, npcs[COMP[o.client].npc]);
+          K.deliver(null, null, 0, Object.assign({}, it, { d: Object.assign({}, it.d, { npc: 1 }) }), o.client, npcs[COMP[o.client].npc]);
         }
         K.all('🚚 Momo est allé livrer avec le camion (−40 % : il prend son temps).', 'info'); Sim.dirty = true;
       }
@@ -169,7 +169,7 @@
         const P = S.pl[n.patient], tp = K.pose[n.patient];
         if (!P || !P.ko || !tp) { leave(n, 'Bon, plus personne à soigner ?'); return true; }
         n.t += dt; n.re = (n.re || 0) - dt;
-        if (Math.hypot(tp.x - n.x, tp.z - n.z) < 1.8) { K.heal(n.patient, 'le Docteur Gwenn'); leave(n, ML.line('docteur')); return true; }
+        if (Math.hypot(tp.x - n.x, tp.z - n.z) < 1.8) { K.heal(n.patient, 'le Docteur Gwenn'); leave(n, U.pick(ML.LINES.docteur)); return true; }
         if (n.re <= 0) { n.re = 1.5; K.walkTo(n, tp.x, tp.z); }
         if (n.t > 45 && Math.hypot(tp.x - n.x, tp.z - n.z) > 25) { n.x = tp.x + 4; n.z = tp.z + 4; U.resolveCircle(n, 0.3); n.t = 0; }
         return true;
@@ -177,7 +177,7 @@
       case 'gege': {
         if (n.state === 'fix') {
           n.t -= dt;
-          if (n.t <= 0) { const M = S.machines[n.job]; if (M) { M.broken = false; M.chips = 0; M.bin = true; } delete K.issueT[n.job]; K.all(`🔧 Gégé a remis ${n.job} en état.`, 'good'); Sim.dirty = true; leave(n, ML.line('gege')); }
+          if (n.t <= 0) { const M = S.machines[n.job]; if (M) { M.broken = false; M.chips = 0; M.bin = true; } delete K.issueT[n.job]; K.all(`🔧 Gégé a remis ${n.job} en état.`, 'good'); Sim.dirty = true; leave(n, U.pick(ML.LINES.gege)); }
         }
         return true;
       }
@@ -202,13 +202,13 @@
         const c = S.cars[P.car]; if (!c || c.kind !== 'fenwick' || c.dr !== pid) return true;
         const fx = c.x + Math.sin(c.h) * 1.9, fz = c.z + Math.cos(c.h) * 1.9;
         if (!c.load) {
-          const o = S.items.find(x => x.type === 'palette' && x.rest && Math.hypot(x.x - fx, x.z - fz) < 2.4);
-          if (!o) { K.note(pid, 'Rien sur les fourches : approche une PALETTE (gros colis) et appuie sur R.'); return true; }
+          const o = S.items.find(x => (x.type === 'palette' || x.type === 'machine') && x.rest && Math.hypot(x.x - fx, x.z - fz) < 2.4);   // machine : caisse de machine neuve (sim_build.js)
+          if (!o) { K.note(pid, 'Rien sur les fourches : approche une PALETTE (gros colis) ou une caisse MACHINE et appuie sur R.'); return true; }
           c.load = K.strip(o); K.removeItem(o); K.sfx('pickup', fx, fz);
         } else {
           const cam = S.cars.find(x => x.kind === 'camion' && Math.hypot(x.x - fx, x.z - fz) < 5.5);
-          if (cam && K.bedFree(cam) >= 4) { cam.bed.push(c.load); c.load = null; K.note(pid, '🚚 Palette chargée dans le camion !', 'good'); K.sfx('drop', fx, fz); }
-          else if (cam) K.note(pid, 'Plus de place sur le plateau du camion.', 'warn');
+          if (cam && cam.bed.length < cam.cap) { cam.bed.push(c.load); c.load = null; K.note(pid, '🚚 Palette chargée dans le camion !', 'good'); K.sfx('drop', fx, fz); }
+          else if (cam) K.note(pid, 'Le camion est plein (2 palettes).', 'warn');
           else { K.spawnItem(c.load, fx, 0, fz); c.load = null; K.sfx('drop', fx, fz); }
         }
         Sim.dirty = true; return true;
@@ -218,7 +218,7 @@
         if (!c.bed.length) { K.note(pid, 'Le camion est vide. Le cariste charge les palettes au QUAI GROS COLIS.'); return true; }
         const Z = ML.LOC.bigZone;
         if (c.x > Z.minX - 8 && c.x < Z.maxX + 8 && c.z > Z.minZ - 4 && c.z < Z.maxZ + 12) {   // retour à l'atelier : on dépose
-          for (const it of c.bed.splice(0)) { if (it.type === 'palette') { const [x, z] = K.bigSpot(); K.spawnItem(it, x, 0, z); } else { const [x, z] = K.expeditionSpot(); K.spawnItem(it, x, 0.5, z); } }
+          for (const it of c.bed.splice(0)) { const [x, z] = K.bigSpot(); K.spawnItem(it, x, 0, z); }
           Sim.dirty = true; return true;
         }
         let here = null; for (const k in ML.LOC.comp) if (Math.hypot(ML.LOC.comp[k].dock.x - c.x, ML.LOC.comp[k].dock.z - c.z) < 18) here = k;
@@ -267,7 +267,7 @@
   mod.npcUse = (pid, P, ps, sel, held, n) => {
     const comp = K.compOf(n.id), C2 = comp && COMP[comp];
     if (C2 && (C2.kind === 'matiere' || C2.kind === 'outils') && P.role !== 'magasinier') { K.say(n, 'Je ne traite qu\'avec le MAGASINIER de chez Lebec !'); needRole(pid, 'magasinier', 'Commander'); return true; }
-    if (['docteur', 'gege', 'momo', 'sylvie'].includes(n.id)) { K.say(n, ML.line(n.id)); return true; }
+    if (['docteur', 'gege', 'momo', 'sylvie'].includes(n.id)) { K.say(n, U.pick(ML.LINES[n.id])); return true; }
     return false;
   };
   mod.onHit = (pid, kind) => {
@@ -296,8 +296,8 @@
     for (let i = 0; i < S.cars.length; i++) {
       const c = S.cars[i]; if (c.kind === 'fenwick' || IT.heavy(o)) continue;
       if (S.pl[o.thr] && (S.pl[o.thr].car === i)) continue;
-      const k = c.kind === 'tp' ? 0.4 : c.kind === 'camion' ? 1.4 : 1.25, bx = c.x - Math.sin(c.h) * k, bz = c.z - Math.cos(c.h) * k;
-      if (Math.hypot(o.x - bx, o.z - bz) < (c.kind === 'tp' ? 0.9 : c.kind === 'camion' ? 2.8 : 1.4) && o.y < (c.kind === 'camion' ? 2.8 : 2.4) && o.vy < 0 && K.bedFree(c) >= 1) {
+      const k = c.kind === 'tp' ? 0.4 : c.kind === 'camion' ? 2.2 : 1.25, bx = c.x - Math.sin(c.h) * k, bz = c.z - Math.cos(c.h) * k;
+      if (Math.hypot(o.x - bx, o.z - bz) < (c.kind === 'tp' ? 0.9 : 1.3) && o.y < 2.4 && o.vy < 0 && c.bed.length < c.cap && c.kind !== 'camion') {
         o.gone = true; o.rest = true; c.bed.push(K.strip(o)); K.sfx('drop', c.x, c.z); K.note(o.thr, `🎯 Dans ${c.name} !`, 'good'); Sim.dirty = true; return true;
       }
     }

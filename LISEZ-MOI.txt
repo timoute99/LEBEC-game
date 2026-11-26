@@ -1,5 +1,5 @@
-MÉCANIQUE LEBEC — usinage en équipe (V4.5, 1 à 6 joueurs)
-==========================================================
+MÉCANIQUE LEBEC — usinage en équipe (V3, 1 à 5 joueurs)
+=========================================================
 En ligne : https://lebec-game.onrender.com
 
 JOUER TOUT SEUL
@@ -21,7 +21,6 @@ METTRE À JOUR LE SERVEUR EN LIGNE (Render) — même méthode que pour la V1
        AUTH_SECRET   = une longue phrase secrète au hasard (signe les connexions)
        GITHUB_TOKEN  = un jeton GitHub (droits « Contents : read and write » sur un dépôt)
        GITHUB_REPO   = propriétaire/nom-du-dépôt où ranger le fichier des comptes
-                       (et, depuis la V4, celui des sauvegardes de campagne : lebec-saves.json)
      Sans GITHUB_TOKEN/GITHUB_REPO, les comptes marchent mais sont perdus quand Render
      redémarre (son disque gratuit est effacé). /health indique le stockage utilisé.
 
@@ -33,53 +32,10 @@ COMPTES
   - Les jetons se gagnent en jouant (score, étoiles) et avec les 16 succès débiles.
 
 MODES
-  Journée libre (petit atelier + 1 500 € à investir) · Campagne (ton entreprise grandit
-  jour après jour, sauvegardée sur le serveur avec un CODE de 6 caractères : n'importe qui
-  avec le code peut la reprendre ; l'Inspecteur vient quand l'atelier est prêt, le réussir
-  termine le jeu) · Inspection (boss : règles absurdes qui changent) · Course de Mégane
-  (5 manches) · Mode traître (3 joueurs minimum : un joueur payé par UsiFlash, vote à la fin).
-
-NOUVEAU EN V4.5
-  - Tes nouvelles répliques (Amaury, Marius, Matis, « renverse ») sont dans le jeu.
-  - Les opérateurs parlent tout seuls de temps en temps pendant qu'ils travaillent.
-  - Une phrase écrite sans « - » après une ligne vide compte quand même comme réplique.
-  - Les longues répliques restent affichées plus longtemps.
-
-NOUVEAU EN V4.4 (personnages)
-  - Tous les personnages, leur personnalité et leurs répliques sont dans UN fichier : js/persos.js.
-    Modifie-le sur GitHub (crayon ✏️) : le jeu est à jour 2-3 minutes après, sans rien d'autre à faire.
-  - Environ 400 répliques, rangées par situation (pause, claque, coup de pelle, livraison…).
-  - Plus de répliques en boucle : chacun dit toutes ses phrases avant de se répéter.
-  - Champ « idées: » par personnage : écris ce que tu veux, Claude le lira et le codera.
-
-NOUVEAU EN V4.3 (graphismes)
-  - Atelier refait : sol peint, charpente, pont roulant, établi, rayonnage, affiches, enseigne géante sur le toit.
-  - Ville plus variée : maisons avec jardin, boutiques aux noms rigolos, immeubles à balcons, passages piétons,
-    bancs, abribus, sapins, fleurs. Les fenêtres s'allument le soir.
-
-NOUVEAU EN V4.1
-  - Bouton « Installer le jeu » (Chrome / Edge) : icône sur le bureau, sa propre fenêtre.
-  - Plus de temps pour faire les pièces ; seul, les pièces rapportent plus et c'est plus calme.
-  - Café : on va beaucoup plus vite. Pigeons plus rares + abonnement Pigeon-Stop.
-  - Les caisses ne tombent qu'en percutant le décor à plus de 70 km/h ; on peut les lancer dans les bennes et le camion.
-  - Touche M : clic = repère, le trajet s'affiche comme un GPS (au sol, mini-carte, carte).
-  - Fournisseurs : panier (+ / − / supprimer), un colis arrive en réception : R pour l'ouvrir, puis ranger au rack / à l'armoire.
-  - Échap dans le PC : on sort du PC (pas de pause). Les journées s'enchaînent tant que la caisse ne passe pas sous −2 000 € (faillite).
-
-NOUVEAU EN V4
-  - Tout se compte en EUROS : livrer rapporte ; matière, outils, sous-traitance, amendes
-    et salaires (le soir) coûtent. Bilan de la journée détaillé.
-  - Départ modeste : T1 + F1, UN opérateur qui court d'une machine à l'autre, le vieux Kangoo.
-  - PC DE GESTION (bureau, mur droit) : accepter les demandes des clients, prévoir la
-    machine, acheter machines / agrandissement / fenwick / améliorations, commander chez
-    les fournisseurs (livré par camion en 2-3 min), embaucher opérateurs, apprentis,
-    Tony (cariste) et Jojo (livreur, tournées automatiques).
-  - Particuliers : ils se garent sur le PARKING CLIENTS et viennent au COMPTOIR demander
-    une pièce urgente, très bien payée.
-  - GARAGE PASQUIER en ville : Méga Mégane, Ducato, camion plateau (palettes + caisses).
-  - Difficulté qui monte avec l'atelier ; conduite plus stable (les caisses tombent moins).
-  - On peut REJOINDRE UNE PARTIE EN COURS ; si l'hôte part en campagne, un autre joueur
-    reprend l'atelier depuis la dernière sauvegarde. 6 joueurs max.
+  Journée libre · Campagne (5 jours, budget, réputation, améliorations de l'atelier,
+  apprentis, sauvegardée sur le PC de l'HÔTE ; jour 5 = l'Inspecteur) · Inspection
+  (boss : règles absurdes qui changent) · Course de Mégane (5 manches) ·
+  Mode traître (case à cocher, 3 joueurs minimum : un joueur payé par UsiFlash, vote à la fin).
 
 NOUVEAU EN V3
   - « Personnaliser mon perso » au menu : aperçu 3D, peau, cheveux, barbe, lunettes,

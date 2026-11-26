@@ -18,10 +18,7 @@
     window.addEventListener('keydown', e => {
       if (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
       if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
-      if (!e.repeat) {
-        I._p[e.code] = true;
-        if (e.key && /^[a-z]$/i.test(e.key)) I._p['Key' + e.key.toUpperCase()] = true;   // AZERTY : la lettre affichée compte aussi
-      }
+      if (!e.repeat) I._p[e.code] = true;
       I.keys[e.code] = true; I.padActive = false;
     });
     window.addEventListener('keyup', e => { I.keys[e.code] = false; });
@@ -44,9 +41,7 @@
     if (ML.debug) { I.locked = true; ML.HUD.showPause(false); return; }
     if (I.padActive) { ML.HUD.showPause(false); return; }
     try { const p = I.canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* refusé */ }
-    // Le navigateur refuse de recapturer la souris juste après Échap : au lieu de l'écran PAUSE,
-    // un simple « clique pour reprendre » (le jeu n'est pas en pause).
-    setTimeout(() => { if (!I.active() && !ML.ui.modal && ML.Game.on) ML.HUD.showPause(true, true); }, 400);
+    setTimeout(() => { if (!I.active() && !ML.ui.modal && ML.Game.on) ML.HUD.showPause(true); }, 400);
   };
   I.unlock = () => { if (document.pointerLockElement) document.exitPointerLock(); if (!ML.debug) I.locked = false; };
   I.pressed = c => !!I._p[c];

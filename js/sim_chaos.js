@@ -14,11 +14,11 @@
     S = K.S; rng = K.rng;
     S.fires = []; S.puddles = [];
     for (const id in S.machines) S.machines[id].chips = Math.floor(rng() * 35);
-    K.pudT = (40 + rng() * 40) / K.D.chaos; K.slipCd = {};
+    K.pudT = 40 + rng() * 40; K.slipCd = {};
     if (rng() < 0.6) addPuddle(-8 + rng() * 16, -2 + rng() * 6);
-    if (S.weather === 'pluie' && !S.up.isolation) for (let i = 0; i < 3; i++) addPuddle(-8 + rng() * 16, 16 + rng() * 6);
+    if (S.weather === 'pluie') for (let i = 0; i < 3; i++) addPuddle(-8 + rng() * 16, 16 + rng() * 6);
     const perch = rng.pick(ML.LOC.perches) || { x: 30, y: 6, z: 40 };
-    pg = K.pg = { x: perch.x, y: perch.y, z: perch.z, perch, state: 'perch', T: 150 + rng() * 120, path: [], carry: null, hold: 0 };
+    pg = K.pg = { x: perch.x, y: perch.y, z: perch.z, perch, state: 'perch', T: 45 + rng() * 50, path: [], carry: null, hold: 0 };
   };
 
   /* ---------- Outils ---------- */
@@ -53,7 +53,7 @@
       K.all(`🐦 ${S.pl[by] ? S.pl[by].name : 'Quelqu\'un'} a fait lâcher la plaquette au pigeon !`, 'good'); if (by) K.stat(by, 'pigeon');
       pg.carry = null;
     }
-    K.sfx('pigeon', pg.x, pg.z); flyTo(rng.pick(ML.LOC.perches) || pg.perch, 'escape'); pg.T = 180 + rng() * 120;
+    K.sfx('pigeon', pg.x, pg.z); flyTo(rng.pick(ML.LOC.perches) || pg.perch, 'escape'); pg.T = 60 + rng() * 50;
   };
   function flyTo(target, state) {
     pg.state = state; pg.target = target;
@@ -67,10 +67,7 @@
     if (pg.state === 'perch') {
       pg.T -= dt;
       if (pg.carry) { pg.hold -= dt; if (pg.hold <= 0) { pg.carry = null; K.all('🐦 Le pigeon a perdu la plaquette dans une gouttière. Adieu.', 'warn'); Sim.dirty = true; } }
-      if (pg.T <= 0 && !pg.carry && S.stock.plaquette > 0) {
-        if (S.up.antipigeon) { pg.T = 120; return; }               // abonnement Pigeon-Stop : les filets le découragent
-        flyTo(CAB, 'steal'); K.sfx('pigeon', pg.x, pg.z);
-      }
+      if (pg.T <= 0 && !pg.carry && S.stock.plaquette > 0) { flyTo(CAB, 'steal'); K.sfx('pigeon', pg.x, pg.z); }
       return;
     }
     const t = pg.path[0]; if (!t) { pg.state = 'perch'; return; }
@@ -81,7 +78,7 @@
         if (pg.state === 'steal') {
           if (S.stock.plaquette > 0) { S.stock.plaquette--; pg.carry = 'plaquette'; pg.hold = 40; K.all('🐦 Le PIGEON a volé une plaquette ! Lance-lui quelque chose (clic droit) ou souffle-le !', 'warn'); Sim.dirty = true; }
           flyTo(rng.pick(ML.LOC.perches) || pg.perch, 'escape');
-        } else { pg.state = 'perch'; pg.perch = pg.target; pg.T = 160 + rng() * 140; }
+        } else { pg.state = 'perch'; pg.perch = pg.target; pg.T = 70 + rng() * 60; }
       }
     } else { pg.x += dx / d * sp; pg.y += dy / d * sp; pg.z += dz / d * sp; }
   }
@@ -92,26 +89,26 @@
       const M = S.machines[id];
       if (M.status === 'run') {
         M.chips = Math.min(100, (M.chips || 0) + dt * 1.5);
-        M.wear = (M.wear || 0) + dt * 0.75 * Math.sqrt(K.D.chaos);
+        M.wear = (M.wear || 0) + dt * 0.75;
         if (M.wear >= 100 && M.job && M.job.tool) {
           M.worn = true; M.job.tool = false; Sim.dirty = true;
           const op = K.npcs[M.op]; K.say(op, `Outil usé ! Il me faut ${M.job.need === 'plaquette' ? 'une plaquette neuve' : M.job.need === 'fraise' ? 'une fraise neuve' : 'un foret neuf'} !`);
           K.all(`⚠ ${id} : outil usé, apporte un(e) ${ML.TOOLS[M.job.need].label.toLowerCase()} neuf(ve).`, 'warn');
         }
-        if (M.chips > 55 && !K.fireAt(id) && rng() < dt * (M.chips - 55) / 45 / 70 * K.D.chaos) K.startFire(id);
-        if (!M.broken && rng() < dt / 280 * K.D.chaos) K.breakMachine(id);
+        if (M.chips > 55 && !K.fireAt(id) && rng() < dt * (M.chips - 55) / 45 / 70) K.startFire(id);
+        if (!M.broken && rng() < dt / 280 * (((S.machDefs || ML.MACHINES).find(d => d.id === id) || {}).panne || 1)) K.breakMachine(id);   // carrière : vieille machine (panne > 1) = plus de pannes
       }
     }
     for (const f of S.fires.slice()) {
       f.hp = Math.min(100, f.hp + dt * 1.5);
       if (S.rt - f.t0 > 50) {
         S.fires.splice(S.fires.indexOf(f), 1); S.machines[f.mid].chips = 0;
-        K.breakMachine(f.mid, 'brûlée'); K.fine(ML.ECO.fines.burn); K.all(`🔥 ${f.mid} a cramé ! Réparations : −${ML.ECO.fines.burn} €`, 'warn');
+        K.breakMachine(f.mid, 'brûlée'); S.score = Math.max(0, S.score - 10); K.all(`🔥 ${f.mid} a cramé ! (−10)`, 'warn');
       }
     }
     K.pudT -= dt;
     if (K.pudT <= 0) {
-      K.pudT = ((S.weather === 'pluie' ? (S.up.isolation ? 70 : 35) : 55) + rng() * 40) / K.D.chaos;
+      K.pudT = (S.weather === 'pluie' ? 35 : 55) + rng() * 40;
       const ids = Object.keys(S.machines), W = ML.World.machines[rng.pick(ids)];
       if (W) { addPuddle(W.station.x + (rng() - 0.5) * 2, W.station.z + (rng() - 0.5) * 2); K.all('💧 Fuite d\'huile soluble près de ' + W.def.id + ' : attention, ça glisse !', 'info'); }
     }

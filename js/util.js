@@ -56,11 +56,34 @@
 
   /* ---------- Collisions ---------- */
   U.addCollider = (minX, maxX, minZ, maxZ, tag) => { const c = { minX, maxX, minZ, maxZ, tag }; ML.colliders.push(c); return c; };
+  /** Retire un collider (machine déplacée, porte ouverte…) */
+  U.removeCollider = c => { const i = ML.colliders.indexOf(c); if (i >= 0) { ML.colliders.splice(i, 1); ML.colliders._v = (ML.colliders._v || 0) + 1; } };
+  /** À appeler si on modifie les bornes d'un collider existant */
+  U.touchColliders = () => { ML.colliders._v = (ML.colliders._v || 0) + 1; };
   U.boxCollider = (cx, cz, w, d, tag) => U.addCollider(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, tag);
   /** Repousse le cercle (p, r) hors des boîtes. Renvoie true s'il y a eu contact. */
+  // grille spatiale (cases de 24 m) reconstruite quand la liste change de taille
+  const GC = 24; let grid = null, gridN = -1, gridRef = null, gridV = -1;
+  function near(x, z, r) {
+    const L = ML.colliders;
+    if (L.length < 64) return L;
+    if (gridN !== L.length || gridRef !== L || gridV !== (L._v || 0)) {
+      grid = new Map(); gridN = L.length; gridRef = L; gridV = L._v || 0;
+      for (const c of L) {
+        const i0 = Math.floor(c.minX / GC), i1 = Math.floor(c.maxX / GC), k0 = Math.floor(c.minZ / GC), k1 = Math.floor(c.maxZ / GC);
+        if ((i1 - i0 + 1) * (k1 - k0 + 1) > 400) { (grid.get('big') || grid.set('big', []).get('big')).push(c); continue; }
+        for (let i = i0; i <= i1; i++) for (let k = k0; k <= k1; k++) { const key = i * 100003 + k; let a = grid.get(key); if (!a) grid.set(key, (a = [])); a.push(c); }
+      }
+    }
+    const out = new Set(grid.get('big') || []);
+    const i0 = Math.floor((x - r) / GC), i1 = Math.floor((x + r) / GC), k0 = Math.floor((z - r) / GC), k1 = Math.floor((z + r) / GC);
+    for (let i = i0; i <= i1; i++) for (let k = k0; k <= k1; k++) { const a = grid.get(i * 100003 + k); if (a) for (const c of a) out.add(c); }
+    return out;
+  }
+  U.nearColliders = near;
   U.resolveCircle = (p, r) => {
     let hit = false;
-    for (const c of ML.colliders) {
+    for (const c of near(p.x, p.z, r + 1)) {
       if (p.x < c.minX - r || p.x > c.maxX + r || p.z < c.minZ - r || p.z > c.maxZ + r) continue;
       const nx = U.clamp(p.x, c.minX, c.maxX), nz = U.clamp(p.z, c.minZ, c.maxZ);
       const dx = p.x - nx, dz = p.z - nz, dd = dx * dx + dz * dz;
@@ -74,8 +97,8 @@
     }
     return hit;
   };
-  U.inCollider = (x, z, pad) => { pad = pad || 0; for (const c of ML.colliders) if (x > c.minX - pad && x < c.maxX + pad && z > c.minZ - pad && z < c.maxZ + pad) return true; return false; };
-  U.inWorkshop = p => p.x > -20 && p.x < 20 && p.z > -14 && p.z < 14;
+  U.inCollider = (x, z, pad) => { pad = pad || 0; for (const c of near(x, z, pad + 1)) if (x > c.minX - pad && x < c.maxX + pad && z > c.minZ - pad && z < c.maxZ + pad) return true; return false; };
+  U.inWorkshop = p => (ML.World && ML.World.inAtelier ? ML.World.inAtelier(p) : p.x > -20 && p.x < 20 && p.z > -14 && p.z < 14);   // atelier évolutif (pièces comprises)
 
   /* ---------- Étiquettes flottantes (sprite, canvas de taille fixe) ---------- */
   U.label = (text, opt) => {

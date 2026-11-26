@@ -46,6 +46,6 @@
   };
   T.mat = (key, rx, ry, tint) => {
     const k = key + '_' + rx + '_' + ry + '_' + (tint || 0xffffff);
-    return mcache[k] || (mcache[k] = new THREE.MeshLambertMaterial({ map: T.tex(key, rx, ry), color: tint || 0xffffff }));
+    return mcache[k] || (mcache[k] = ML.Style.toon(tint || 0xffffff, 0, { map: T.tex(key, rx, ry), key: 'tex_' + k }));
   };
 })();

@@ -17,7 +17,7 @@
     S.evs = {}; K.sched = []; K.vcd = {}; K.lastPos = {};
     if (S.mode !== 'course') {
       const pool = K.shuffle(['audit', 'coupure', 'sabotage', 'herve', 'fred', 'mathieu', 'panne']);
-      const ev = K.D.events, n = S.mode === 'inspection' ? Math.max(1, ev[0]) : ev[0] + Math.floor(rng() * (ev[1] - ev[0] + 1));
+      const n = S.mode === 'inspection' ? 2 : 2 + Math.floor(rng() * 3);
       const times = []; for (let i = 0; i < n; i++) times.push(60 + rng() * 340);
       times.sort((a, b) => a - b).forEach((t, i) => K.sched.push({ k: pool[i], t: Math.max(t, (K.sched.length ? K.sched[K.sched.length - 1].t : 0) + 45) }));
     }
@@ -52,9 +52,9 @@
   K.violation = (pid, rule) => {
     if (S.mode !== 'inspection' || S.rule !== rule || !S.pl[pid]) return;
     const key = pid + rule; if ((K.vcd[key] || 0) > S.rt) return; K.vcd[key] = S.rt + 5;
-    S.viol++; K.fine(ML.ECO.fines.inspect);
-    K.say(npcs.inspecteur, ML.line('inspecteur', 'infraction', 'Infraction !') + ' ' + ML.RULES[rule], true);
-    K.all(`📏 Infraction de ${S.pl[pid].name} : ${ML.RULES[rule]} (${S.viol}/5, −${ML.ECO.fines.inspect} €)`, 'warn'); K.sfx('error'); Sim.dirty = true;
+    S.viol++; S.score = Math.max(0, S.score - 10);
+    K.say(npcs.inspecteur, 'Infraction ! ' + ML.RULES[rule], true);
+    K.all(`📏 Infraction de ${S.pl[pid].name} : ${ML.RULES[rule]} (−10)`, 'warn'); K.sfx('error'); Sim.dirty = true;
   };
 
   /* ---------- Démarrage des événements ---------- */
@@ -120,7 +120,7 @@
   /* ---------- Cerveaux des visiteurs ---------- */
   mod.brain = (n, dt) => {
     if (n.mid && n.state === 'listen') { n.faceYaw = npcs.mathieu.active ? Math.atan2(npcs.mathieu.x - n.x, npcs.mathieu.z - n.z) : n.faceYaw; return true; }
-    if (!['jacky', 'herve', 'fred', 'mathieu', 'saboteur', 'inspecteur'].includes(n.id)) return false;
+    if (!ML.PEOPLE[n.id].visitor) return false;
     if (n.state === 'leave' || n.state === 'arrive') return true;
     switch (n.id) {
       case 'saboteur':
@@ -138,7 +138,7 @@
       }
       case 'inspecteur':
         if (!n.path.length) { n.wait = (n.wait || 0) - dt; if (n.wait <= 0) { const p = rng.pick(IN_SPOTS); K.walkTo(n, p.x, p.z); n.wait = 4 + rng() * 6; } }
-        n.barkT = (n.barkT || 8) - dt; if (n.barkT <= 0) { n.barkT = 14 + rng() * 10; K.say(n, ML.line('inspecteur')); }
+        n.barkT = (n.barkT || 8) - dt; if (n.barkT <= 0) { n.barkT = 14 + rng() * 10; K.say(n, U.pick(ML.LINES.inspecteur)); }
         return true;
     }
     return true;
@@ -161,7 +161,7 @@
     while (K.sched.length && S.rt >= K.sched[0].t) start(K.sched.shift().k);
     for (const k in S.evs) {
       const e = S.evs[k]; if (S.rt < e.until) continue;
-      if (k === 'audit') { K.fine(ML.ECO.fines.audit); K.repAdd(-ML.ECO.rep.audit); K.all(`🔍 Audit raté : personne n'a présenté de caisse à Jacky (−${ML.ECO.fines.audit} €, réputation −${ML.ECO.rep.audit}).`, 'warn'); leave('jacky', ML.line('jacky', 'absent', 'Je mets un écart. Majeur.')); }
+      if (k === 'audit') { S.score = Math.max(0, S.score - 20); K.all('🔍 Audit raté : personne n\'a présenté de caisse à Jacky (−20).', 'warn'); leave('jacky', 'Je mets un écart. Majeur.'); }
       else if (k === 'herve') leave('herve', 'Bon. Je repasserai. Avec un formulaire.');
       else if (k === 'fred') leave('fred', 'Penses-y, à Naval Group !');
       else if (k === 'mathieu') { endMathieu(); leave('mathieu', 'Bon… du coup… je… vais… y aller.'); }
@@ -176,7 +176,7 @@
         const lp = K.lastPos[pid], win = !lp || S.rt - lp.t >= 0.6;      // vitesse mesurée sur 0,6 s
         if (win) K.lastPos[pid] = { x: p.x, z: p.z, t: S.rt };
         if (K.foot(P) && U.inWorkshop(p)) {
-          if (S.rule === 'no_sprint' && lp && win && Math.hypot(p.x - lp.x, p.z - lp.z) / (S.rt - lp.t) > 7.3 * (P.coffee > S.rt ? ML.CFG.COFFEE.mult : 1)) K.violation(pid, 'no_sprint');
+          if (S.rule === 'no_sprint' && lp && win && Math.hypot(p.x - lp.x, p.z - lp.z) / (S.rt - lp.t) > 7.3) K.violation(pid, 'no_sprint');
           if (S.rule === 'casque' && !P.inv.some(x => x && x.type === 'casque')) { K.casqueT = K.casqueT || {}; K.casqueT[pid] = (K.casqueT[pid] || 0) + dt; if (K.casqueT[pid] > 4) { K.casqueT[pid] = 0; K.violation(pid, 'casque'); } }
         }
         if (S.rule === 'speed30' && P.car !== null && S.cars[P.car] && Math.abs(S.cars[P.car].s || 0) > 8.4) K.violation(pid, 'speed30');
@@ -190,13 +190,13 @@
     switch (m.a) {
       case 'audit': {
         const n = npcs.jacky; if (!S.evs.audit || n.state !== 'audit' || !K.near(ps, n.x, n.z, 6) || !K.isPart(held)) return true;
-        if (m.ok) { K.bonus(ML.ECO.bonus.audit); K.repAdd(ML.ECO.rep.audit); S.sat = Math.min(100, S.sat + 10); K.big(`🔍 AUDIT RÉUSSI (+${ML.ECO.bonus.audit} €, réputation +${ML.ECO.rep.audit})`, '#3ecf6e'); leave('jacky', ML.line('jacky', 'reussi', 'MIP/MAP irréprochable. Je note : conforme.')); }
-        else { K.fine(ML.ECO.fines.audit); K.repAdd(-ML.ECO.rep.audit); K.all(`🔍 Audit raté par ${P.name} (−${ML.ECO.fines.audit} €, réputation −${ML.ECO.rep.audit})`, 'warn'); leave('jacky', ML.line('jacky', 'rate', 'Appui plan sur la Réf A ! RÉF A ! Écart majeur.')); }
+        if (m.ok) { S.score += K.points(30); S.sat = Math.min(100, S.sat + 10); K.big('🔍 AUDIT RÉUSSI (+30)', '#3ecf6e'); leave('jacky', 'MIP/MAP irréprochable. Je note : conforme.'); }
+        else { S.score = Math.max(0, S.score - 15); K.all(`🔍 Audit raté par ${P.name} (−15)`, 'warn'); leave('jacky', 'Appui plan sur la Réf A ! RÉF A ! Écart majeur.'); }
         return true;
       }
       case 'mathieu': {
         const n = npcs.mathieu; if (!S.evs.mathieu || !K.near(ps, n.x, n.z, 7)) return true;
-        endMathieu(); leave('mathieu', 'Merci… du coup… c\'était… bien… voilà.'); K.bonus(ML.ECO.bonus.mathieu); K.note(pid, `🐌 Tu as écouté Mathieu jusqu'au bout. Héroïque. (+${ML.ECO.bonus.mathieu} €)`, 'good');
+        endMathieu(); leave('mathieu', 'Merci… du coup… c\'était… bien… voilà.'); S.score += 5; K.note(pid, '🐌 Tu as écouté Mathieu jusqu\'au bout. Héroïque. (+5)', 'good');
         return true;
       }
       case 'vote': {
@@ -216,8 +216,8 @@
         if (K.give(pid, { type: 'convention', d: { signee: false } }, sel)) K.note(pid, '📝 Convention imprimée : fais-la signer par LEBEC (E sur lui), puis donne-la à Hervé.', 'good');
         return true;
       case 'pc':
-        if (S.evs.fred && m.mg === 'ok') { leave('fred', 'Parfait ! Et tu as pensé à Naval Group ?'); K.bonus(ML.ECO.bonus.fred); K.all(`💼 ${P.name} a rempli Arexis. Fred s'en va (+${ML.ECO.bonus.fred} €).`, 'good'); }
-        else if (!S.evs.fred) K.note(pid, 'Le PC rame. Il y a 47 mises à jour Windows en attente. (Arexis : rien à remplir)');
+        if (S.evs.fred && m.mg === 'ok') { leave('fred', 'Parfait ! Et tu as pensé à Naval Group ?'); S.score += 5; K.all(`💼 ${P.name} a rempli Arexis. Fred s'en va (+5).`, 'good'); }
+        else if (!S.evs.fred) K.note(pid, 'Le PC rame. Il y a 47 mises à jour Windows en attente.');
         return true;
       case 'panel':
         if (!S.power && m.mg === 'ok') { S.power = true; delete S.evs.coupure; K.all(`⚡ ${P.name} a réarmé le disjoncteur : le courant est revenu !`, 'good'); K.sfx('success'); }
@@ -248,13 +248,13 @@
       return false;
     }
     if (n.id === 'herve') {
-      if (held && held.type === 'convention' && held.d.signee) { P.inv[sel] = null; K.bonus(ML.ECO.bonus.herve); K.all(`📝 Convention signée remise à Hervé par ${P.name} : l'armoire est libre (+${ML.ECO.bonus.herve} €) !`, 'good'); leave('herve', 'Parfait ! Bon stage !'); return true; }
-      K.say(n, held && held.type === 'convention' ? "Elle n'est pas signée ! Par M. Lebec, s'il vous plaît." : ML.line('herve')); return true;
+      if (held && held.type === 'convention' && held.d.signee) { P.inv[sel] = null; S.score += 10; K.all(`📝 Convention signée remise à Hervé par ${P.name} : l'armoire est libre (+10) !`, 'good'); leave('herve', 'Parfait ! Bon stage !'); return true; }
+      K.say(n, held && held.type === 'convention' ? "Elle n'est pas signée ! Par M. Lebec, s'il vous plaît." : U.pick(ML.LINES.herve)); return true;
     }
-    if (n.id === 'jacky') { K.say(n, S.evs.audit ? ML.line('jacky', 'audit', 'Une CAISSE. Au MARBRE. Maintenant.') : ML.line('jacky')); return true; }
-    if (n.id === 'fred') { K.say(n, ML.line('fred')); return true; }
-    if (n.id === 'inspecteur') { K.say(n, ML.line('inspecteur')); return true; }
-    if (n.id === 'saboteur') { K.say(n, ML.line('saboteur')); return true; }
+    if (n.id === 'jacky') { K.say(n, S.evs.audit ? 'Une CAISSE. Au MARBRE. Maintenant.' : U.pick(ML.LINES.jacky)); return true; }
+    if (n.id === 'fred') { K.say(n, U.pick(ML.LINES.fred)); return true; }
+    if (n.id === 'inspecteur') { K.say(n, U.pick(ML.LINES.inspecteur)); return true; }
+    if (n.id === 'saboteur') { K.say(n, U.pick(ML.LINES.saboteur)); return true; }
     if (n.id === 'kevin' && K.priv.traitor === pid && !held) { K.say(n, 'Chut. Apporte-moi leurs caisses, je te paie en croissants.'); return true; }
     return false;
   };
@@ -264,7 +264,7 @@
       K.say(n, 'Aïe ! Je me casse !'); n.state = 'flee'; n.fleeT = 18; return true;
     }
     if (n.id === 'mathieu') { endMathieu(); leave('mathieu', 'Ah… bon… du coup… je… m\'en vais.'); return false; }
-    if (n.id === 'inspecteur') { K.fine(ML.ECO.fines.slapInsp); S.viol++; K.say(n, 'OUTRAGE À FONCTIONNAIRE !', true); K.all(`🎓 Claque à l'inspecteur : −${ML.ECO.fines.slapInsp} € et une infraction.`, 'warn'); return false; }
+    if (n.id === 'inspecteur') { S.score = Math.max(0, S.score - 20); S.viol++; K.say(n, 'OUTRAGE À FONCTIONNAIRE !', true); K.all('🎓 Claque à l\'inspecteur : −20 et une infraction.', 'warn'); return false; }
     return false;
   };
   mod.onHit = pid => { if (K.violation) K.violation(pid, 'no_hit'); };
@@ -273,9 +273,8 @@
   /* ---------- Fin de journée : inspection, vote du traître ---------- */
   mod.onEnd = res => {
     if (S.mode === 'inspection') {
-      res.inspection = { viol: S.viol, pass: S.viol <= 4 && res.profit >= res.need[0] };
+      res.inspection = { viol: S.viol, pass: S.viol <= 4 && res.score >= res.need[0] };
       if (res.inspection.pass) for (const p in S.pl) K.stat(p, 'inspection');
-      if (res.inspection.pass && S.campaign && !S.co.won) { res.won = true; for (const p in S.pl) K.stat(p, 'game_won'); }
     }
     if (K.priv.traitor && S.pl[K.priv.traitor] && Object.keys(S.pl).length >= 3) res.vote = true;
   };
