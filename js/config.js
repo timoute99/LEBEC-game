@@ -26,7 +26,7 @@ ML.CFG = {
   ORDER: { base: 250, perStep: 90, far: 35, interval: 44, firstAt: 2 },   // V4.1 : beaucoup plus de temps pour faire les pièces
   PROD_SEC: 14, SUB_SEC: 16,
   COFFEE: { mult: 1.45, sec: 60, secPro: 120 },                           // café : on va beaucoup plus vite
-  START_STOCK: { acier: 4, alu: 4, inox: 3, plaquette: 3, fraise: 3, foret: 3 },
+  START_STOCK: { acier: 4, alu: 4, inox: 3, plaquette: 3, fraise: 3, foret: 3, acier_oc: 0, alu_oc: 0, inox_oc: 0, plaquette_oc: 0, fraise_oc: 0, foret_oc: 0 },
   SPEED_LIMIT: 16.7,                   // 60 km/h : au-delà, les radars flashent
   POLICE_TRIGGER: 19.5,                // 70 km/h près de la police : poursuite
   MAP: { minX: -170, maxX: 170, minZ: -40, maxZ: 330 }
@@ -44,6 +44,7 @@ ML.MATERIALS = {
 };
 ML.TOOLS = { plaquette: { label: 'Plaquette', color: 0xffd23f, css: '#ffd23f' }, fraise: { label: 'Fraise', color: 0x3fa7ff, css: '#3fa7ff' }, foret: { label: 'Foret', color: 0xff7a3f, css: '#ff7a3f' } };
 ML.MTYPE = { tour: 'Tour', fraiseuse: 'Fraiseuse' };
+ML.on = id => 'O-' + String(id | 0).padStart(4, '0');   // V6 : n° d'O (ordre), plus de noms de pièces
 ML.STEP = { fonderie: 'Fonderie', chaudro: 'Chaudronnerie', usinage: 'Usinage', tth: 'Traitement th.', livraison: 'Livraison' };
 
 ML.PARTS = {
@@ -107,6 +108,13 @@ ML.COMPANIES = {
   // V5.2 : lieux où l'on entre
   mall: { name: 'Centre commercial Les Copeaux', sub: 'Snack · farces & attrapes · boxe', kind: 'mall', short: 'Centre co.', npc: 'vendeuse', w: 26, d: 17, h: 9, wall: 'beton', color: 0xf5f0e6, roof: 0x8e44ad, open: true, near: true },
   gym: { name: 'Salle de sport Le Biceps', sub: 'Tapis de course : + endurance', kind: 'gym', short: 'Salle de sport', npc: 'coach', w: 18, d: 13, h: 7, wall: 'beton', color: 0xeaf2f8, roof: 0x16a085, open: true },
+  // V6 : distractions en ville (on y flambe la caisse de l'atelier…)
+  pmu: { name: 'PMU Le Fer à Cheval', sub: 'Paris sur les courses de chevaux', kind: 'pmu', short: 'PMU', npc: 'turfiste', w: 16, d: 12, h: 6, wall: 'brique', color: 0xc0392b, roof: 0x27ae60, open: true },
+  casino: { name: 'Casino Le Tour de Main', sub: 'Blackjack — la maison gagne toujours', kind: 'casino', short: 'Casino', npc: 'croupier', w: 18, d: 14, h: 7, wall: 'beton', color: 0x2c3e50, roof: 0xd4ac0d, open: true },
+  gages: { name: 'Prêteur sur gages Chez Dédé', sub: 'Achat · vente · objets inutiles', kind: 'gages', short: 'Prêteur', npc: 'preteur', w: 14, d: 12, h: 6, wall: 'brique', color: 0x8d6e63, roof: 0x5d4037, open: true },
+  boite: { name: 'Boîte de nuit Le Copeau', sub: 'Tenue correcte exigée (ou pas)', kind: 'boite', short: 'Boîte de nuit', npc: 'barman', w: 20, d: 16, h: 7, wall: 'beton', color: 0x1b1b2f, roof: 0xe84393, open: true },
+  arene: { name: 'Hangar 13', sub: 'Combats clandestins — on ne pose pas de questions', kind: 'arene', short: 'Combats', npc: 'bookmaker', w: 22, d: 18, h: 8, wall: 'tole', color: 0x4b4b4b, roof: 0x2d2d2d, open: true },
+  noir: { name: 'Jean-Mi « Sous-le-Manteau »', sub: 'Pièces au black, pas de facture', kind: 'client', npc: 'jeanmi', virtual: true, w: 1, d: 1, h: 1, wall: 'beton', color: 0x111111, roof: 0x111111 },
   part: { name: 'Particulier', sub: 'Client au comptoir', kind: 'particulier', npc: null, virtual: true, w: 1, d: 1, h: 1, wall: 'beton', color: 0xffffff, roof: 0xe84393 },
   sae: { name: 'Jury de SAE', sub: 'IUT — Situation d\'Apprentissage et d\'Évaluation', kind: 'sae', npc: null, virtual: true, w: 1, d: 1, h: 1, wall: 'beton', color: 0xffffff, roof: 0x6c5ce7 }
 };
@@ -186,15 +194,23 @@ ML.EVENTS = {
 };
 /* V5.2 : CADRE D'ASTUCES affiché quand un événement commence (titre + que faire) */
 ML.EVTIPS = {
+  // --- V6 ---
+  squat: ['🛋 Des squatteurs dans l\'atelier', ['Ils salissent et font fuir les clients.', 'Prends la GRANDE CLÉ À MOLETTE (mur gauche) et clic gauche dessus.', 'Un vigile à l\'entrée (PC, Boutique) les refoule.']],
+  dennis: ['👦 Dennis, le gamin du quartier', ['Il tague et met le bazar (taches de peinture).', 'Les coups ne marchent pas : LANCE-LUI des sacs-poubelles (pile près de la benne, clic droit).', 'Nettoie ensuite à la soufflette.']],
+  racket: ['🕶 Un racketteur', ['Il réclame de l\'argent : E sur lui pour payer… ou refuser.', 'S\'il attaque : la BATTE DE BASEBALL (râtelier à l\'entrée de l\'atelier).', 'Clic gauche avec la batte : il détale.']],
+  payeur: ['💸 Un mauvais payeur', ['Le client a gardé la pièce sans payer.', 'Retourne le voir avec la BATTE DE BASEBALL.', 'Un coup de batte (clic gauche) : il paie, et vite.']],
+  raid: ['🚔 Contrôle de police', ['Les flics arrivent : ils cherchent les pièces AU BLACK.', 'Range les caisses au black dans la PLANQUE (bâche, mur gauche), E.', 'Machine qui usine du black : E dessus = faux programme.']],
+  faim: ['🍔 Tu as faim / tu es épuisé', ['À 0, tu t\'évanouis sur place !', 'Manger : hot-dog (stand devant l\'atelier), distributeur, kebab…', 'Dormir : la banquette de la salle de pause (E), ou un café.']],
+  akinox: ['📠 AKINOX INGENIEURING', ['Brut pas cher, mais délai au hasard.', 'Parfois ils ne livrent pas : tu es prévenu tout de suite.', 'Dans ce cas, recommande ailleurs (PC ou fournisseur).']],
   audit: ['🔍 Audit surprise', ['Prends une CAISSE usinée.', 'Pose-la au MARBRE (E) devant Jacky.', 'Réponds à sa question MIP/MAP.']],
   coupure: ['⚡ Coupure de courant', ['Les machines sont à l\'arrêt.', 'Va au TABLEAU ÉLECTRIQUE (mur droit).', 'E puis tape Espace pour réarmer.']],
-  sabotage: ['🕶 Saboteur d\'UsiFlash', ['Il vise une caisse de l\'atelier.', 'Mets-lui une claque (clic gauche) : il lâche tout.', 'Range tes caisses en EXPÉDITION.']],
+  sabotage: ['🕶 Saboteur d\'UsiFlash', ['Il vise une caisse de l\'atelier.', 'Un coup de BATTE DE BASEBALL (râtelier à l\'entrée) : il lâche tout.', 'Range tes caisses en EXPÉDITION.']],
   herve: ['📝 Hervé bloque l\'armoire', ['Imprime la convention (imprimante du bureau).', 'Fais-la signer par LEBEC (E sur lui).', 'Rends-la à Hervé.']],
   fred: ['💼 Fred et Arexis', ['Il te colle et te ralentit.', 'Va au PC de gestion (bureau).', 'Bouton « Remplir ARÉXIS ».']],
   mathieu: ['🐌 Mathieu Riou', ['Il bloque un opérateur avec ses « du coup ».', 'E sur Mathieu : écoute-le à sa place.', 'L\'opérateur repart travailler.']],
   panne: ['💥 Grosse panne', ['Éteins le feu : EXTINCTEUR (mur gauche), clic gauche maintenu.', 'Puis CLÉ À MOLETTE + rôle MAINTENANCE : E sur la machine.']],
-  johan: ['🦹 Johan Bois', ['Il vole les caisses PRÊTES (expédition).', 'Claque-le pour qu\'il lâche la caisse !', 'Au PC : un VIGILE l\'empêche d\'entrer.']],
-  bleuenn: ['💣 Lean Manufacturing a tout fait sauter', ['Plus de courant : TABLEAU ÉLECTRIQUE (mur droit).', 'Puis E sur CHAQUE machine pour la redémarrer.', 'Éteins les feux à l\'extincteur.']],
+  johan: ['🦹 Johan Bois', ['Il vole les caisses PRÊTES (expédition).', 'Seule la GRANDE CLÉ À MOLETTE (mur gauche) le fait lâcher !', 'Au PC : un VIGILE l\'empêche d\'entrer.']],
+  bleuenn: ['💣 Lean Manufacturing a tout fait sauter', ['Plus de courant : TABLEAU ÉLECTRIQUE (mur droit).', 'Puis E sur CHAQUE machine pour la redémarrer.', 'Éteins les feux à l\'extincteur.', 'La prochaine fois : GRANDE CLÉ À MOLETTE avant qu\'elle branche !']],
   wc: ['🚽 Toilettes dégoûtantes', ['Les opérateurs ralentissent (et Lebec râle).', 'Cabine WC à gauche de l\'atelier, dehors.', 'E puis tape Espace pour nettoyer.']],
   quest: ['🙋 Quelqu\'un demande un service', ['Il arrive à l\'entrée (E sur lui) ou il appelle.', 'Prends l\'objet demandé (ou celui posé au COMPTOIR).', 'Va au repère (M) avec l\'objet en main : c\'est validé tout seul !']],
   sae: ['🎓 SAE du jour', ['Usine les pièces SAE (tickets violets).', 'Contrôle-les au MARBRE (meilleure note).', 'Apporte-les au JURY au marbre avant la fin.']]
@@ -263,7 +279,22 @@ ML.SHOP = {
   peinture_bleu: { cat: 'peinture', name: 'Bleu Gordini', price: 140, color: 0x1f4e9a },
   aileron: { cat: 'aileron', name: 'Aileron de course', price: 200 },
   flammes: { cat: 'flammes', name: 'Flammes sur le capot', price: 250 },
-  jantes: { cat: 'jantes', name: 'Jantes dorées', price: 180 }
+  jantes: { cat: 'jantes', name: 'Jantes dorées', price: 180 },
+  // V6 : plus de personnalisation (avec essayage avant d'acheter)
+  chaus_blanc: { cat: 'chaussures', name: 'Baskets blanches', price: 60, shoes: 0xf5f5f5 },
+  chaus_rangers: { cat: 'chaussures', name: 'Rangers', price: 80, shoes: 0x3b2f20 },
+  chaus_sabots: { cat: 'chaussures', name: 'Sabots orange (confort absolu)', price: 70, shoes: 0xff7a1a, big: 1 },
+  chaus_or: { cat: 'chaussures', name: 'Chaussures de sécu DORÉES', price: 300, shoes: 0xffd700 },
+  pant_jean: { cat: 'pantalon', name: 'Jean délavé', price: 60, pants: 0x4a6fa5 },
+  pant_cargo: { cat: 'pantalon', name: 'Cargo kaki', price: 70, pants: 0x6b6b3a },
+  pant_jog: { cat: 'pantalon', name: 'Jogging gris', price: 50, pants: 0x8e8e8e },
+  pant_short: { cat: 'pantalon', name: 'Short (même en hiver)', price: 90, pants: 0x2c3e50, shorts: 1 },
+  lun_soleil: { cat: 'lunettes', name: 'Lunettes de soleil', price: 70, gl: 'sun' },
+  lun_avi: { cat: 'lunettes', name: 'Aviateur dorées', price: 120, gl: 'avi' },
+  lun_loupe: { cat: 'lunettes', name: 'Loupes de contrôleur', price: 90, gl: 'loupe' },
+  sac_dos: { cat: 'sac', name: 'Sac à dos', price: 60, bag: 'dos' },
+  sac_banane: { cat: 'sac', name: 'Banane fluo', price: 70, bag: 'banane' },
+  sac_cape: { cat: 'sac', name: 'Cape de super-régleur', price: 250, bag: 'cape' }
 };
 ML.SKINS = [0xf0c8a0, 0xe2b48c, 0xc68642, 0x8d5524, 0x5b3a29];
 ML.HAIRS = [0x3b2a1a, 0xe0b050, 0x111111, 0x8b5a2b, 0xa0522d, 0xbdc3c7];
@@ -273,7 +304,7 @@ ML.HAIRS = [0x3b2a1a, 0xe0b050, 0x111111, 0x8b5a2b, 0xa0522d, 0xbdc3c7];
    salaires et les amendes coûtent. Les prix ci-dessous équilibrent une
    campagne d'environ 1 h 30 jusqu'à l'inspecteur. */
 ML.ECO = {
-  startMoney: 900, freeMoney: 1500, startRep: 40, bankrupt: -2000,     // sous −2 000 € le soir : faillite
+  startMoney: 3200, freeMoney: 3800, startRep: 40, bankrupt: -2000,     // V6 : on démarre SANS machine, avec de quoi en acheter ; sous −2 000 € le soir : faillite
   // moins on est de joueurs, plus les pièces rapportent et plus on a de temps (index = nb de joueurs − 1)
   playerPay: [1.6, 1.25, 1.1, 1], playerTime: [1.35, 1.15, 1.05, 1], playerChaos: [0.55, 0.75, 0.9, 1],
   order: { base: 125, perStep: 65, far: 30, ctl: 15 },        // prix d'une commande (avant taille, réputation, délai)
@@ -283,6 +314,8 @@ ML.ECO = {
   supplierDelay: [120, 180], fee: 20,                           // livraison par camion fournisseur (s, frais de port)
   sub: { fonderie: 60, chaudro: 70, tth: 45 },                  // sous-traitance en direct
   subPC: { fonderie: 90, chaudro: 100 }, subDelay: [100, 140],  // brut commandé au PC (livré à l'atelier)
+  akinox: { fonderie: 45, chaudro: 50, delay: [50, 260], fail: 0.25, warn: 8 },   // V6 : AKINOX INGENIEURING — pas cher, délai au hasard, parfois ne livre pas (prévenu après ~8 s)
+  occaz: { supply: 0.5, wrong: 0.25, wear: 2.5, brkBrut: 2.5, brkTool: 2 },   // V6 : bruts / outils d'occasion
   coco: 70,                                                     // caisse d'outils en direct chez Outi'Pro
   fines: { radar: 5, police: 60, ped: 30, burn: 80, audit: 40, inspect: 10, slapInsp: 30, jail: 100, vandal: 150 },
   jail: { peds: 3, sec: 45, bail: 150 },                        // 3 passants renversés → la gendarmerie te poursuit ; prison 45 s (caution 150 €)
@@ -305,17 +338,28 @@ ML.SUPPLY = {
   plaquette: { name: 'Plaquette carbure', price: 15, lot: 2, from: 'outipro' }, fraise: { name: 'Fraise', price: 20, lot: 2, from: 'outipro' },
   foret: { name: 'Foret', price: 12, lot: 2, from: 'outipro' }
 };
+// V6 : la même chose d'OCCASION (moitié prix, plus de pannes et de pièces non conformes)
+for (const k of Object.keys(ML.SUPPLY)) { const L = ML.SUPPLY[k]; ML.SUPPLY[k + '_oc'] = { name: L.name + ' d\'occasion', price: Math.round(L.price * 0.5), lot: L.lot, from: L.from, oc: true, base: k }; }
 ML.CART_MAX = 40;                                               // articles max dans un colis
+/* V6 : gammes de machines — on choisit à l'achat (prix × price ; vitesse ; pannes × brk) */
+ML.MMODELS = {
+  occaz: { tag: 'OCCASION', icon: '🔧', price: 0.45, speed: 0.8, brk: 2.6, paint: 0xa08f66, desc: 'Pas chère, mais lente (−20 %) et souvent en panne.' },
+  std: { tag: 'STANDARD', icon: '⚙️', price: 1, speed: 1, brk: 1, paint: 0xdfe6ec, desc: 'Le bon compromis.' },
+  pro: { tag: 'HAUT DE GAMME', icon: '💎', price: 1.75, speed: 1.35, brk: 0.35, paint: 0xf4f9ff, desc: 'Neuve : +35 % de vitesse et presque jamais en panne.' }
+};
+ML.MBRAND = { tour: { occaz: 'Tour Ernault-Somua 1984', std: 'Tour CN', pro: 'Tour Mazak QT-Ultra' }, fraiseuse: { occaz: 'Fraiseuse Huron 1979', std: 'Fraiseuse CN', pro: 'Centre DMG Mori' } };
 /* Catalogue du PC (machines, équipements, améliorations). now: effet immédiat ; sinon installé le lendemain matin. */
 ML.CATALOG = {
-  T2: { cat: 'machine', name: 'Tour CN T2', price: 1100, mach: 'T2', desc: 'Un deuxième tour. Il lui faut un opérateur (RH).' },
-  F2: { cat: 'machine', name: 'Fraiseuse CN F2', price: 1100, mach: 'F2', desc: 'Une deuxième fraiseuse.' },
+  T1: { cat: 'machine', name: 'Tour T1', price: 1000, mach: 'T1', desc: 'Premier emplacement de tour (à gauche, devant les racks).' },
+  F1: { cat: 'machine', name: 'Fraiseuse F1', price: 1000, mach: 'F1', desc: 'Premier emplacement de fraiseuse.' },
+  T2: { cat: 'machine', name: 'Tour T2', price: 1100, mach: 'T2', desc: 'Un deuxième tour. Il lui faut un opérateur (RH).' },
+  F2: { cat: 'machine', name: 'Fraiseuse F2', price: 1100, mach: 'F2', desc: 'Une deuxième fraiseuse.' },
   agrandissement: { cat: 'atelier', name: "Agrandissement de l'atelier", price: 1400, desc: 'Deux emplacements de plus : T3 et F3 (le sol gris dans l\'atelier).', now: true, day: ML.PROGRESS.agrandissement },
   extension: { cat: 'atelier', name: 'Extension Est (nouveau hall)', price: 2600, desc: 'Un hall de plus à droite de l\'atelier : emplacements T4 et F4. Construit pendant la nuit.', day: ML.PROGRESS.extension },
-  T3: { cat: 'machine', name: 'Tour CN T3', price: 1600, mach: 'T3', need: 'agrandissement', desc: 'Grand tour CN (après agrandissement).' },
-  F3: { cat: 'machine', name: 'Fraiseuse CN F3', price: 1600, mach: 'F3', need: 'agrandissement', desc: 'Centre d\'usinage (après agrandissement).' },
-  T4: { cat: 'machine', name: 'Tour CN T4', price: 1900, mach: 'T4', need: 'extension', desc: 'Dans l\'extension Est.' },
-  F4: { cat: 'machine', name: 'Fraiseuse CN F4', price: 1900, mach: 'F4', need: 'extension', desc: 'Dans l\'extension Est.' },
+  T3: { cat: 'machine', name: 'Tour T3', price: 1600, mach: 'T3', need: 'agrandissement', desc: 'Grand tour CN (après agrandissement).' },
+  F3: { cat: 'machine', name: 'Fraiseuse F3', price: 1600, mach: 'F3', need: 'agrandissement', desc: 'Centre d\'usinage (après agrandissement).' },
+  T4: { cat: 'machine', name: 'Tour T4', price: 1900, mach: 'T4', need: 'extension', desc: 'Dans l\'extension Est.' },
+  F4: { cat: 'machine', name: 'Fraiseuse F4', price: 1900, mach: 'F4', need: 'extension', desc: 'Dans l\'extension Est.' },
   tp: { cat: 'equip', name: 'Transpalette', price: 250, veh: 'tp', desc: 'Déplace 4 caisses dans l\'atelier.' },
   fenwick: { cat: 'equip', name: 'Fenwick', price: 650, veh: 'fenwick', desc: 'Indispensable pour les GROSSES pièces sur palette (quai gros colis). Avec le camion plateau du garage, elles rapportent gros.' },
   erp_auto: { cat: 'atelier', name: 'Logiciel ERP+ (acceptation auto)', price: 450, desc: 'Les demandes des clients sont acceptées toutes seules.', now: true },
@@ -332,7 +376,7 @@ ML.CATALOG = {
   // --- V5.2 ---
   prepa: { cat: 'atelier', name: 'Poste de préparation d\'usinage', price: 1800, desc: 'Prépare tout seul des KITS (brut + bon outil) pour les commandes acceptées : tu prends le kit, tu le donnes à la machine. Prend dans le stock.', now: true },
   meuleuse: { cat: 'equip', name: 'Meuleuse « casse-radar »', price: 180, desc: 'Sur son crochet (mur gauche). E sur un radar pour le découper… mais si un témoin te voit : 150 € d\'amende.', now: true },
-  vigile: { cat: 'abo', name: 'Vigile anti-Johan Bois', price: 120, daily: 35, desc: 'Raymond garde la porte : Johan Bois ne vole plus rien. 35 €/jour, résiliable.', now: true },
+  vigile: { cat: 'abo', name: 'Videur à l\'entrée (Raymond)', price: 120, daily: 35, desc: 'Raymond garde la porte : Johan Bois, les squatteurs et les saboteurs n\'entrent plus. 35 €/jour, résiliable.', now: true },
   radarpass: { cat: 'abo', name: 'Abonnement « Pass Radar »', price: 90, daily: 30, desc: 'Les radars flashent… mais l\'amende est pour l\'abonnement. Plus d\'amende de radar. 30 €/jour.', now: true }
 };
 /* Personnel : embauche (une fois) + salaire (chaque soir) */
@@ -364,6 +408,25 @@ ML.MALL = {
   poisson: { stand: 'farces', name: 'Poisson en caoutchouc', price: 12, icon: '🐟', desc: 'Clic gauche : une baffe qui fait « COUIC » (étourdit 2 s).', weapon: { reach: 2.8, stun: 2, push: 3 } },
   batte: { stand: 'farces', name: 'Batte en mousse', price: 18, icon: '🏏', desc: 'Clic gauche : frappe de loin et envoie valser.', weapon: { reach: 3.6, stun: 1.6, push: 9 } },
   gants: { stand: 'boxe', name: 'Gants de boxe (comme Coco)', price: 25, icon: '🥊', desc: 'Clic gauche : crochet du gauche, BAM ! (étourdit 2,5 s).', weapon: { reach: 2.5, stun: 2.5, push: 6 } }
+};
+/* ======================= V6 ======================= */
+ML.WEAPONS = {                                                 // armes de l'atelier (en plus de celles du centre commercial)
+  grande_cle: { reach: 3.1, stun: 2.2, push: 7 },               // la seule qui chasse les perturbateurs (Johan, Lean Manufacturing, squatteurs)
+  batte_bb: { reach: 3.5, stun: 2.8, push: 11 }                 // la seule qui règle les conflits (racketteurs, saboteurs, mauvais payeurs)
+};
+ML.V6 = {
+  food: { sec: 380, eat: { kebab: 60, barre: 25, baguette: 35, viennoiseries: 30, hotdog: 55 } },   // faim : 100 → 0 en ~6 min
+  sleep: { sec: 470, coffee: 25, napSec: 6 },                    // fatigue : 100 → 0 en ~8 min ; un café +25 ; une sieste = plein
+  faint: { sec: 7, back: 40 },                                   // évanouissement : 7 s par terre, on se relève à 40 %
+  hotdog: 5, snack: 3,
+  black: { mult: 2.3, fine: 350, every: [230, 420], warn: 25, props: 3, rep: 5, heat: 0.6 },
+  racket: { ask: 50, every: [80, 150], dist: 75, dmg: 30, steal: 0.12, wait: 12 },
+  payeur: 0.08,
+  club: { drink: 8, round: 40, knock: 35, steal: 0.1 },
+  bet: { min: 10, max: 500 },
+  pawn: { nain: 35, buste: 120, tableau: 80, trophee: 60, lampe: 25 },
+  fight: { prize: 3, dmg: 45 },
+  squat: { sat: 4, every: 20 }
 };
 ML.MALL_STANDS = { snack: ['🌯 Snack Le Petit Creux', '#e67e22'], farces: ['🎭 Farces & Attrapes', '#8e44ad'], boxe: ['🥊 Boxe Shop', '#c0392b'] };
 /* V5.2 : QUÊTES SECONDAIRES (un PNJ vient au comptoir demander un service).
@@ -501,6 +564,19 @@ ML.PEOPLE = {
   cardin: { name: 'Cardin', role: 'Un pote de l\'atelier', visitor: true, look: { skin: 0xf0c8a0, shirt: 0xc0392b, pants: 0x2c3e50, hair: 0x3b2a1a, height: 1.8 } },
   kawa: { name: 'Jimmy Kawa', role: 'Un pote de l\'atelier', visitor: true, look: { skin: 0xd9a37a, shirt: 0x2980b9, pants: 0x34495e, hair: 0x111111, height: 1.76, cap: 0x2980b9 } },
   vendeuse: { name: 'Sandra', role: 'Caissière — Centre commercial', look: { skin: 0xf3cba5, shirt: 0x8e44ad, pants: 0x2c3e50, hair: 0xe0b050, height: 1.66, longHair: true } },
+  // V6
+  turfiste: { name: 'Gégène', role: 'Patron du PMU', look: { skin: 0xe2b48c, shirt: 0x27ae60, pants: 0x2c3e50, hair: 0x7f8c8d, height: 1.7, width: 1.3, mustache: true, cap: 0x27ae60 } },
+  croupier: { name: 'Monsieur Vincent', role: 'Croupier', look: { skin: 0xf0c8a0, shirt: 0xffffff, pants: 0x111111, hair: 0x111111, height: 1.82, tie: 0x8b0000 } },
+  preteur: { name: 'Dédé la Brocante', role: 'Prêteur sur gages', look: { skin: 0xd9a37a, shirt: 0x8d6e63, pants: 0x3e2723, hair: 0xbdc3c7, height: 1.68, glasses: true, beard: true } },
+  barman: { name: 'Kenzo', role: 'Barman du Copeau', look: { skin: 0xc68642, shirt: 0x111111, pants: 0x111111, hair: 0x111111, height: 1.8 } },
+  bookmaker: { name: 'Le Balafré', role: 'Organisateur des combats', look: { skin: 0xe2b48c, shirt: 0x5d4037, pants: 0x212121, hair: 0x212121, height: 1.9, width: 1.25, cap: 0x212121 } },
+  jeanmi: { name: 'Jean-Mi « Sous-le-Manteau »', role: 'Pièces au black', look: { skin: 0xe8b98f, shirt: 0x3d3d3d, pants: 0x1e272e, hair: 0x3b2a1a, height: 1.74, cap: 0x2d3436, glasses: true } },
+  squat1: { name: 'Steeve le squatteur', role: 'Perturbateur', visitor: true, look: { skin: 0xe2b48c, shirt: 0x6d4c41, pants: 0x455a64, hair: 0x8b5a2b, height: 1.78, beard: true, cap: 0x37474f } },
+  squat2: { name: 'Kéké le squatteur', role: 'Perturbateur', visitor: true, look: { skin: 0xc68642, shirt: 0x8e44ad, pants: 0x263238, hair: 0x111111, height: 1.72, cap: 0xc0392b } },
+  dennis: { name: 'Dennis', role: 'Le gamin insupportable du quartier', visitor: true, look: { skin: 0xf3cba5, shirt: 0xe74c3c, pants: 0x1f4e9a, hair: 0xe0b050, height: 1.22, width: 0.8, cap: 0xf1c40f } },
+  racket: { name: 'Bébert la Gâchette', role: 'Racketteur', visitor: true, look: { skin: 0xe2b48c, shirt: 0x212121, pants: 0x212121, hair: 0x111111, height: 1.88, width: 1.3, glasses: true } },
+  flic: { name: 'Brigadier Ropars', role: 'Police — brigade financière', visitor: true, look: { skin: 0xf0c8a0, shirt: 0x1f3a93, pants: 0x1c2a5a, hair: 0x5a3d22, height: 1.83, cap: 0x1f3a93 } },
+  hotdog: { name: 'Mehdi', role: 'Vendeur de hot-dogs', visitor: true, look: { skin: 0xc68642, shirt: 0xffffff, pants: 0x2c3e50, hair: 0x111111, height: 1.76, cap: 0xe74c3c, apron: 0xe74c3c } },
   coach: { name: 'Coach Bruno', role: 'Salle de sport Le Biceps', look: { skin: 0xc68642, shirt: 0x16a085, pants: 0x111111, hair: 0x111111, height: 1.85, width: 1.35 } }
 };
 

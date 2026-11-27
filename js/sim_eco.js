@@ -87,13 +87,13 @@
   function erp(pid, P, m) {
     switch (m.op) {
       case 'accept': if (!K.accept(+m.id, pid)) K.note(pid, 'Cette demande n\'est plus disponible.', 'warn'); return;
-      case 'refuse': { const i = S.props.findIndex(p => p.id === +m.id); if (i >= 0) { const p = S.props.splice(i, 1)[0]; K.all(`🗑 ${name(pid)} a refusé la demande de ${COMP[p.client].name} (${p.part}).`, 'info'); Sim.dirty = true; } return; }
+      case 'refuse': { const i = S.props.findIndex(p => p.id === +m.id); if (i >= 0) { const p = S.props.splice(i, 1)[0]; K.all(`🗑 ${name(pid)} a refusé la demande ${ML.on(p.id)} de ${COMP[p.client].name}.`, 'info'); Sim.dirty = true; } return; }
       case 'plan': {
         const o = S.orders.find(x => x.id === +m.id); if (!o || o.m || K.stage(o) !== 'usinage' && !o.src) return;
         const mid = String(m.mid || ''), def = ML.MACHINES.find(x => x.id === mid);
         if (!mid) { o.plan = null; Sim.dirty = true; return; }
-        if (!S.machines[mid] || !def || def.type !== o.mtype) return K.note(pid, `La #${o.id} se fait sur une ${ML.MTYPE[o.mtype]}.`, 'warn');
-        o.plan = mid; Sim.dirty = true; K.note(pid, `📌 #${o.id} prévue sur ${mid}.`, 'good'); return;
+        if (!S.machines[mid] || !def || def.type !== o.mtype) return K.note(pid, `La ${ML.on(o.id)} se fait sur une ${ML.MTYPE[o.mtype]}.`, 'warn');
+        o.plan = mid; Sim.dirty = true; K.note(pid, `📌 ${ML.on(o.id)} prévue sur ${mid}.`, 'good'); return;
       }
       case 'buy': {
         const k = String(m.k), it = ML.CATALOG[k]; if (!it) return;
@@ -102,16 +102,17 @@
         const early = it.day && (S.co.day || S.day) < it.day;
         if (early && !m.early) return K.note(pid, `${it.name} : se débloque au jour ${it.day} (ou tout de suite, plus cher : bouton « Débloquer maintenant »).`, 'warn');
         if (it.mach && ML.MACHINES.find(x => x.id === it.mach).ext && !S.ext) return K.note(pid, `${it.name} : l'extension sera construite cette nuit, achète la machine demain !`, 'warn');
-        const fee = early ? K.earlyFee(it) : 0, price = K.catPrice(k) + fee;
+        const mo = it.mach ? (ML.MMODELS[m.mo] ? m.mo : 'std') : null;            // V6 : gamme choisie (occasion / standard / haut de gamme)
+        const fee = early ? K.earlyFee(it) : 0, price = Math.round(K.catPrice(k) * (mo ? ML.MMODELS[mo].price : 1)) + fee;
         if (!K.spend(pid, price, 'invest', it.name + (early ? ' (déblocage anticipé)' : '') + (S.black ? ' — Black Friday' : ''))) return;
         if (it.mach && S.saeBon) { K.all(`🎓 Bon de SAE utilisé : −${S.saeBon} % sur ${it.name} !`, 'good'); S.saeBon = 0; S.up.sae_bon = 0; delete S.up.sae_bon; }
         if (early) K.all(`🔓 ${name(pid)} a débloqué « ${it.name} » en avance (supplément ${fee} €).`, 'good');
         if (it.mach) {
-          S.machines[it.mach] = { status: 'idle', job: null, op: null, wear: 0, broken: false, plan: null, bin: true, chips: 0 };
+          S.machines[it.mach] = { status: 'idle', job: null, op: null, wear: mo === 'occaz' ? 40 : 0, broken: false, plan: null, bin: true, chips: 0, mo };
           ML.World.syncMachines(S); K.assignOps();
           const def = ML.MACHINES.find(x => x.id === it.mach);
-          K.big(`🏭 ${it.mach} installée !`, '#ffd257'); K.sfx('success', def.x, def.z);
-          K.all(`🏭 ${name(pid)} a acheté ${it.name} (${price} €). ${S.staff.filter(id => ML.PEOPLE[id].op).length < Object.keys(S.machines).length ? 'Pas assez d\'opérateurs : ils vont jongler (ou embauche au PC, onglet RH).' : ''}`, 'good');
+          K.big(`🏭 ${it.mach} installée : ${ML.MBRAND[def.type][mo]} !`, '#ffd257'); K.sfx('success', def.x, def.z);
+          K.all(`🏭 ${name(pid)} a acheté ${it.name} — ${ML.MBRAND[def.type][mo]} (${ML.MMODELS[mo].tag}, ${price} €).${mo === 'occaz' ? ' Elle est lente et tombera plus souvent en panne.' : mo === 'pro' ? ' +35 % de vitesse !' : ''} ${S.staff.filter(id => ML.PEOPLE[id].op).length < Object.keys(S.machines).length ? 'Pas assez d\'opérateurs : ils vont jongler (ou embauche au PC, onglet RH).' : ''}`, 'good');
         } else if (it.veh) {
           S.owned.push(it.veh);
           const p = it.veh === 'tp' ? ML.LOC.tpSpawn : ML.LOC.fenSpawn;
@@ -131,10 +132,18 @@
       case 'subpc': {
         const o = S.orders.find(x => x.id === +m.id); if (!o || o.q) return;
         const st = K.stage(o); if (st !== 'fonderie' && st !== 'chaudro') return;
+        if (m.src === 'akinox') {                                     // V6 : AKINOX INGENIEURING — pas cher, délai au hasard, parfois rien
+          const A = ECO.akinox, pr = A[st]; if (!K.spend(pid, pr, 'achat', 'brut AKINOX')) return;
+          const fails = rng() < A.fail, eta = S.rt + A.delay[0] + rng() * (A.delay[1] - A.delay[0]);
+          o.q = true; o.ak = { warn: S.rt + A.warn, fail: fails };
+          S.deliv.push({ id: S.nextId++, oid: o.id, sub: st, eta: fails ? S.rt + A.warn : eta, eta0w: S.rt + A.warn, from: st, ak: true, fail: fails, name: `Brut AKINOX ${ML.on(o.id)}` });
+          K.all(`📠 ${name(pid)} a commandé le brut de la ${ML.on(o.id)} chez AKINOX INGENIEURING (${pr} €). Ils confirment… ou pas : réponse dans quelques secondes.`, 'info');
+          Sim.dirty = true; return;
+        }
         if (!K.spend(pid, ECO.subPC[st], 'achat', 'le brut')) return;
         o.q = true; const d = ECO.subDelay, eta = S.rt + (d[0] + rng() * (d[1] - d[0])) * (S.beginner && !S.tutoDone ? 0.2 : 1);     // V5.3 : mode débutant (tutoriel) = livraison express
-        S.deliv.push({ id: S.nextId++, oid: o.id, sub: st, eta, from: st, name: `Brut ${st === 'fonderie' ? 'de fonderie' : 'mécano-soudé'} #${o.id}` });
-        K.all(`🛒 ${name(pid)} a commandé le brut de la #${o.id} chez ${COMP[st].name} (${ECO.subPC[st]} €) : livré à l'atelier dans ~${Math.round((eta - S.rt) / 6) / 10} min.`, 'info');
+        S.deliv.push({ id: S.nextId++, oid: o.id, sub: st, eta, from: st, name: `Brut ${st === 'fonderie' ? 'de fonderie' : 'mécano-soudé'} ${ML.on(o.id)}` });
+        K.all(`🛒 ${name(pid)} a commandé le brut de la ${ML.on(o.id)} chez ${COMP[st].name} (${ECO.subPC[st]} €) : livré à l'atelier dans ~${Math.round((eta - S.rt) / 6) / 10} min.`, 'info');
         Sim.dirty = true; return;
       }
       case 'hire': {
@@ -176,7 +185,9 @@
     }
   }
   function spawnPart(id, slot) {
-    const sp = ML.LOC.parkSlots[slot], n = npcs[id], [part, mat, mtype, tool] = rng.pick(ML.PART_REQ.filter(r => Object.keys(S.machines).some(m => ML.MACHINES.find(x => x.id === m).type === r[2])));
+    const req = ML.PART_REQ.filter(r => Object.keys(S.machines).some(m => ML.MACHINES.find(x => x.id === m).type === r[2]));
+    if (!req.length) return;                                              // V6 : atelier vide → pas de particulier
+    const sp = ML.LOC.parkSlots[slot], n = npcs[id], [part, mat, mtype, tool] = rng.pick(req);
     const price = K.orderPrice(['usinage', 'livraison'], 's', false, ECO.part.mult);
     const p = { id, slot, st: 'arrive', part, mat, mtype, tool, price, dur: ECO.part.dur * K.D.dur, exp: 0, oid: null };
     S.parts.push(p); Sim.dirty = true;
@@ -199,7 +210,7 @@
     const o = { id: S.nextOid++, client: 'part', who: p.id, part: p.part, mat: p.mat, mtype: p.mtype, tool: p.tool, steps: ['usinage', 'livraison'], si: 0, size: 's', src: null, dur: p.dur, price: p.price, t0: S.rt, dl: S.rt + p.dur, q: false, m: null, plan: null };
     S.orders.push(o); p.st = 'order'; p.oid = o.id; Sim.dirty = true;
     K.say(n, `Merci ! Je l'attends ici, ${Math.round(p.dur / 60 * 10) / 10} minutes max !`);
-    K.all(`📋 Commande #${o.id} (particulier ${ML.PEOPLE[p.id].name}) : ${o.part} en ${ML.MATERIALS[o.mat].label} · ${o.price} € · à rapporter au COMPTOIR.`, 'info'); K.sfx('order');
+    K.all(`📋 Commande ${ML.on(o.id)} (particulier ${ML.PEOPLE[p.id].name}) : pièce en ${ML.MATERIALS[o.mat].label} · ${o.price} € · à rapporter au COMPTOIR.`, 'info'); K.sfx('order');
   }
 
   /* ---------- Personnel IA ---------- */
@@ -249,7 +260,7 @@
     for (const it of T.items) {
       const o = K.isPart(it) || it.type === 'palette' ? S.orders.find(x => x.id === it.d.oid) : null;
       if (o && K.stage(o) === 'livraison') { K.deliver(null, null, 0, Object.assign({}, it, { d: Object.assign({}, it.d, { npc: 0.9 }) }), o.client, npcs[COMP[o.client].npc]); del++; continue; }
-      if (o && K.stage(o) === 'tth' && !o.q && S.money >= ECO.sub.tth) { K.money(-ECO.sub.tth, 'achat', { who: 'Jojo', what: `Traitement thermique #${o.id}` }); o.q = true; S.subs.tth.push({ oid: o.id, end: S.rt + C.SUB_SEC, nc: !!it.d.nc, mes: it.d.mes, type: it.type }); tth++; continue; }
+      if (o && K.stage(o) === 'tth' && !o.q && S.money >= ECO.sub.tth) { K.money(-ECO.sub.tth, 'achat', { who: 'Jojo', what: `Traitement thermique ${ML.on(o.id)}` }); o.q = true; S.subs.tth.push({ oid: o.id, end: S.rt + C.SUB_SEC, nc: !!it.d.nc, mes: it.d.mes, type: it.type }); tth++; continue; }
       if (it.type === 'matiere') { if (it.d.mat) S.stock[it.d.mat] += it.d.q; else { S.stock.plaquette += 2; S.stock.fraise += 2; S.stock.foret += 2; } back++; continue; }
       const [x, z] = K.receptionSpot(); K.spawnItem(it, x, 0, z); back++;
     }
@@ -261,6 +272,7 @@
   /* ---------- Boucle ---------- */
   mod.step = dt => {
     for (const d of S.deliv.slice()) {
+      if (d.ak && !d.fail && !d.said && S.rt > d.eta0w) { d.said = true; const o = S.orders.find(x => x.id === d.oid); if (o) o.ak = { ok: true }; K.all(`📠 AKINOX confirme la ${ML.on(d.oid)} : livraison à la RÉCEPTION dans ~${Math.max(1, Math.round((d.eta - S.rt) / 60))} min (ils ne sont jamais à l'heure…).`, 'info'); Sim.dirty = true; }
       if (S.rt < d.eta) continue;
       S.deliv.splice(S.deliv.indexOf(d), 1); Sim.dirty = true;
       if (d.k) { S.stock[d.k] += d.q; K.all(`🚚 Le camion de ${COMP[d.from].name} a livré : ${d.name} (Sylvie l'a rangé en stock).`, 'good'); K.sfx('success'); continue; }
@@ -271,8 +283,12 @@
       }
       const o = S.orders.find(x => x.id === d.oid);
       if (!o || K.stage(o) !== d.sub) continue;
+      if (d.ak && d.fail) {                                           // V6 : AKINOX ne livrera pas — on le sait tout de suite
+        o.q = false; o.ak = null; K.big('📠 AKINOX : PAS DE LIVRAISON', '#ff6b6b'); K.sfx('fail');
+        K.all(`📠 AKINOX INGENIEURING annule la ${ML.on(o.id)} (« rupture de stock, désolé chef ») : l'argent est perdu. Recommande le brut ailleurs (PC ou en direct) !`, 'warn'); continue;
+      }
       const [x, z] = K.receptionSpot(); K.spawnItem({ type: 'brut_sp', d: { oid: o.id, mat: d.sub === 'fonderie' ? 'fonte' : 'soude' } }, x, 0, z);
-      o.si++; o.q = false; K.all(`🚚 Brut de la #${o.id} livré par ${COMP[d.sub].name} : il est en RÉCEPTION, à l'atelier.`, 'good'); K.sfx('success');
+      o.si++; o.q = false; o.ak = null; K.all(`🚚 Brut de la ${ML.on(o.id)} livré par ${d.ak ? 'AKINOX INGENIEURING' : COMP[d.sub].name} : il est en RÉCEPTION, à l'atelier.`, 'good'); K.sfx('success');
     }
     partStep(dt); tonyStep(dt); jojoStep(dt);
   };
@@ -289,7 +305,7 @@
     if (ML.PARTICULIERS.includes(n.id)) {
       const p = S.parts.find(x => x.id === n.id); if (!p) return '';
       if (p.st === 'wait') return `❗ Pièce urgente : ${p.price} € (E)`;
-      if (p.st === 'order') { const o = S.orders.find(x => x.id === p.oid); return o ? `⏳ #${o.id} ${o.part} · ${Math.max(0, Math.ceil(o.dl - S.rt))} s` : ''; }
+      if (p.st === 'order') { const o = S.orders.find(x => x.id === p.oid); return o ? `⏳ ${ML.on(o.id)} · ${Math.max(0, Math.ceil(o.dl - S.rt))} s` : ''; }
       return '';
     }
     if (n.id === 'tony') { const cam = S.cars.find(c => c.kind === 'camion'); return n.job ? '🚜 Je charge…' : cam ? '' : '🚜 Pas de camion…'; }

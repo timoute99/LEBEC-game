@@ -18,6 +18,8 @@
   const opName = npc => short(npc);
   const fireAt = mid => (S_().fires || []).find(f => f.mid === mid);
   const myRole = () => { const S = S_(); return S && S.pl[ML.Game.me] ? S.pl[ML.Game.me].role : 'poly'; };
+  const soloR = () => { const S = S_(); return !!S && Object.keys(S.pl).length === 1; };   // V6 : seul = tous les rôles
+  const isR = r => myRole() === r || soloR();
   R.myRole = myRole;
   const isPart = it => !!it && (it.type === 'caisse' || it.type === 'piece');
   const inv = () => { const S = S_(); return S && S.pl[ML.Game.me] ? S.pl[ML.Game.me].inv : []; };
@@ -29,18 +31,18 @@
     if (M.stopped) return S.power ? `▶ Redémarrer ${mid} (arrêt d'urgence)` : `⏹ ${mid} : arrêt d'urgence — remets d'abord le courant (tableau électrique)`;
     if (!M.op) return `${mid} : SANS OPÉRATEUR — embauche au PC de gestion (onglet Personnel)`;
     if (fireAt(mid)) return held && held.type === 'extincteur' ? `🔥 Éteindre : maintiens le CLIC GAUCHE vers le feu` : `🔥 FEU sur ${mid} ! Prends un extincteur (mur gauche)`;
-    if (M.broken) return held && held.type === 'cle' ? (myRole() === 'maintenance' ? `🔧 Réparer ${mid} (clé à molette)` : `${mid} en panne : réservé MAINTENANCE 🔧`) : `${mid} EN PANNE : clé à molette (maintenance)`;
+    if (M.broken) return held && held.type === 'cle' ? (isR('maintenance') ? `🔧 Réparer ${mid} (clé à molette)` : `${mid} en panne : réservé MAINTENANCE 🔧`) : `${mid} EN PANNE : clé à molette (maintenance)`;
     if (M.bin === false || M.chips >= 100) return `🗑 ${mid} bloquée : bac à copeaux ${M.bin === false ? 'ABSENT' : 'PLEIN'} (maintenance)`;
     if (M.worn && M.job) return held && IT.def(held).kind === 'tool' ? `Changer l'outil usé de ${mid}` : `${mid} : outil usé → ${ML.TOOLS[M.job.need].label} neuf(ve)`;
     if (held) {
       const t = IT.def(held);
-      if (t.kind === 'kit') return M.job ? `${mid} est occupée` : `🧰 Lancer le KIT #${held.d.oid} sur ${mid} (brut + outil d'un coup) — prise d'origine`;
+      if (t.kind === 'kit') return M.job ? `${mid} est occupée` : `🧰 Lancer le KIT ${ML.on(held.d.oid)} sur ${mid} (brut + outil d'un coup) — prise d'origine`;
       if (t.kind === 'brut') return M.job ? `${mid} est occupée` : `Lancer « ${IT.name(held)} » sur ${mid} (${ML.MTYPE[def.type]}) — prise d'origine${M.plan ? ` · prévu : #${M.plan}` : ''}`;
       if (t.kind === 'tool') return !M.job ? `${mid} : donne d'abord un brut` : M.job.tool ? `${mid} a déjà son outil` : `Donner « ${IT.name(held)} » à ${mid}`;
     }
     if (!S.power) return `${mid} : plus de courant !`;
     if (!M.job) return `${mid} ${ML.MTYPE[def.type]} libre — apporte un brut`;
-    return `${mid} : #${M.job.oid} ` + (M.job.tool ? `${Math.floor(100 * M.job.prog / M.job.total)} %` : `attend : ${ML.TOOLS[M.job.need].label}`);
+    return `${mid} : ${ML.on(M.job.oid)} ` + (M.job.tool ? `${Math.floor(100 * M.job.prog / M.job.total)} %` : `attend : ${ML.TOOLS[M.job.need].label}`);
   }
 
   /** Texte affiché pour une cible, ou null si rien à faire */
@@ -59,23 +61,23 @@
       case 'panel': return !S.power ? '⚡ Réarmer le disjoncteur' : G.traitor ? '🕵 Couper le courant (discrètement…)' : null;
       case 'marbre':
         if (!isPart(held)) return S.evs && S.evs.audit ? '🔍 Jacky attend une CAISSE ici' : null;
-        return S.evs && S.evs.audit && G.npcDist('jacky') < 6 ? `🔍 Présenter la caisse #${held.d.oid} à Jacky (audit)` : `📏 Contrôler la caisse #${held.d.oid} au pied à coulisse`;
+        return S.evs && S.evs.audit && G.npcDist('jacky') < 6 ? `🔍 Présenter la caisse ${ML.on(held.d.oid)} à Jacky (audit)` : `📏 Contrôler la caisse ${ML.on(held.d.oid)} au pied à coulisse`;
       case 'mach': return machineLabel(a, held);
       case 'bac': {
         const M = S.machines[a]; if (!M) return null;
-        if (myRole() !== 'maintenance') return M.chips >= 75 || M.bin === false ? `Bac de ${a} ${M.bin === false ? 'absent' : Math.round(M.chips) + ' %'} — réservé MAINTENANCE 🔧` : null;
+        if (!isR('maintenance')) return M.chips >= 75 || M.bin === false ? `Bac de ${a} ${M.bin === false ? 'absent' : Math.round(M.chips) + ' %'} — réservé MAINTENANCE 🔧` : null;
         if (M.bin === false) return held && held.type === 'bac_vide' ? `🪣 Remettre le bac sur ${a}` : `Bac de ${a} absent : vide-le à la benne et rapporte-le`;
         return M.chips >= 15 ? `🗑 Prendre le bac de copeaux de ${a} (${Math.round(M.chips)} %)` : null;
       }
       case 'benne': return held && held.type === 'bac_plein' ? '🗑 Vider le bac dans la benne à copeaux' : null;
-      case 'item': { const it = G.itemViews[a]; if (!it) return null; if (it.type === 'colis') return `📦 Porter le colis (${it.d.n} articles) · [R] l'OUVRIR`; if (it.type === 'palette') return `🏗 Palette #${it.d.oid} : trop lourd ! Fenwick (cariste)`; return it.type === 'find' ? `★ Ramasser la trouvaille : ${IT.name(it)}` : `Ramasser : ${IT.name(it)}`; }
+      case 'item': { const it = G.itemViews[a]; if (!it) return null; if (it.type === 'colis') return `📦 Porter le colis (${it.d.n} articles) · [R] l'OUVRIR`; if (it.type === 'palette') return `🏗 Palette ${ML.on(it.d.oid)} : trop lourd ! Fenwick (cariste)`; return it.type === 'find' ? `★ Ramasser la trouvaille : ${IT.name(it)}` : `Ramasser : ${IT.name(it)}`; }
       case 'car': {
         const c = S.cars[+a]; if (!c) return null;
         if (b === 'door') {
           if (held && held.type === 'jerrican' && c.kind !== 'tp') return `⛽ Verser le jerrican dans ${c.name} (${c.fuel} %)`;
           const V = ML.VEHICLES[c.kind];
           if (c.dr) return V.seats && !(c.pass || []).some(x => x.seat === 'cab') ? `🪑 Monter côté passager (${S.pl[c.dr] ? S.pl[c.dr].name : '?'} conduit)` : `${c.name} (conduit par ${S.pl[c.dr] ? S.pl[c.dr].name : '?'})`;
-          if (V.role && myRole() !== V.role) return `${c.name} : réservé au ${ML.ROLES[V.role].icon} ${ML.ROLES[V.role].name.toUpperCase()}`;
+          if (V.role && myRole() !== V.role && !soloR()) return `${c.name} : réservé au ${ML.ROLES[V.role].icon} ${ML.ROLES[V.role].name.toUpperCase()}`;
           return `Conduire ${c.name}` + (['tp', 'fenwick'].includes(c.kind) ? '' : ` (⛽ ${c.fuel} %)`) + (c.kind === 'fenwick' ? ' — R : fourches' : c.kind === 'camion' ? ' — R : décharger' : '');
         }
         if (c.kind === 'fenwick') return null;
@@ -129,13 +131,13 @@
       case 'herve': return held && held.type === 'convention' ? (held.d.signee ? '📝 Rendre la convention SIGNÉE à Hervé' : 'La convention n\'est pas signée (Lebec !)') : 'Hervé : « La convention ? »';
       case 'fred': return 'Fred : « Arexis ! » (remplis-le sur le PC)';
       case 'mathieu': return '🐌 Écouter Mathieu à la place de l\'opérateur';
-      case 'saboteur': return 'Gars louche… (une claque le ferait fuir)';
+      case 'saboteur': return 'Gars louche… (la BATTE DE BASEBALL le ferait fuir)';
       case 'inspecteur': return 'Parler à l\'inspecteur';
       // --- V5.2 ---
-      case 'johan': return (G.npcViews.johan || {}).st === 'r' ? '🦹 Johan Bois file avec une caisse : une CLAQUE (clic gauche) !' : '🦹 Johan Bois… (une claque le ferait fuir)';
+      case 'johan': return (G.npcViews.johan || {}).st === 'r' ? '🦹 Johan Bois file avec une caisse : GRANDE CLÉ À MOLETTE (clic gauche) !' : '🦹 Johan Bois… (la GRANDE clé à molette le ferait fuir)';
       case 'vigile': return '🛡 Raymond, le vigile anti-Johan';
-      case 'bleuenn': return '💣 Lean Manufacturing bricole… une CLAQUE (clic gauche) l\'arrêterait !';
-      case 'garnier': case 'fanfrelat': return isPart(held) ? `🎓 Présenter la pièce #${held.d.oid} au jury de SAE` : `🎓 ${P_(n).name} (jury de SAE)`;
+      case 'bleuenn': return '💣 Lean Manufacturing bricole… la GRANDE CLÉ À MOLETTE (clic gauche) l\'arrêterait !';
+      case 'garnier': case 'fanfrelat': return isPart(held) ? `🎓 Présenter la pièce ${ML.on(held.d.oid)} au jury de SAE` : `🎓 ${P_(n).name} (jury de SAE)`;
       case 'vendeuse': return '🛍 Sandra : les stands sont au fond (E sur un article pour l\'acheter)';
       case 'coach': return '🏃 Coach Bruno : E sur un tapis de course pour s\'entraîner';
       case 'cardin': case 'kawa': { const Q = S.quest; return Q && Q.giver === n && Q.st === 'ask' ? `🙋 ${P_(n).name} : écouter sa demande (${Q.reward} €)` : `Parler à ${P_(n).name}`; }
@@ -144,7 +146,7 @@
     if (ML.PARTICULIERS.includes(n)) {
       const p = (S.parts || []).find(x => x.id === n); if (!p) return null;
       if (p.st === 'wait') return `🙋 ${P_(n).name} : écouter sa demande (${p.price} €)`;
-      if (p.st === 'order') return isPart(held) ? `Donner la pièce #${held.d.oid} à ${P_(n).name}` : `${P_(n).name} attend sa pièce (#${p.oid})`;
+      if (p.st === 'order') return isPart(held) ? `Donner la pièce ${ML.on(held.d.oid)} à ${P_(n).name}` : `${P_(n).name} attend sa pièce (${ML.on(p.oid)})`;
       return null;
     }
     const comp = COMP_OF[n], C = comp && COMP[comp];
@@ -152,18 +154,18 @@
     switch (C.kind) {
       case 'boulangerie': return 'Prendre des viennoiseries (pour Matis)';
       case 'station': return 'Prendre un jerrican d\'essence (gratuit)';
-      case 'matiere': return myRole() === 'magasinier' ? 'Commander de la matière à Eliott (il parle TRÈS vite)' : 'Eliott ne parle qu\'au MAGASINIER 📦';
-      case 'outils': return myRole() === 'magasinier' ? 'Acheter des outils (écouter Coco parler boxe 6 s)' : 'Coco ne vend qu\'au MAGASINIER 📦';
+      case 'matiere': return isR('magasinier') ? 'Commander de la matière à Eliott (il parle TRÈS vite)' : 'Eliott ne parle qu\'au MAGASINIER 📦';
+      case 'outils': return isR('magasinier') ? 'Acheter des outils (écouter Coco parler boxe 6 s)' : 'Coco ne vend qu\'au MAGASINIER 📦';
       case 'fonderie': case 'chaudro': {
         const list = S.orders.filter(o => stage(o) === comp && !o.q);
         return list.length ? `Commander le brut de ${list.length > 1 ? 'la commande…' : 'la commande #' + list[0].id} (${C.name})` : `${C.name} : aucune commande ne demande ce brut`;
       }
       case 'tth': {
-        if (isPart(held)) { const o = G.order(held.d.oid); return o && stage(o) === 'tth' ? `Confier la caisse #${o.id} au traitement thermique` : 'Cette caisse n\'a pas besoin de traitement thermique'; }
+        if (isPart(held)) { const o = G.order(held.d.oid); return o && stage(o) === 'tth' ? `Confier la caisse ${ML.on(o.id)} au traitement thermique` : 'Cette caisse n\'a pas besoin de traitement thermique'; }
         return 'TTH Ouest : apporte une caisse à traiter';
       }
-      case 'client': return isPart(held) ? `Livrer la caisse #${held.d.oid} à ${C.name}` : `${C.name} : parler`;
-      case 'concurrent': return isPart(held) ? `🕵 Donner la caisse #${held.d.oid} à UsiFlash (trahison !)` : 'Kévin (UsiFlash)';
+      case 'client': return isPart(held) ? `Livrer la caisse ${ML.on(held.d.oid)} à ${C.name}` : `${C.name} : parler`;
+      case 'concurrent': return isPart(held) ? `🕵 Donner la caisse ${ML.on(held.d.oid)} à UsiFlash (trahison !)` : 'Kévin (UsiFlash)';
     }
     return null;
   }
@@ -209,7 +211,7 @@
         { const Q = S.quest; if (Q && Q.giver === a && Q.st === 'ask') return ML.Dialogue.choice(P_(a).name, `${Q.ask} (${Q.at.name}) — je te donne ${Q.reward} € !`, [{ label: `✅ D'accord (${Q.reward} €)`, fn: () => G.intent({ a: 'quest', ok: 1 }) }, { label: 'Désolé, pas le temps', fn: () => G.intent({ a: 'quest', ok: 0 }) }, { label: 'Je réfléchis…', fn: null }]); }
         if (ML.PARTICULIERS.includes(a)) {
           const p = (S.parts || []).find(x => x.id === a);
-          if (p && p.st === 'wait') return ML.Dialogue.choice(P_(a).name, `${ML.line(a, 'demande', 'Bonjour !')} Il me faudrait : « ${p.part} » en ${ML.MATERIALS[p.mat].label} (${ML.MTYPE[p.mtype]}, ${ML.TOOLS[p.tool].label.toLowerCase()}). C'est urgent : ${Math.round(p.dur / 60 * 10) / 10} min maximum. Je paie ${p.price} € !`,
+          if (p && p.st === 'wait') return ML.Dialogue.choice(P_(a).name, `${ML.line(a, 'demande', 'Bonjour !')} Il me faudrait une pièce en ${ML.MATERIALS[p.mat].label} (${ML.MTYPE[p.mtype]}, ${ML.TOOLS[p.tool].label.toLowerCase()}). C'est urgent : ${Math.round(p.dur / 60 * 10) / 10} min maximum. Je paie ${p.price} € !`,
             [{ label: `Accepter (${p.price} €)`, fn: () => G.intent({ a: 'part', id: a, ok: 1 }) }, { label: 'Refuser', fn: () => G.intent({ a: 'part', id: a, ok: 0 }) }, { label: 'Je réfléchis…', fn: null }]);
           break;
         }
@@ -224,18 +226,18 @@
         }
         if (a === 'mathieu') return ML.Dialogue.listen(P_('mathieu').name, [0, 1, 2, 3].map(() => ML.line('mathieu')).concat(['Et… du coup… voilà… quoi.']), 7, () => G.intent({ a: 'mathieu' }), null, () => G.npcDist('mathieu') < 6);
         const comp = COMP_OF[a], C = comp && COMP[comp];
-        if (C && (C.kind === 'matiere' || C.kind === 'outils') && myRole() !== 'magasinier') break;
+        if (C && (C.kind === 'matiere' || C.kind === 'outils') && !isR('magasinier')) break;
         if (C && C.kind === 'matiere') return ML.Dialogue.supplier(a, (mat, succ) => G.intent({ a: 'eliott', mat, succ }));
         if (C && C.kind === 'outils') return ML.Dialogue.listen(P_('coco').name, [0, 1, 2, 3, 4].map(() => ML.line('coco', 'boxe', 'Jab, jab, uppercut !')), 6, () => { G.intent({ a: 'coco' }); ML.Dialogue.info(P_('coco').name, "Merci de m'avoir écouté ! Ta caisse d'outils est sur le quai. Dépose-la en RÉCEPTION à l'atelier."); }, null, () => G.npcDist(a) < 6);
         if (C && (C.kind === 'fonderie' || C.kind === 'chaudro')) {
           const list = S.orders.filter(o => stage(o) === comp && !o.q);
           if (!list.length) return;
           if (list.length === 1) return G.intent({ a: 'sub', comp, oid: list[0].id });
-          return ML.Dialogue.choice(C.name, 'Pour quelle commande ?', list.map(o => ({ label: `#${o.id} — ${o.part} (${COMP[o.client].name})`, fn: () => G.intent({ a: 'sub', comp, oid: o.id }) })).concat([{ label: 'Rien', fn: null }]));
+          return ML.Dialogue.choice(C.name, 'Pour quelle commande ?', list.map(o => ({ label: `${ML.on(o.id)} (${COMP[o.client].name})`, fn: () => G.intent({ a: 'sub', comp, oid: o.id }) })).concat([{ label: 'Rien', fn: null }]));
         }
         if (C && C.kind === 'client' && !(isPart(held))) {
           const mine = S.orders.filter(o => o.client === comp);
-          return ML.Dialogue.info(C.name, ML.line(a, null, 'Bonjour !') + ' ' + (mine.length ? 'On attend : ' + mine.map(o => `#${o.id} ${o.part}`).join(', ') + '.' : 'Rien en attente pour nous.'));
+          return ML.Dialogue.info(C.name, ML.line(a, null, 'Bonjour !') + ' ' + (mine.length ? 'On attend : ' + mine.map(o => `${ML.on(o.id)}`).join(', ') + '.' : 'Rien en attente pour nous.'));
         }
         break;
       }
@@ -261,7 +263,8 @@
     radar: 'Au-dessus de 60 km/h, ça flashe. 🤫 Il paraît qu\'une meuleuse traîne dans l\'atelier…',
     frigo: 'Matis travaille beaucoup mieux le ventre plein.',
     mall: 'Pendant le Black Friday, tout est moins cher.',
-    gym: 'L\'endurance reste sur ton compte : tu cours plus longtemps dans toutes les parties.'
+    gym: 'L\'endurance reste sur ton compte : tu cours plus longtemps dans toutes les parties.',
+    planque: 'Les flics ne regardent jamais sous la bâche. Jamais.', distrib: 'Une barre = +25 de faim. Le hot-dog dehors cale mieux.', sieste: 'Quelques secondes de sieste = fatigue à zéro.', poubelles: 'Clic droit pour lancer. Dennis déteste ça.', ring: 'Frappe au bon moment (ESPACE dans la zone verte).'
   };
   const HINT_NPC = {
     lebec: 'Le patron voit tout dans l\'atelier… sauf quand tu chasses un intrus.',
@@ -269,8 +272,8 @@
     brieuc: 'Très rapide, mais quand il a la flemme, une claque le relance.',
     amaury: 'Tête en l\'air : vérifie qu\'il usine bien la bonne pièce.',
     jacky: 'Il veut une caisse usinée au MARBRE, et une réponse MIP/MAP.',
-    johan: 'Il vole les caisses prêtes. Lebec ferme les yeux si tu le chasses.',
-    bleuenn: 'Elle bricole n\'importe quoi. Lebec ferme les yeux si tu la chasses.',
+    johan: 'Il vole les caisses prêtes. Seule la GRANDE clé à molette (mur gauche) le fait lâcher.',
+    bleuenn: 'Elle bricole n\'importe quoi. La GRANDE clé à molette, avant le BOUM !',
     vigile: 'Tant qu\'il est là, Johan Bois n\'entre pas.',
     tony: 'Il charge tout seul les palettes du quai dans le camion.',
     jojo: 'Il livre l\'expédition et passe aussi au TTH.',
@@ -278,7 +281,8 @@
     gendarme: 'Un ami en prison ? Payer la caution le fait sortir tout de suite.',
     fred: 'Il te lâche quand ARÉXIS est rempli au PC.',
     herve: 'Imprimante du bureau → signature de Lebec → retour à Hervé.',
-    mathieu: 'Écoute-le à la place de l\'opérateur, il le libérera.'
+    mathieu: 'Écoute-le à la place de l\'opérateur, il le libérera.',
+    jeanmi: 'Payé 2,3× plus, mais la police passe : planque + faux programme.', hotdog: 'Un hot-dog = presque plus faim. Le meilleur rapport qualité-prix.', racket: 'Sans la batte de baseball, mieux vaut payer…', squat1: 'Seule la GRANDE clé à molette les fait partir.', squat2: 'Seule la GRANDE clé à molette les fait partir.', dennis: 'Les coups ne servent à rien : lance-lui un sac-poubelle.', flic: 'Ne le frappe pas. Vraiment pas.', barman: 'Les videurs ne plaisantent pas avec la scène.', bookmaker: 'Sur le ring : ESPACE au bon moment.', croupier: 'Le croupier tire jusqu\'à 17.', turfiste: 'Le n°4 paie ×9… mais il ne gagne presque jamais.', preteur: 'Rien de ce qu\'il vend ne sert à quelque chose.'
   };
   const SRC = { viennoiseries: 'à la boulangerie de Mimi', jerrican: 'à la station-service', cle: 'sur le chariot à outils de l\'atelier', extincteur: 'sur le mur gauche de l\'atelier' };
   R.hint = id => {

@@ -20,7 +20,7 @@
       at: () => tgt('pc'), ok: () => ML.ui.modal === 'erp' || S().orders.length > 0 },
     { tx: () => 'C\'est un vrai ordinateur : clique l\'icône <b>📥 Commandes</b>, puis <b>« Accepter »</b> sur une demande (elle arrive en quelques secondes). Puis <b>Échap</b> pour éteindre le PC. Le 📌 pense-bête à droite dit toujours quoi faire.',
       at: () => tgt('pc'), ok: () => S().orders.length > 0 && ML.ui.modal !== 'erp' },
-    { tx: () => { const o = focus(); return o ? `Ton <b>ticket</b> (en haut) dit quoi faire. Commande #${o.id} : il faut un <b>brut ${ML.MATERIALS[o.mat].label}</b>. Prends-le au <b>rack</b> du fond de l'atelier (E).` : 'Prends un <b>brut</b> au rack du fond de l\'atelier (E).'; },
+    { tx: () => { const o = focus(); return o ? `Ton <b>ticket</b> (en haut) dit quoi faire. Commande ${ML.on(o.id)} : il faut un <b>brut ${ML.MATERIALS[o.mat].label}</b>. Prends-le au <b>rack</b> du fond de l'atelier (E).` : 'Prends un <b>brut</b> au rack du fond de l\'atelier (E).'; },
       at: () => { const o = focus(); return tgt('rack:' + (o && ['acier', 'alu', 'inox'].includes(o.mat) ? o.mat : 'acier')); },
       ok: () => { const h = held(); return (h && ML.Items.def(h).kind === 'brut') || !!myJob(); } },
     { tx: () => { const o = focus(); return `Apporte le brut à une machine libre : un <b>${o ? ML.MTYPE[o.mtype].toUpperCase() : 'TOUR ou une FRAISEUSE'}</b> (écrit sur le ticket). <b>E</b> dessus, puis réussis la <b>prise d'origine</b> (mini-jeu).`; },
@@ -54,7 +54,7 @@
     { tx: () => 'Une <b>demande</b> = un client qui veut une pièce. Tu y lis la <b>matière</b> (ALU, ACIER…), la <b>machine</b> (Tour / Fraiseuse), l\'<b>outil</b>, le <b>délai</b> et le <b>prix</b>. Clique <b>« Accepter »</b>.',
       at: () => tgt('pc'), ok: () => S().orders.length > 0 },
     { tx: () => 'Bravo ! La commande devient un <b>TICKET</b>. Éteins le PC : touche <b>Échap</b> (ou le bouton rouge ⏻ en bas à droite).', at: () => tgt('pc'), ok: () => ML.ui.modal !== 'erp' },
-    { info: 1, tx: () => { const o = focus(); return (o ? `Ton ticket <b>#${o.id}</b> est en haut de l'écran : <b>${ML.MATERIALS[o.mat].label}</b> · <b>${ML.MTYPE[o.mtype]}</b> · outil <b>${ML.TOOLS[o.tool].label}</b>. ` : '') + 'Les petites icônes 🛠️ › 🚚 sont les <b>étapes</b> : usinage, puis livraison. Celle en couleur, c\'est maintenant.' + NXT; } },
+    { info: 1, tx: () => { const o = focus(); return (o ? `Ton ticket <b>${ML.on(o.id)}</b> est en haut de l'écran : <b>${ML.MATERIALS[o.mat].label}</b> · <b>${ML.MTYPE[o.mtype]}</b> · outil <b>${ML.TOOLS[o.tool].label}</b>. ` : '') + 'Les petites icônes 🛠️ › 🚚 sont les <b>étapes</b> : usinage, puis livraison. Celle en couleur, c\'est maintenant.' + NXT; } },
     STEPS[2], STEPS[3], STEPS[4],
     { tx: () => 'La machine usine toute seule (le <b>%</b> est affiché au-dessus). Quand c\'est fini, la caisse sort en <b>📦 EXPÉDITION</b> (zone verte à droite de la grande porte). Prends-la (<b>E</b>).',
       at: STEPS[5].at, ok: () => isPart(held()) || S().served > T.served0 || bedPart() },
@@ -66,7 +66,7 @@
     { info: 1, tx: () => '🎉 <b>Première livraison !</b> L\'argent tombe tout de suite. Livrer <b>à l\'heure</b> fait monter la ⭐ réputation… et les prix des commandes. Reviens à l\'atelier.' + NXT },
     { tx: () => 'Une pièce spéciale arrive : une demande <b>⚙️ MÉCANO-SOUDÉ</b>. Elle ne part pas d\'une barre du rack mais d\'un <b>BRUT soudé</b> qu\'il faut acheter. Va au <b>PC</b>, 📥 Commandes : sur cette demande, clique le bouton orange <b>« ✅ Accepter + commander le brut »</b>.',
       enter: () => G().intent({ a: 'tuto', k: 'chaudro' }), at: () => tgt('pc'), ok: () => !!spo() },
-    { tx: () => { const o = spo(); return `Dans <b>📥 Commandes</b>, sur la <b>#${o ? o.id : '?'}</b>, dans l'encadré orange <b>🧱 BRUTS À ACHETER</b>, clique <b>« 🛒 Commander »</b> (${ML.ECO.subPC.chaudro} €). Le brut sera livré à la <b>RÉCEPTION</b> de l'atelier. <span class="dim">(Moins cher mais plus long : aller payer la Chaudronnerie Babinsky — voir l'app 💡 Astuces.)</span>`; },
+    { tx: () => { const o = spo(); return `Dans <b>📥 Commandes</b>, sur la <b>${o ? ML.on(o.id) : "?"}</b>, dans l'encadré orange <b>🧱 BRUTS À ACHETER</b>, clique <b>« 🛒 Commander »</b> (${ML.ECO.subPC.chaudro} €). Le brut sera livré à la <b>RÉCEPTION</b> de l'atelier. <span class="dim">(Moins cher mais plus long : aller payer la Chaudronnerie Babinsky — voir l'app 💡 Astuces.)</span>`; },
       at: () => tgt('pc'), ok: () => { const o = spo(); return !o || o.q || o.steps[o.si] !== 'chaudro'; } },
     { tx: () => 'Le livreur arrive (compte à rebours 🚚 en haut à droite). En attendant, jette un œil à l\'app <b>💡 Astuces</b> du PC : tout y est. Quand le brut 🧱 est en <b>RÉCEPTION</b> (zone bleue, à gauche de la porte), prends-le (<b>E</b>).',
       at: () => { const R = ML.LOC.reception; return R ? { x: R.x, y: 1, z: R.z } : null; },
@@ -79,6 +79,11 @@
     { info: 1, tx: () => '🚨 En vraie journée, il y a des <b>imprévus</b> (coupure de courant, audit, Johan Bois qui vole des caisses…) : un <b>cadre d\'astuces</b> s\'affiche alors à droite. Et si tu regardes un objet un moment, un <b>💡 petit conseil</b> apparaît sous l\'action.' + NXT },
     { tx: () => 'Tu es prêt ! 🎉 Finis la commande mécano-soudée et livre-la. <b>Tab</b> = aide · <b>M</b> = carte · PC → <b>💡 Astuces</b>. Les journées suivantes seront de vraies journées. Bon courage !', at: () => null, ok: () => T.t > 12, end: true }
   ];
+  // V6 : on démarre sans machine → étape « achète ta machine » juste après l'acceptation (sautée si tu en as déjà une)
+  const hasType = () => { const s = S(), o = focus(); return Object.keys(s.machines).some(id => !o || ML.MACHINES.find(x => x.id === id).type === o.mtype); };
+  STEPS.splice(2, 0, { tx: () => { const o = focus(); return `Ton atelier est <b>VIDE</b> : il faut une machine ! Au PC, icône <b>🏭 Boutique Atelier</b> → achète un${o ? (o.mtype === 'tour' ? ' <b>TOUR</b>' : 'e <b>FRAISEUSE</b>') : ' tour ou une fraiseuse'} (le type écrit sur ton ticket). 🔧 Occasion = pas chère mais lente et souvent en panne · ⚙️ Standard · 💎 Haut de gamme = rapide et fiable.`; },
+    at: () => tgt('pc'), ok: () => hasType() });
+  B.splice(B.length - 2, 0, { info: 1, tx: () => '🏭 Tu as déjà un tour et une fraiseuse <b>standard</b>. Au PC (🏭 Boutique) tu peux en ajouter : <b>🔧 occasion</b> (pas chère, lente, pannes), <b>⚙️ standard</b> ou <b>💎 haut de gamme</b> (rapide, fiable). Bruts et outils existent aussi d\'<b>occasion ♻</b> (moitié prix, plus de pannes et de pièces ratées).' + NXT });
   const list = () => (T.full ? B : STEPS);
 
   T.start = force => {
@@ -88,7 +93,9 @@
     T.full = !!(G().game && G().game.beginner);                         // V5.3 : mode débutant = tutoriel complet, même si on a déjà fait l'autre
     if (!force && !T.full && (A.prof.tuto || ((A.prof.st || {}).days || 0) >= 3 || (G().game && G().game.mode === 'course'))) return;   // invités et débutants
     T.on = true; T.i = 0; T.t = 0; T.gps = false; T.nxt = false; T.entered = -1; T.served0 = S() ? S().served : 0;
-    T.el = document.getElementById('tuto'); T.el.classList.remove('hidden', 'done');
+    T.el = document.getElementById('tuto'); T.el.classList.remove('hidden', 'done', 'min'); T.min = false;
+    if (!T.el._v6) { T.el._v6 = 1; T.el.addEventListener('mousedown', e => { const b = e.target.closest('[data-tu]'); if (!b) return; e.stopPropagation(); e.preventDefault();
+      if (b.dataset.tu === 'skip') T.finish(true); else { T.min = !T.min; T.el.classList.toggle('min', T.min); T.html = null; } }); }
     if (!T.mark) {
       T.mark = new THREE.Group();
       const m = new THREE.MeshBasicMaterial({ color: 0xffd257, depthTest: false, transparent: true });
@@ -115,7 +122,7 @@
     if (T.entered !== T.i) { T.entered = T.i; if (st.enter) st.enter(); }
     T.t += dt;
     if (st.end) { T.el.classList.add('done'); if (T.t > (T.full ? 12 : 9)) return T.finish(); }
-    const html = `<div class="tt">${T.full ? '🐣 MODE DÉBUTANT' : '📘 TUTORIEL'} · étape ${T.i + 1}/${L.length}</div><div class="tx">${st.tx()}</div><div class="tk">J : passer le tutoriel</div>`;
+    const html = `<div class="tt">${T.full ? '🐣 MODE DÉBUTANT' : '📘 TUTORIEL'} · étape ${T.i + 1}/${L.length}<span class="tu-b"><button data-tu="min" title="Réduire / agrandir">${T.min ? '▢' : '▁'}</button><button data-tu="skip" title="Fermer le tutoriel">✕</button></span></div>${T.min ? '' : `<div class="tx">${st.tx()}</div><div class="tk">J : fermer le tutoriel · Échap puis ✕ à la souris</div>`}`;
     if (html !== T.html) { T.el.innerHTML = html; T.html = html; }
     const p = st.at && st.at();
     T.mark.visible = !!p;

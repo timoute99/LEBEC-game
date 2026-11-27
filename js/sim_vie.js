@@ -92,7 +92,7 @@
     const crate = n.goal && S.items.find(o => o.id === n.goal && o.rest);
     if (crate && Math.hypot(crate.x - n.x, crate.z - n.z) < 3) {
       n.carry = K.strip(crate); K.removeItem(crate);
-      K.big('🦹 JOHAN BOIS VOLE UNE CAISSE !', '#ff7a1a'); K.all(`🦹 Johan Bois a piqué la caisse #${n.carry.d.oid} ! Rattrapez-le et mettez-lui une claque !`, 'warn');
+      K.big('🦹 JOHAN BOIS VOLE UNE CAISSE !', '#ff7a1a'); K.all(`🦹 Johan Bois a piqué la caisse ${ML.on(n.carry.d.oid)} ! Rattrapez-le et mettez-lui une claque !`, 'warn');
     } else {
       const m = ['acier', 'alu', 'inox'].sort((a, b) => S.stock[b] - S.stock[a])[0], q = Math.min(2, S.stock[m]);
       if (q) { S.stock[m] -= q; K.all(`🦹 Johan Bois a piqué ${q} barre${q > 1 ? 's' : ''} ${ML.MATERIALS[m].label} dans le rack !`, 'warn'); }
@@ -103,7 +103,7 @@
   function johanEscaped(n) {
     if (n.carry) {
       const o = S.orders.find(x => x.id === n.carry.d.oid);
-      if (o) { o.si = o.steps.indexOf(o.src || 'usinage'); o.m = null; o.q = false; o.by = null; K.all(`😡 Johan Bois est parti avec la caisse #${o.id} : il faut la refaire !`, 'warn'); K.sfx('fail'); }
+      if (o) { o.si = o.steps.indexOf(o.src || 'usinage'); o.m = null; o.q = false; o.by = null; K.all(`😡 Johan Bois est parti avec la caisse ${ML.on(o.id)} : il faut la refaire !`, 'warn'); K.sfx('fail'); }
       n.carry = null;
     }
     n.active = false; n.state = 'away'; delete S.evs.johan; Sim.dirty = true;
@@ -121,11 +121,11 @@
     for (const id in S.machines) S.machines[id].stopped = true;
     const run = Object.keys(S.machines).filter(id => S.machines[id].job); if (run.length && K.startFire) K.startFire(rng.pick(run));
     K.ev({ e: 'boom', x: PANEL.x - 0.6, z: PANEL.z }); K.ev({ e: 'tip', k: 'bleuenn' }); K.sfx('boom', PANEL.x, PANEL.z);
-    K.big('💥 BLEUENN A TOUT FAIT SAUTER !', '#ff3b30');
+    K.big('💥 LEAN MANUFACTURING A TOUT FAIT SAUTER !', '#ff3b30');
     K.all('💥 BOUM ! Plus de courant et toutes les machines en ARRÊT D\'URGENCE : réarme le tableau électrique, puis E sur chaque machine.', 'warn');
     for (const pid in S.pl) { const p = K.pose[pid]; if (!p || !K.foot(S.pl[pid])) continue; const dx = p.x - PANEL.x, dz = p.z - PANEL.z, d = Math.hypot(dx, dz); if (d < 9) { K.ev({ e: 'push', to: pid, vx: dx / (d || 1) * 8, vz: dz / (d || 1) * 8 }); if (K.damage) K.damage(pid, 8, 'souffle de l\'explosion'); } }
     for (const id in npcs) { const o = npcs[id]; if (o.active && o !== n && Math.hypot(o.x - PANEL.x, o.z - PANEL.z) < 9) o.stun = 1.5; }
-    if (npcs.lebec && npcs.lebec.active) K.say(npcs.lebec, 'BLEUENN !!! MON ATELIER !!!', true);
+    if (npcs.lebec && npcs.lebec.active) K.say(npcs.lebec, 'LEAN MANUFACTURING !!! MON ATELIER !!!', true);
     n.stun = 1.2; setTimeoutSim(() => goAway(n, ML.line('bleuenn', 'boum', 'C\'était pas prévu, ça.')), 2.5);
     Sim.dirty = true;
   }
@@ -155,10 +155,11 @@
     for (const pid in S.pl) for (const x of S.pl[pid].inv) if (x && x.type === 'kit') kitted.add(x.d.oid);
     const cand = S.orders.filter(o => K.stage(o) === 'usinage' && !o.src && !o.m && !kitted.has(o.id)).sort((a, b) => a.dl - b.dl);
     if (!cand.length) { S.prepaMsg = ''; return; }
-    const o = cand.find(x => S.stock[x.mat] > 0 && S.stock[x.tool] > 0);
-    if (!o) { const c = cand[0]; S.prepaMsg = 'manque : ' + [S.stock[c.mat] ? '' : 'barre ' + ML.MATERIALS[c.mat].label, S.stock[c.tool] ? '' : ML.TOOLS[c.tool].label].filter(Boolean).join(' + '); return; }
-    S.stock[o.mat]--; S.stock[o.tool]--; S.prepaMsg = '';
-    const sp = free[0]; K.spawnItem({ type: 'kit', d: { oid: o.id, mat: o.mat, tool: o.tool } }, sp.x, sp.y, sp.z);
+    const has = k => S.stock[k] > 0 || (S.stock[k + '_oc'] || 0) > 0;   // V6 : le neuf d'abord, sinon l'occasion
+    const o = cand.find(x => has(x.mat) && has(x.tool));
+    if (!o) { const c = cand[0]; S.prepaMsg = 'manque : ' + [has(c.mat) ? '' : 'barre ' + ML.MATERIALS[c.mat].label, has(c.tool) ? '' : ML.TOOLS[c.tool].label].filter(Boolean).join(' + '); return; }
+    let oc = false; for (const k of [o.mat, o.tool]) { if (S.stock[k] > 0) S.stock[k]--; else { S.stock[k + '_oc']--; oc = true; } } S.prepaMsg = '';
+    const sp = free[0]; K.spawnItem({ type: 'kit', d: oc ? { oid: o.id, mat: o.mat, tool: o.tool, oc: 1 } : { oid: o.id, mat: o.mat, tool: o.tool } }, sp.x, sp.y, sp.z);
     K.sfx('drop', sp.x, sp.z); Sim.dirty = true;
   }
 
@@ -340,7 +341,7 @@
       case 'quest': questDecide(pid, !!m.ok); return true;
       case 'eat': {
         const F = IT.food(held); if (!F) return true;
-        P.inv[sel] = null; P.hp = Math.min(C.HP.max, (P.hp || 0) + (F.hp || 0)); if (F.coffee) P.coffee = Math.max(P.coffee || 0, S.rt + F.coffee);
+        P.inv[sel] = null; P.hp = Math.min(C.HP.max, (P.hp || 0) + (F.hp || 0)); if (K.v6Eat) K.v6Eat(P, held.type); if (F.coffee) P.coffee = Math.max(P.coffee || 0, S.rt + F.coffee);
         K.ev({ e: 'eat', to: pid, k: held.type, stam: F.stam ? 1 : 0 }); K.sfx('pickup', ps.x, ps.z); Sim.dirty = true; return true;
       }
     }
@@ -396,11 +397,16 @@
     return false;
   };
   mod.npcHit = (n, by) => {
+    if ((n.id === 'johan' || n.id === 'bleuenn') && K.hitWith !== 'grande_cle') {   // V6 : seule la GRANDE clé à molette les chasse
+      K.say(n, n.id === 'johan' ? 'Ha ! Même pas mal.' : 'Hé ! Laisse-moi bricoler !'); if (S.pl[by]) K.note(by, '🔧 Il te faut la GRANDE CLÉ À MOLETTE (mur gauche de l\'atelier) !', 'warn'); return true;
+    }
     if (n.id === 'johan') {
+      K.ev({ e: 'nrag', id: n.id });
       if (n.carry) { K.spawnItem(n.carry, n.x, 0.8, n.z, [0, 2, 0]); n.carry = null; K.stat(by, 'johan_stop'); K.all(`👊 ${name(by)} a fait lâcher la caisse à Johan Bois !`, 'good'); }
       K.say(n, 'Aïe ! Ça va, ça va, je m\'en vais !'); n.state = 'flee'; n.fleeT = 16; delete S.evs.johan; return true;
     }
     if (n.id === 'bleuenn' && (n.state === 'arrive' || n.state === 'bricole')) {
+      K.ev({ e: 'nrag', id: n.id });
       n.state = 'done'; K.all(`👋 ${name(by)} a empêché Lean Manufacturing de brancher son engin : l'atelier est sauvé !`, 'good'); K.bonus(15, 'Explosion évitée', by);
       goAway(n, 'Bon, d\'accord, je range ma rallonge…'); return true;
     }

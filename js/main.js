@@ -9,9 +9,13 @@
     /** Aperçu 3D du perso du joueur (on = true : (re)construit) */
     preview: on => {
       if (ML.Main.pv) { ML.People.dispose(ML.Main.pv); ML.Main.pv = null; }
+      if (ML.Main.pvCar) { ML.scene.remove(ML.Main.pvCar); ML.Main.pvCar = null; }
       if (!on || ML.Game.on) return;
-      const L = ML.Account.look(), suit = L.suit;
-      const v = ML.People.build({ skin: L.skin, shirt: L.shirt || suit, pants: suit, hair: L.hair, height: L.height, width: L.width, beard: L.beard, glasses: L.glasses },
+      const L = ML.Account.look(ML.Lobby && ML.Lobby.tryOn), suit = L.suit;
+      // V6 : aperçu de la voiture avec le tuning (essayé ou équipé)
+      const car = ML.Cars.model('megane', 0xf1c40f); car.position.set(4.2, ML.gy ? ML.gy(4.2, 22.4) : 0, 22.4); car.rotation.y = 0.9; ML.scene.add(car); ML.Main.pvCar = car;
+      ML.Cars.tune(car.userData.car, L.tune, 0xf1c40f);
+      const v = ML.People.build({ skin: L.skin, shirt: L.shirt || suit, pants: L.pants !== undefined ? L.pants : suit, shorts: L.shorts, shoes: L.shoes, bigShoes: L.bigShoes, gl: L.gl, bag: L.bag, hair: L.hair, height: L.height, width: L.width, beard: L.beard, glasses: L.glasses },
         { name: ML.Account.name() || 'Moi', helmet: L.hat ? null : 0xf5f5f5, hat: L.hat, vest: (ML.ROLES[ML.Lobby.myRole] || ML.ROLES.poly).color });
       v.pos.set(0, 0, 22); v.target.copy(v.pos); v.yaw = 0.5; v.seen = true; ML.Main.pv = v;
     },
@@ -52,7 +56,9 @@
       if (ML.Game.on) ML.Game.step(dt, true, raw);
       else if (ML.Main.pv) {                                      // aperçu du perso (menu « Mon perso »)
         const v = ML.Main.pv; v.yaw += dt * 0.6; v.tYaw = v.yaw; ML.People.animate(v, dt, null);
-        camera.position.set(1.7, 1.3, 25.6); camera.lookAt(1.45, 1.0, 22);
+        const vc = ML.Lobby && ML.Lobby.pvView === 'car', k = ML.Main.pvK = (ML.Main.pvK || 0) + ((vc ? 1 : 0) - (ML.Main.pvK || 0)) * Math.min(1, dt * 5);
+        if (ML.Main.pvCar) ML.Main.pvCar.rotation.y += dt * (vc ? 0.5 : 0);
+        camera.position.set(1.7 + k * 1.2, 1.3 + k * 1.1, 25.6 + k * 4.2); camera.lookAt(1.45 + k * 6.2, 1.0 - k * 0.3, 22 + k * 0.2);
         sun.position.set(10, 30, 40); sun.target.position.set(0, 0, 22); sun.target.updateMatrixWorld();
       } else {
         menuT += dt * 0.05; camera.position.set(Math.sin(menuT) * 70, 28, 60 + Math.cos(menuT) * 50); camera.lookAt(0, 0, 40);

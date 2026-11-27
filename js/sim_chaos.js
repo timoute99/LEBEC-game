@@ -92,14 +92,15 @@
       const M = S.machines[id];
       if (M.status === 'run') {
         M.chips = Math.min(100, (M.chips || 0) + dt * 1.5);
-        M.wear = (M.wear || 0) + dt * 0.75 * Math.sqrt(K.D.chaos);
+        M.wear = (M.wear || 0) + dt * 0.75 * Math.sqrt(K.D.chaos) * (M.job && M.job.ocT ? ML.ECO.occaz.wear : 1);   // V6 : un outil d'occasion s'use 2,5× plus vite
         if (M.wear >= 100 && M.job && M.job.tool) {
           M.worn = true; M.job.tool = false; Sim.dirty = true;
           const op = K.npcs[M.op]; K.say(op, `Outil usé ! Il me faut ${M.job.need === 'plaquette' ? 'une plaquette neuve' : M.job.need === 'fraise' ? 'une fraise neuve' : 'un foret neuf'} !`);
           K.all(`⚠ ${id} : outil usé, apporte un(e) ${ML.TOOLS[M.job.need].label.toLowerCase()} neuf(ve).`, 'warn');
         }
         if (M.chips > 55 && !K.fireAt(id) && rng() < dt * (M.chips - 55) / 45 / 70 * K.D.chaos) K.startFire(id);
-        if (!M.broken && rng() < dt / 280 * K.D.chaos) K.breakMachine(id);
+        const OC = ML.ECO.occaz, brk = (ML.MMODELS[M.mo || 'std'] || ML.MMODELS.std).brk * (M.job && M.job.ocB ? OC.brkBrut : 1) * (M.job && M.job.ocT ? OC.brkTool : 1);
+        if (!M.broken && rng() < dt / 280 * K.D.chaos * brk) K.breakMachine(id, M.job && (M.job.ocB || M.job.ocT) ? 'matériel d\'occasion' : M.mo === 'occaz' ? 'vieille machine d\'occasion' : '');   // V6 : gamme + occasion
       }
     }
     for (const f of S.fires.slice()) {

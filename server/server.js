@@ -292,14 +292,14 @@ function accountOp(m) {
       const salt = crypto.randomBytes(16).toString('hex');
       accounts[key] = { name: user, salt, hash: hashPass(String(m.pass), salt), created: Date.now(), profile: cleanProfile(m.profile, user) };
       scheduleSave(); try { statDay().a++; STATS.save(); } catch (e) { /* stats facultatives */ }
-      return { ok: true, token: sign(key), user, profile: accounts[key].profile };
+      return { ok: true, token: sign(key), user, profile: accounts[key].profile, admin: ADMINS().includes(key) };
     }
     case 'login': {
       const a = accounts[key];
       if (!a || hashPass(String(m.pass || ''), a.salt) !== a.hash) return { ok: false, m: 'Pseudo ou mot de passe incorrect.' };
-      return { ok: true, token: sign(key), user: a.name, profile: a.profile };
+      return { ok: true, token: sign(key), user: a.name, profile: a.profile, admin: ADMINS().includes(key) };
     }
-    case 'resume': { const k = verify(m.token), a = k && accounts[k]; return a ? { ok: true, token: m.token, user: a.name, profile: a.profile } : { ok: false, m: 'Session expirée, reconnecte-toi.' }; }
+    case 'resume': { const k = verify(m.token), a = k && accounts[k]; return a ? { ok: true, token: m.token, user: a.name, profile: a.profile, admin: ADMINS().includes(k) } : { ok: false, m: 'Session expirée, reconnecte-toi.' }; }
     case 'save': {
       const k = verify(m.token), a = k && accounts[k];
       if (!a) return { ok: false, m: 'Session expirée.' };

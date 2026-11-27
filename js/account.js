@@ -33,7 +33,7 @@
   A.auth = async (op, user, pass) => {
     const r = await N.acc(op, { user, pass, profile: op === 'register' ? A.prof : undefined });
     if (!r.ok) return r;
-    A.token = r.token; A.user = r.user; A.prof = Object.assign(fresh(r.user), r.profile || {});
+    A.token = r.token; A.user = r.user; A.prof = Object.assign(fresh(r.user), r.profile || {}); A.admin = !!r.admin;   // V6 : mode admin (tests) — F9 en partie
     localStorage.setItem('ml_token', A.token); localStorage.setItem('ml_user', A.user); localStorage.setItem('ml_profile', JSON.stringify(A.prof));
     return r;
   };
@@ -42,7 +42,7 @@
     let r = await N.acc('resume', { token: A.token });
     for (let i = 0; i < 4 && !r.ok && r.wait; i++) { await new Promise(ok => setTimeout(ok, 8000)); r = await N.acc('resume', { token: A.token }); }   // serveur qui démarre
     if (!r.ok) { if (/expir/i.test(r.m || '')) A.logout(); return false; }     // une simple coupure ne déconnecte plus le compte
-    A.user = r.user;
+    A.user = r.user; A.admin = !!r.admin;
     if (localStorage.getItem('ml_dirty') === '1' && A.prof && A.prof.v === 2) A.save();   // des progrès faits hors ligne : on les envoie
     else { A.prof = Object.assign(fresh(r.user), r.profile || {}); localStorage.setItem('ml_profile', JSON.stringify(A.prof)); }
     return true;
@@ -58,10 +58,11 @@
   };
   A.equip = (cat, id) => { if (id && !A.owns(id)) return; if (id) A.prof.eq[cat] = id; else delete A.prof.eq[cat]; A.save(); };
   /** Apparence envoyée aux autres joueurs */
-  A.look = () => {
-    const e = A.prof.eq, g = k => (e[k] && SHOP[e[k]]) || {};
+  A.look = tryOn => {
+    const e = Object.assign({}, A.prof.eq, tryOn || {}), g = k => (e[k] && SHOP[e[k]]) || {};
     const L = A.prof.look;
     return { skin: L.skin, hair: L.hair, suit: L.suit !== undefined ? L.suit : 0x1f4e9a, height: L.height || 1.78, width: L.width || 1, beard: !!L.beard, glasses: !!L.glasses, shirt: g('tenue').shirt, hat: g('chapeau').hat, klaxon: e.klaxon || 'base',
+      pants: g('pantalon').pants, shorts: !!g('pantalon').shorts, shoes: g('chaussures').shoes, bigShoes: !!g('chaussures').big, gl: g('lunettes').gl, bag: g('sac').bag,
       tune: { paint: g('peinture').color, aileron: !!e.aileron, flammes: !!e.flammes, jantes: !!e.jantes } };
   };
 

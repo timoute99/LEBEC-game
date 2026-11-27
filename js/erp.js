@@ -62,7 +62,7 @@
         ML.Sfx.play('bip'); E.render(true); return;
       }
       const m = { a: 'erp', op: a };
-      for (const k of ['id', 'mid', 'k']) if (b.dataset[k] !== undefined) m[k] = b.dataset[k];
+      for (const k of ['id', 'mid', 'k', 'mo', 'src']) if (b.dataset[k] !== undefined) m[k] = b.dataset[k];
       if (b.dataset.early) m.early = 1;                                    // V5.2 : déblocage anticipé (plus cher)
       if (a === 'supply') { const q = el.querySelector(`select[data-q="${b.dataset.k}"]`); m.n = q ? +q.value : 1; }
       G.intent(m); ML.Sfx.play('bip');
@@ -88,12 +88,13 @@
   /** Ce qu'il y a à faire maintenant (pense-bête du bureau) */
   function todo(S) {
     const L = [], props = S.props.length + S.parts.filter(p => p.st === 'wait').length;
+    if (!Object.keys(S.machines).length) L.push(['shop', '🏭 Aucune machine : achète un tour et une fraiseuse (Boutique Atelier)']);   // V6
     if (props) L.push(['cmd', `📥 ${props} demande${props > 1 ? 's' : ''} de client à accepter`]);
-    for (const o of S.orders) if ((o.src === 'fonderie' || o.src === 'chaudro') && o.steps[o.si] === o.src && !o.q) L.push(['cmd', `${o.src === 'fonderie' ? '🔥' : '⚙️'} #${o.id} : commander le brut ${o.src === 'fonderie' ? 'de fonderie' : 'mécano-soudé'}`]);
-    for (const o of S.orders) if (o.size === 'l') { const miss = ['fenwick', 'camion'].filter(v => !S.owned.includes(v)); if (miss.length) { L.push([miss.includes('fenwick') ? 'shop' : 'cmd', `🏗 Grosse pièce #${o.id} : il manque ${miss.map(v => v === 'fenwick' ? 'le fenwick (Boutique)' : 'le camion (Garage Pasquier)').join(' et ')}`]); break; } }
+    for (const o of S.orders) if ((o.src === 'fonderie' || o.src === 'chaudro') && o.steps[o.si] === o.src && !o.q) L.push(['cmd', `${o.src === 'fonderie' ? '🔥' : '⚙️'} ${ML.on(o.id)} : commander le brut ${o.src === 'fonderie' ? 'de fonderie' : 'mécano-soudé'}`]);
+    for (const o of S.orders) if (o.size === 'l') { const miss = ['fenwick', 'camion'].filter(v => !S.owned.includes(v)); if (miss.length) { L.push([miss.includes('fenwick') ? 'shop' : 'cmd', `🏗 Grosse pièce ${ML.on(o.id)} : il manque ${miss.map(v => v === 'fenwick' ? 'le fenwick (Boutique)' : 'le camion (Garage Pasquier)').join(' et ')}`]); break; } }
     for (const id of ML.MACHINE_ORDER) if (S.machines[id] && !S.machines[id].op) { L.push(['rh', `👷 ${id} n'a pas d'opérateur`]); break; }
     const need = {}; for (const o of S.orders) if (o.steps[o.si] === 'usinage' && !o.src && !o.m) { need[o.mat] = (need[o.mat] || 0) + 1; need[o.tool] = (need[o.tool] || 0) + 1; }
-    for (const k in need) if ((S.stock[k] || 0) < need[k]) { L.push(['sup', `🛒 Plus assez de ${(ML.MATERIALS[k] || ML.TOOLS[k]).label.toLowerCase()} en stock`]); break; }
+    for (const k in need) if ((S.stock[k] || 0) + (S.stock[k + '_oc'] || 0) < need[k]) { L.push(['sup', `🛒 Plus assez de ${(ML.MATERIALS[k] || ML.TOOLS[k]).label.toLowerCase()} en stock`]); break; }
     if (S.saeBon) L.push(['shop', `🎓 Bon de SAE : −${S.saeBon} % sur une machine`]);
     if (S.evs && S.evs.fred) L.push(['arexis', '💼 Fred attend : remplir ARÉXIS']);
     return L;
@@ -111,7 +112,7 @@
       <div class="os-info"><b>${U.esc(S.co.name || 'Mécanique Lebec')}</b><br>📅 Jour ${S.co.day || S.day} · ${clock}<br>⭐ Réputation ${S.rep}/100<br><span class="${S.money < 0 ? 'red' : 'ok'}">💶 ${eur(S.money)}</span>${S.co.code ? `<br><span class="dim small">code ${S.co.code}</span>` : ''}</div>
       ${S.black ? '<div class="os-black">🛍 BLACK FRIDAY<br><span>tout est moins cher aujourd\'hui</span></div>' : ''}
       <div class="os-hint">💡 Clique une icône pour ouvrir une application. <b>Échap</b> : éteindre le PC.</div>`;
-    const win = app ? `<div class="os-win"><div class="os-title"><span class="os-tn">${app[1]} ${app[2]}</span><span class="os-td">${U.esc(app[3])}</span><button class="os-x" data-act="desk" title="Fermer la fenêtre">✕</button></div>
+    const win = app ? `<div class="os-win ${E._scTab !== E.tab ? 'anim' : ''}"><div class="os-title"><span class="os-tn">${app[1]} ${app[2]}</span><span class="os-td">${U.esc(app[3])}</span><button class="os-x" data-act="desk" title="Fermer la fenêtre">✕</button></div>
       ${S.evs && S.evs.fred ? '<div class="erp-alert">💼 Fred Castells attend que quelqu\'un remplisse ARÉXIS… <button data-act="arexis">Remplir ARÉXIS</button></div>' : ''}
       <div class="erp-body">${({ cmd: tabCmd, shop: tabShop, sup: tabSup, rh: tabRh, bil: tabBil, his: tabHis, help: tabHelp })[app[0]](S)}</div></div>` : '';
     const menu = E.menu ? `<div class="os-menu"><div class="os-mh">🔧 LebecOS 95</div>${APPS.map(([k, ic, n]) => `<button data-act="tab" data-t="${k}">${ic} ${n}</button>`).join('')}<hr><button data-act="off">⏻ Éteindre le PC</button></div>` : '';
@@ -137,10 +138,12 @@
     let h = '<div class="brutbox"><div class="bb-h">🧱 BRUTS À ACHETER <span>pièces de fonderie et mécano-soudées : elles ne partent pas d\'une barre du rack</span></div>';
     for (const o of L) {
       const st = o.steps[o.si], d = S.deliv.find(x => x.oid === o.id), pc = ML.ECO.subPC[st], dir = ML.ECO.sub[st];
-      h += `<div class="bb-row ${o.q ? 'done' : ''}"><div class="bb-ic">${BICON[st]}</div><div class="bb-tx"><b>#${o.id} ${U.esc(o.part)}</b> <span class="dim">· ${U.esc(who(o))}</span><br>`;
+      h += `<div class="bb-row ${o.q ? 'done' : ''}"><div class="bb-ic">${BICON[st]}</div><div class="bb-tx"><b>${ML.on(o.id)}</b> <span class="dim">· ${U.esc(who(o))}</span><br>`;
       if (!o.q) h += `Brut ${BNAME[st]} à commander.</div><div class="bb-act"><button class="big" data-act="subpc" data-id="${o.id}" ${S.money < pc ? 'disabled' : ''}>🛒 Commander : ${eur(pc)}</button><span class="small">livré à la <b>RÉCEPTION</b> de l'atelier (~2 min)</span>
+          <button class="ak" data-act="subpc" data-id="${o.id}" data-src="akinox" ${S.money < ML.ECO.akinox[st] ? 'disabled' : ''}>📠 AKINOX : ${eur(ML.ECO.akinox[st])} <span class="small">délai au hasard, parfois ne livre pas</span></button>
           <span class="small dim">ou ${eur(dir)} en allant payer ${COMP[st].name} sur place <button class="mini" data-act="gps" data-k="${st}">📍 GPS</button></span></div>`;
-      else if (d) h += `🚚 En route : arrive à la <b>RÉCEPTION</b> dans <b>${T(d.eta)}</b>. Ensuite : prends-le (E) → machine → outil.</div><div class="bb-act"><span class="ok">✔ commandé</span></div>`;
+      else if (d && d.ak && !(o.ak && o.ak.ok)) h += `📠 AKINOX INGENIEURING : en attente de leur réponse…</div><div class="bb-act"><span class="dim">⏳</span></div>`;
+      else if (d) h += `🚚 En route${d.ak ? ' (AKINOX)' : ''} : arrive à la <b>RÉCEPTION</b> dans <b>${d.ak ? '~' + Math.max(1, Math.round((d.eta - S.rt) / 60)) + ' min' : T(d.eta)}</b>. Ensuite : prends-le (E) → machine → outil.</div><div class="bb-act"><span class="ok">✔ commandé</span></div>`;
       else h += `🏭 En fabrication chez ${COMP[st].name} : il sortira sur <b>son quai</b>.</div><div class="bb-act"><button class="mini" data-act="gps" data-k="${st}">📍 GPS</button></div>`;
       h += '</div>';
     }
@@ -150,11 +153,11 @@
     let h = '<h3>📥 Demandes des clients</h3>';
     const waiting = S.parts.filter(p => p.st === 'wait');
     if (!S.props.length && !waiting.length) h += `<p class="dim">Aucune demande pour l'instant.${S.up.erp_auto ? ' (ERP+ : elles sont acceptées automatiquement.)' : ' Elles arrivent ici : accepte-les avant qu\'elles expirent !'}</p>`;
-    for (const p of waiting) h += `<div class="erp-row part"><div><b>🙋 ${U.esc(ML.PEOPLE[p.id].name)}</b> attend au COMPTOIR : <b>${U.esc(p.part)}</b> ${chips(p)} — à faire en ${Math.round(p.dur)} s</div>
+    for (const p of waiting) h += `<div class="erp-row part"><div><b>🙋 ${U.esc(ML.PEOPLE[p.id].name)}</b> attend au COMPTOIR une pièce ${chips(p)} — à faire en ${Math.round(p.dur)} s</div>
       <div class="erp-act"><b class="price">${eur(p.price)}</b><span class="dim">part dans ${T(p.exp)}</span><button data-act="part" data-id="${p.id}" data-ok="1">Accepter</button><button class="sec" data-act="part" data-id="${p.id}" data-ok="0">Refuser</button></div></div>`;
     for (const p of S.props) {
       const sp = p.src && (p.src === 'fonderie' || p.src === 'chaudro') ? p.src : null, bp = sp && ML.ECO.subPC[sp];
-      h += `<div class="erp-row ${sp ? 'brutrow' : ''}"><div><b>${U.esc(COMP[p.client].name)}</b> : ${U.esc(p.part)} ${chips(p)} <span class="steps">${steps(p)}</span> — délai ${Math.round(p.dur)} s
+      h += `<div class="erp-row ${sp ? 'brutrow' : ''}"><div><b>${ML.on(p.id)}</b> · <b>${U.esc(COMP[p.client].name)}</b> ${chips(p)} <span class="steps">${steps(p)}</span> — délai ${Math.round(p.dur)} s
         ${sp ? `<div class="brutnote">${BICON[sp]} Pièce ${BNAME[sp]} : pas de barre du rack, il faut <b>acheter le brut</b> (${eur(bp)}, livré à l'atelier).</div>` : ''}</div>
       <div class="erp-act"><b class="price">${eur(p.price)}</b><span class="dim">expire dans ${T(p.exp)}</span>${sp ? `<button class="big" data-act="acceptsub" data-id="${p.id}" ${S.money < bp ? 'disabled' : ''}>✅ Accepter + commander le brut (${eur(bp)})</button><button class="sec" data-act="accept" data-id="${p.id}">Accepter seulement</button>` : `<button data-act="accept" data-id="${p.id}">Accepter</button>`}<button class="sec" data-act="refuse" data-id="${p.id}">Refuser</button></div></div>`;
     }
@@ -174,13 +177,13 @@
         now = o.q ? (d ? `🚚 brut en route : à la RÉCEPTION dans ${T(d.eta)}` : `brut en cours chez ${COMP[st].name}…`) : `⚠️ brut à commander (voir en haut) : <button class="mini" data-act="subpc" data-id="${o.id}">Commander au PC (${ML.ECO.subPC[st]} €, livré ~2 min)</button> <span class="dim">ou en direct chez ${COMP[st].name} (${ML.ECO.sub[st]} €)</span>`;
       } else if (st === 'tth') now = o.q ? 'au four chez TTH Ouest…' : `caisse → TTH Ouest (${ML.ECO.sub.tth} €)`;
       else now = o.client === 'part' ? 'à rapporter au COMPTOIR' : `à livrer chez ${COMP[o.client].name}`;
-      h += `<div class="erp-row ${urgent ? 'urgent' : ''}"><div><b>#${o.id}</b> ${U.esc(who(o))} : ${U.esc(o.part)} ${chips(o)} <span class="steps">${steps(o, o.si)}</span><br><span class="small">${now}</span></div>
+      h += `<div class="erp-row ${urgent ? 'urgent' : ''}"><div><b>${ML.on(o.id)}</b> · ${U.esc(who(o))} ${chips(o)} <span class="steps">${steps(o, o.si)}</span><br><span class="small">${now}</span></div>
         <div class="erp-act"><b class="price">${eur(o.price)}</b><span class="${urgent ? 'red' : 'dim'}">${T(o.dl)}</span></div></div>`;
     }
     h += '<h3>🏭 Machines</h3><div class="erp-grid">' + mids.map(id => {
       const M = S.machines[id], op = M.op ? ML.PEOPLE[M.op].name : null;
       const st = { idle: 'libre', wait: 'attend un outil', run: 'usine', stop: 'opérateur absent', panne: 'EN PANNE', usure: 'outil usé', off: 'plus de courant', bac: 'bac à copeaux !', noop: 'sans opérateur' }[M.status] || M.status;
-      return `<div class="erp-mach ${M.status}"><b>${id}</b> ${ML.MTYPE[ML.MACHINES.find(m => m.id === id).type]}<br>${op ? '👷 ' + U.esc(op) : '<span class="red">pas d\'opérateur</span>'}<br>${st}${M.job ? ` · #${M.job.oid} ${PC(id)}` : M.plan ? ` · prévu #${M.plan}` : ''}</div>`;
+      return `<div class="erp-mach ${M.status}"><b>${id}</b> ${ML.MTYPE[ML.MACHINES.find(m => m.id === id).type]}<br>${op ? '👷 ' + U.esc(op) : '<span class="red">pas d\'opérateur</span>'}<br>${st}${M.job ? ` · ${ML.on(M.job.oid)} ${PC(id)}` : M.plan ? ` · prévu #${M.plan}` : ''}</div>`;
     }).join('') + '</div>';
     return h;
   }
@@ -194,6 +197,7 @@
   function tabShop(S) {
     const cats = { machine: '🏭 Machines', atelier: '🏗 Atelier', equip: '🚜 Équipement', deco: '☕ Confort & déco (installé le lendemain)', abo: '🐦 Abonnements (payés chaque soir)' };
     let h = '<p class="dim">Les véhicules (scooter, Mégane, Ducato, camion plateau) s\'achètent au <b>Garage Pasquier</b>, en ville.</p>';
+    if (!Object.keys(S.machines).length) h += '<div class="brutbox"><div class="bb-h">🏭 AUCUNE MACHINE ! <span>commence par acheter au moins un tour et une fraiseuse ci-dessous</span></div><div class="bb-row"><div class="bb-tx">🔧 <b>Occasion</b> : pas chère mais lente et souvent en panne · ⚙️ <b>Standard</b> : le bon compromis · 💎 <b>Haut de gamme</b> : chère, rapide et fiable.</div></div></div>';
     if (S.black) h += `<div class="erp-black">🛍 BLACK FRIDAY : machines, atelier et équipements −${Math.round((1 - ML.ECO.black.cat) * 100)} % aujourd'hui seulement !</div>`;
     if (S.saeBon) h += `<div class="erp-sae">🎓 Bon de SAE : <b>−${S.saeBon} %</b> sur la prochaine machine achetée (déjà déduit des prix ci-dessous).</div>`;
     for (const cat in cats) {
@@ -210,6 +214,14 @@
             ${needOk ? `<button class="early" data-act="buy" data-k="${k}" data-early="1" ${S.money < tot ? 'disabled' : ''}>🔓 Débloquer maintenant : ${eur(tot)} <span class="small">(dont +${eur(fee)} d'avance)</span></button>` : `<span class="dim">il faut d'abord : ${U.esc(ML.CATALOG[it.need].name)}</span>`}</div>`;
           continue;
         }
+        if (it.mach && !own && !lock) {                                // V6 : choisir la gamme de la machine
+          const def = ML.MACHINES.find(x => x.id === it.mach), base = catPrice(S, k);
+          h += `<div class="erp-item mach-pick"><b>${U.esc(it.name)}</b><span class="small dim">${U.esc(it.desc || '')}</span><div class="mpick">` + Object.keys(ML.MMODELS).map(mo => { const MM = ML.MMODELS[mo], pr = Math.round(base * MM.price);
+            return `<button class="mo-${mo}" data-act="buy" data-k="${k}" data-mo="${mo}" ${S.money < pr ? 'disabled' : ''}><span class="mt">${MM.icon} ${MM.tag}</span><span class="mn">${U.esc(ML.MBRAND[def.type][mo])}</span><span class="mp">${eur(pr)}</span><span class="md">${U.esc(MM.desc)}</span></button>`; }).join('') + '</div></div>';
+          continue;
+        }
+        if (it.mach && own) { const M = S.machines[it.mach], MM = ML.MMODELS[M.mo || 'std'], def = ML.MACHINES.find(x => x.id === it.mach);
+          h += `<div class="erp-item own"><b>${U.esc(it.name)}</b><span class="small">${MM.icon} ${U.esc(ML.MBRAND[def.type][M.mo || 'std'])} <span class="dim">(${MM.tag})</span></span><span class="ok">✔ installée</span></div>`; continue; }
         h += `<div class="erp-item ${own ? 'own' : ''}"><b>${U.esc(it.name)}${lvl}</b><span class="small dim">${U.esc(it.desc || '')}</span>
           ${own && it.daily ? `<span class="ok">✔ abonné (${it.daily} €/jour)</span><button class="sec" data-act="unsub" data-k="${k}">Résilier</button>` : own ? '<span class="ok">✔ acheté</span>' : lock ? `<span class="dim">🔒 il faut : ${U.esc(ML.CATALOG[it.need].name)}</span>` : `<button data-act="buy" data-k="${k}" ${S.money < catPrice(S, k) ? 'disabled' : ''}>Acheter ${priceHtml(S, k)}</button>`}</div>`;
       }
@@ -221,10 +233,12 @@
   function tabSup(S) {
     const sp = k => Math.round(ML.SUPPLY[k].price * (S.black ? ML.ECO.black.supply : 1));      // V5.2 : Black Friday
     const C = E.cart, units = Object.values(C).reduce((x, y) => x + y, 0), sub = Object.keys(C).reduce((x, k) => x + C[k] * sp(k), 0), total = units ? sub + ML.ECO.fee : 0;
-    const label = k => (ML.MATERIALS[k] || ML.TOOLS[k]).label;
+    const label = k => ML.SUPPLY[k] ? ML.SUPPLY[k].name : (ML.MATERIALS[k] || ML.TOOLS[k]).label;
     let h = brutBox(S) + `<p class="dim small">Ajoute les produits au panier, puis commande tout d'un coup : un seul COLIS arrive en réception (${ML.ECO.supplierDelay[0] / 60} à ${ML.ECO.supplierDelay[1] / 60} min). Ouvre-le avec <b>R</b>, puis range les produits (E sur le rack ou l'armoire). Pressé ? Le MAGASINIER peut aller chercher directement chez Eliott et Coco, sans frais de port.</p><h3>🛒 Produits</h3><div class="erp-grid">`;
+    let lastOc = false;
     for (const k in ML.SUPPLY) {
       const L = ML.SUPPLY[k], q = C[k] || 0;
+      if (L.oc && !lastOc) { lastOc = true; h += `</div><h3>♻ D'occasion (moitié prix)</h3><p class="small dim">Rangés à part (étiquette ♻ OCCAZ, couleur rouillée) : on ne les prend au rack que quand il n'y a plus de neuf. <b>Risques</b> : pièce non conforme, outil usé 2,5× plus vite, machine plus souvent en panne.</p><div class="erp-grid">`; }
       h += `<div class="erp-item prod"><b>${U.esc(L.name)}</b><span class="small dim">${COMP[L.from].name} · <b class="price">${S.black ? `<s>${L.price}</s> ` : ''}${sp(k)} €</b> l'unité · en stock : <b class="${S.stock[k] ? '' : 'red'}">${S.stock[k]}</b></span>
         <span class="qty"><button class="mini" data-act="cminus" data-k="${k}" ${q ? '' : 'disabled'}>−</button><b>${q}</b><button class="mini" data-act="cplus" data-k="${k}" ${units >= ML.CART_MAX ? 'disabled' : ''}>+</button><button class="mini del" data-act="cdel" data-k="${k}" ${q ? '' : 'disabled'} title="Supprimer">🗑</button></span></div>`;
     }
@@ -301,12 +315,54 @@
       'Tony le <b>cariste</b> charge les palettes du quai dans le camion, Jojo le <b>livreur</b> fait les tournées (et le TTH).',
       'Les salaires tombent <b>le soir</b> : regarde le 📊 Bilan avant d\'embaucher.'
     ]);
+    // V6
+    const ak = eco.akinox || {};
+    h += sec('🏭', 'Acheter ses machines (V6 : on démarre sans !)', [
+      'Une partie libre commence avec <b>un atelier vide</b> et plus d\'argent : achète tes machines dans <b>🏭 Boutique</b>.',
+      'Trois gammes : <b>♻ occasion</b> (pas chère, lente, tombe souvent en panne), <b>standard</b>, et <b>⭐ haut de gamme</b> (chère, rapide, fiable). La gamme se voit à la couleur de la machine.',
+      'Sans machine du bon type, une commande ne peut pas être usinée : regarde les puces du ticket (Tour / Fraiseuse) avant d\'accepter.'
+    ]);
+    h += sec('♻', 'Bruts et outils d\'OCCASION', [
+      'Dans 🛒 Fournisseurs, les bruts et outils ♻ <b>d\'occasion</b> coûtent moitié moins cher. On les reconnaît : rouillés, étiquette « ♻ OCCAZ ».',
+      'Mais ils sont <b>risqués</b> : outils qui s\'usent bien plus vite, machine qui casse plus souvent, pièce parfois <b>non conforme</b>.',
+      'Le rack et le chariot donnent d\'abord le <b>neuf</b>, puis l\'occasion s\'il n\'y a plus de neuf.'
+    ]);
+    h += sec('📠', 'AKINOX INGENIEURING (bruts pas chers… en théorie)', [
+      `Sur une commande fonderie / mécano-soudé, le bouton <b>AKINOX</b> commande le brut pour ${eur(ak.fonderie || 45)} / ${eur(ak.chaudro || 50)} : bien moins cher.`,
+      `Mais le <b>délai varie</b> beaucoup, et ${Math.round((ak.fail || 0.25) * 100)} % du temps <b>rien n'arrive</b> : tu le sais au bout de ${ak.warn || 8} s (confirmation… ou annulation, argent perdu).`,
+      'Si c\'est annulé, recommande tout de suite ailleurs (Fonderie Boulard / Babinsky) : le délai client continue de tourner.'
+    ]);
+    h += sec('🕶', 'Le marché noir (Jean-Mi, derrière l\'atelier)', [
+      'Jean-Mi attend au <b>comptoir derrière le bâtiment</b>. Il propose des pièces <b>sans facture</b>, payées bien plus cher, en liquide. Ses tickets sont <b>noirs</b>.',
+      'Tu les usines comme les autres et tu les lui ramènes <b>à lui</b> (pas au client).',
+      'Plus ta <b>réputation black</b> monte, plus il a de commandes… et plus la <b>police</b> passe.',
+      '<b>Contrôle de police</b> : tu as quelques secondes. Range les caisses au black sous la <b>bâche (planque, mur gauche)</b> et mets un <b>FAUX PROGRAMME</b> (E) sur la machine qui usine du black. Chaque pièce trouvée = grosse amende.',
+      '🤫 Certains clients « oublient » de payer : retourne les voir avec la <b>batte</b>.'
+    ]);
+    h += sec('🏏', 'Les relous : qui chasser avec quoi ?', [
+      '<b>GRANDE clé à molette</b> (crochet mur gauche) : Johan Bois, Lean Manufacturing, les <b>squatteurs</b> (ils font fuir les clients et salissent).',
+      '<b>Batte de baseball</b> (près de la porte) : le saboteur, le <b>racketteur</b> de la rue, les mauvais payeurs.',
+      '<b>Dennis</b> (le gamin aux bombes de peinture) : les coups ne marchent pas, il faut lui <b>LANCER</b> des sacs-poubelle (pile à côté de la benne, clic droit).',
+      'Le <b>videur</b> (abonnement Raymond) empêche squatteurs et saboteurs d\'entrer. Taper un policier : très mauvaise idée.'
+    ]);
+    h += sec('🌭', 'Faim et fatigue', [
+      'Deux jauges sous ta vie : 🍔 <b>faim</b> et 💤 <b>fatigue</b>. À zéro, tu <b>t\'évanouis</b> (et tu perds du temps).',
+      'Manger : <b>hot-dogs</b> (stand devant l\'atelier), distributeur (coin café), viennoiseries. Dormir : la <b>sieste</b> sur le banc du coin café, ou un café pour tenir un peu.'
+    ]);
+    h += sec('🎰', 'Les lieux pour dépenser (ou perdre) ton argent', [
+      '<b>PMU</b> : paris sur les courses de chevaux. <b>Casino</b> : blackjack. <b>Prêteur sur gages</b> : objets inutiles (et chers).',
+      '<b>Boîte de nuit</b> : on dépense… et on ne monte pas sur scène (les videurs assomment). <b>Hangar 13</b> : combats clandestins, en pari ou en vrai sur le ring.',
+      'La caisse de l\'atelier paie tout : attention aux salaires du soir !'
+    ]);
+    h += sec('🌊', 'Tombé dans la rivière ?', [
+      'La voiture est remorquée à l\'atelier (amende de remorquage), les caisses à bord sont <b>perdues</b> (à refaire), et toi tu sors de l\'eau sur la berge.'
+    ]);
     const ev = Object.keys(ML.EVTIPS).map(k => { const [t, L] = ML.EVTIPS[k]; return `<b>${t}</b> : ${L.join(' ')}`; });
     h += sec('🚨', 'Les événements (quoi faire quand ça part en vrille)', ev);
     h += sec('🙋', 'Quêtes, SAE et visiteurs', [
       'Quand quelqu\'un demande un service, parle-lui (E). Si tu acceptes, un <b>repère</b> apparaît sur la carte (M) et un bandeau en haut de l\'écran donne la distance.',
       'Va au repère et appuie sur <b>E</b> dessus (ou apporte l\'objet demandé), puis reviens voir la personne.',
-      'Les visiteurs pénibles (Johan Bois, Lean Manufacturing) peuvent être chassés à la claque : <b>Lebec ne t\'en voudra pas</b>.',
+      'Les visiteurs pénibles (Johan Bois, Lean Manufacturing, squatteurs) ne partent qu\'à la <b>GRANDE clé à molette</b> (crochet du mur gauche) : <b>Lebec ne t\'en voudra pas</b>.',
       'La <b>soufflette</b> nettoie les taches dans l\'atelier <b>et devant la porte</b>.'
     ]);
     h += sec('🚗', 'Véhicules, essence, radars, gendarmes', [

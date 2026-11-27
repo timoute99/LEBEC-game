@@ -16,7 +16,7 @@
     U.box(1.85, 0.6, 4.5, body, 0, 0.65, 0, g); U.box(1.8, 0.25, 1.1, body, 0, 1.05, 1.65, g);
     U.box(1.78, 0.1, 1.1, body, 0, 1.98, 0.3, g);
     for (const x of [-0.85, 0.85]) { U.box(0.08, 0.95, 0.1, body, x, 1.48, 1.0, g); U.box(0.08, 0.95, 0.12, body, x, 1.48, -0.25, g); }
-    const glass = new THREE.MeshLambertMaterial({ color: 0x9fd3ff, transparent: true, opacity: 0.2 });
+    const glass = new THREE.MeshLambertMaterial({ color: 0x9fd3ff, transparent: true, opacity: 0.2, depthWrite: false })   // V6 : sans écrire la profondeur, le trait GPS reste visible à travers le pare-brise;
     const ws = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.9, 0.04), glass); ws.position.set(0, 1.5, 1.0); ws.rotation.x = -0.35; g.add(ws);
     U.box(1.7, 0.22, 0.35, 0x2d2d2d, 0, 1.05, 1.0, g);
     const wheelS = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.025, 6, 16), U.mat(0x111111)); wheelS.position.set(0.38, 1.22, 0.78); wheelS.rotation.x = -0.5; g.add(wheelS);
@@ -92,7 +92,7 @@
   /** V5 : modèle seul (showroom du garage), sans l'enregistrer comme véhicule */
   Cars.model = (kind, color) => {
     const g = new THREE.Group(), c = { kind, group: g, wheels: [], bed: new THREE.Group() }, spec = { kind, color };
-    buildAny(c, spec);
+    buildAny(c, spec); g.userData.car = c;                                 // V6 : pour l'aperçu du tuning (boutique)
     return g;
   };
   Cars.build = (i, spec) => {
@@ -117,7 +117,7 @@
   Cars.clear = () => { for (const c of Cars.list) if (c) ML.scene.remove(c.group); Cars.list = []; Cars.key = ''; for (const t of Cars.traffic) ML.scene.remove(t); Cars.traffic = []; if (Cars.police) ML.scene.remove(Cars.police); Cars.police = null; if (Cars.parkedPolice) ML.scene.remove(Cars.parkedPolice); Cars.parkedPolice = null; };
   /** Tuning : peinture, aileron, flammes, jantes (Méga Mégane) */
   Cars.tune = (c, t, baseColor) => {
-    const k = JSON.stringify(t || {}); if (!c || !['megane', 'kangoo', 'ducato'].includes(c.kind) || k === c.tuneKey) return; c.tuneKey = k; t = t || {};
+    const k = JSON.stringify(t || {}); if (!c || !['megane', 'kangoo', 'ducato', 'camion', 'scooter'].includes(c.kind) || k === c.tuneKey) return; c.tuneKey = k; t = t || {};   // V6 : aussi le camion et le scooter (peinture, jantes)
     c.bodyMat.color.setHex(t.paint !== undefined ? t.paint : baseColor);
     c.wing.visible = !!t.aileron; c.flames.visible = !!t.flammes; c.rimMat.color.setHex(t.jantes ? 0xffd700 : 0xbdc3c7); c.rimMat.emissive.setHex(t.jantes ? 0x443300 : 0);
   };
@@ -192,6 +192,8 @@
     c.pos.x += f.x * moved; c.pos.z += f.z * moved;
     if (!tp && Math.abs(moved) > 0) c.fuel = Math.max(0, c.fuel - Math.abs(moved) * (P.fuelUse || CF.fuelUse));
     let hit = false, hard = 0, decor = false;
+    // V6 : foncer dans la rivière (hors pont) au-delà de ~25 km/h = la voiture coule
+    if (!tp && c.kind !== 'fenwick' && Math.abs(c.speed) > 7) { const k0 = OFF(c)[0] + R(c) + 1.0, fp = { x: c.pos.x + f.x * k0 * Math.sign(c.speed || 1), z: c.pos.z + f.z * k0 * Math.sign(c.speed || 1) }; if (ML.riverAt && ML.riverAt(fp.x, fp.z, 0.2)) return { lat: 0, side: 0, hard: 0, crash: 0, sunk: true }; }
     for (const k of OFF(c)) {
       const p = { x: c.pos.x + f.x * k, z: c.pos.z + f.z * k }, ox = p.x, oz = p.z;
       if (U.resolveCircle(p, R(c) - 0.02)) { hit = true; decor = true; c.pos.x += p.x - ox; c.pos.z += p.z - oz; }

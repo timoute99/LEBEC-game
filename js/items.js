@@ -10,13 +10,13 @@
     brut_acier: { kind: 'brut', mat: 'acier', name: 'Brut ACIER', icon: '🔩' },
     brut_alu: { kind: 'brut', mat: 'alu', name: 'Brut ALU', icon: '🔩' },
     brut_inox: { kind: 'brut', mat: 'inox', name: 'Brut INOX', icon: '🔩' },
-    brut_sp: { kind: 'brut', name: d => `Brut ${M[d.mat].label} #${d.oid}`, icon: '🧱' },     // fonderie / chaudronnerie
+    brut_sp: { kind: 'brut', name: d => `Brut ${M[d.mat].label} ${ML.on(d.oid)}`, icon: '🧱' },     // fonderie / chaudronnerie
     plaquette: { kind: 'tool', tool: 'plaquette', name: 'Plaquette carbure', icon: '◆' },
     fraise: { kind: 'tool', tool: 'fraise', name: 'Fraise', icon: '🌀' },
     foret: { kind: 'tool', tool: 'foret', name: 'Foret', icon: '📍' },
-    caisse: { bulky: true, name: d => `Caisse #${d.oid}` + (d.ctl ? ' ✔ contrôlée' : ''), icon: '📦' },
-    piece: { name: d => `Petite pièce #${d.oid}` + (d.ctl ? ' ✔' : ''), icon: '⚙️', hint: 'Se lance (clic droit) : dans une benne, à un collègue…' },
-    palette: { bulky: true, heavy: true, name: d => `GROSSE pièce #${d.oid} (palette)`, icon: '🏗️' },
+    caisse: { bulky: true, name: d => `Caisse ${ML.on(d.oid)}` + (d.ctl ? ' ✔ contrôlée' : ''), icon: '📦' },
+    piece: { name: d => `Petite pièce ${ML.on(d.oid)}` + (d.ctl ? ' ✔' : ''), icon: '⚙️', hint: 'Se lance (clic droit) : dans une benne, à un collègue…' },
+    palette: { bulky: true, heavy: true, name: d => `GROSSE pièce ${ML.on(d.oid)} (palette)`, icon: '🏗️' },
     bac_plein: { bulky: true, name: 'Bac de copeaux PLEIN', icon: '🗑️', hint: 'À vider dans la benne à copeaux (dehors)' },
     bac_vide: { bulky: true, name: d => `Bac vide (pour ${d.mid || '?'})`, icon: '🪣', hint: 'À remettre sur sa machine' },
     matiere: { bulky: true, name: d => d.mat ? `Caisse ${M[d.mat].label} ×${d.q}` : "Caisse d'outils", icon: '🗃️' },
@@ -30,7 +30,7 @@
     find: { name: d => ML.FINDS[d.k].name, icon: '⭐' },
     colis: { bulky: d => d.sz !== 's', name: d => `Colis fournisseurs (${d.n || '?'} articles)`, icon: '📦', hint: 'R : ouvrir (tout tombe par terre), puis range les produits' },
     // --- V5.2 ---
-    kit: { kind: 'kit', name: d => `KIT #${d.oid} (brut ${M[d.mat] ? M[d.mat].label : '?'} + ${T[d.tool] ? T[d.tool].label.toLowerCase() : 'outil'})`, icon: '🧰', hint: 'E sur la bonne machine : brut ET outil d\'un coup' },
+    kit: { kind: 'kit', name: d => `KIT ${ML.on(d.oid)} (brut ${M[d.mat] ? M[d.mat].label : '?'} + ${T[d.tool] ? T[d.tool].label.toLowerCase() : 'outil'})`, icon: '🧰', hint: 'E sur la bonne machine : brut ET outil d\'un coup' },
     meuleuse: { kind: 'equip', name: 'Meuleuse « casse-radar »', icon: '🪚', hint: 'E sur un radar pour le découper (gare aux témoins !)' },
     carton: { bulky: true, name: d => `Carton pour ${d.to || '?'}`, icon: '📦', hint: 'À livrer : suis le repère (carte M)' },
     cles_trit: { name: 'Clés de Trit', icon: '🔑', hint: 'À déposer à l\'appartement de Trit (repère sur la carte)' },
@@ -39,13 +39,23 @@
     baguette: { kind: 'food', name: 'Baguette', icon: '🥖', hint: 'R : manger · clic gauche : frapper' },
     poisson: { kind: 'weapon', name: 'Poisson en caoutchouc', icon: '🐟', hint: 'Clic gauche : baffe « COUIC »' },
     batte: { kind: 'weapon', name: 'Batte en mousse', icon: '🏏', hint: 'Clic gauche : frappe de loin' },
-    gants: { kind: 'weapon', name: 'Gants de boxe', icon: '🥊', hint: 'Clic gauche : crochet du gauche' }
+    gants: { kind: 'weapon', name: 'Gants de boxe', icon: '🥊', hint: 'Clic gauche : crochet du gauche' },
+    // --- V6 ---
+    grande_cle: { kind: 'weapon', name: 'GRANDE clé à molette', icon: '🔧', hint: 'Clic gauche : chasser Johan Bois, Lean Manufacturing, les squatteurs… (et E sur une machine en panne)' },
+    batte_bb: { kind: 'weapon', name: 'Batte de baseball', icon: '🏏', hint: 'Clic gauche : régler les conflits (racketteurs, saboteurs, mauvais payeurs)' },
+    sac_poubelle: { name: 'Sac-poubelle', icon: '🗑️', hint: 'Clic droit : le lancer (sur Dennis !)' },
+    hotdog: { kind: 'food', name: 'Hot-dog moutarde', icon: '🌭', hint: 'R : manger' },
+    nain: { kind: 'junk', name: 'Nain de jardin', icon: '🧙', hint: 'Totalement inutile. Se lance (clic droit).' },
+    buste: { kind: 'junk', bulky: true, name: 'Buste de Lebec en plâtre', icon: '🗿', hint: 'Totalement inutile, mais tellement beau.' },
+    tableau: { kind: 'junk', bulky: true, name: 'Tableau « Chiens jouant au poker »', icon: '🖼️', hint: 'Inutile. Mais on dirait un vrai.' },
+    trophee: { kind: 'junk', name: 'Trophée de pêche 1987', icon: '🏆', hint: 'Personne ne sait qui l\'a gagné.' },
+    lampe: { kind: 'junk', name: 'Lampe à lave', icon: '🪔', hint: 'Ça bulle. C\'est tout.' }
   };
   /** V5.2 : objet qui sert d'arme (clic gauche) → { reach, stun, push } ou null */
-  I.weapon = it => (it && ML.MALL[it.type] && ML.MALL[it.type].weapon) || null;
-  I.food = it => (it && ML.MALL[it.type] && ML.MALL[it.type].eat) || null;
+  I.weapon = it => (it && ((ML.MALL[it.type] && ML.MALL[it.type].weapon) || (ML.WEAPONS && ML.WEAPONS[it.type]))) || null;
+  I.food = it => (it && ((ML.MALL[it.type] && ML.MALL[it.type].eat) || (it.type === 'hotdog' && { hp: 25 }))) || null;
   I.def = it => I.TYPES[it.type];
-  I.name = it => { const n = I.def(it).name; return typeof n === 'function' ? n(it.d || {}) : n; };
+  I.name = it => { const n = I.def(it).name, t = typeof n === 'function' ? n(it.d || {}) : n; return it.d && it.d.oc ? t + ' ♻ OCCASION' : t; };   // V6
   I.icon = it => I.def(it).icon;
   I.bulky = it => { if (!it) return false; const b = I.def(it).bulky; return typeof b === 'function' ? !!b(it.d || {}) : !!b; };
   I.heavy = it => !!(it && I.def(it).heavy);
@@ -82,6 +92,16 @@
       }
       case 'extincteur': U.cyl(0.11, 0.11, 0.55, 0xd62d20, 0, 0.28, 0, g); U.box(0.08, 0.1, 0.18, 0x222222, 0, 0.6, 0.05, g); break;
       case 'cle': U.box(0.06, 0.03, 0.34, 0x95a5a6, 0, 0.02, 0, g); U.box(0.12, 0.035, 0.08, 0x7f8c8d, 0, 0.02, 0.18, g); break;
+      // --- V6 ---
+      case 'grande_cle': U.box(0.11, 0.05, 0.85, 0xb0b7bf, 0, 0.03, 0, g); U.box(0.26, 0.06, 0.16, 0x8a939b, 0, 0.03, 0.46, g); U.box(0.09, 0.07, 0.1, 0x6c757d, 0.05, 0.03, 0.56, g); U.box(0.12, 0.06, 0.22, 0xc0392b, 0, 0.03, -0.32, g); break;
+      case 'batte_bb': U.cyl(0.055, 0.025, 0.85, 0xc89b5a, 0, 0.05, 0, g, 10).rotation.z = Math.PI / 2; U.cyl(0.03, 0.03, 0.18, 0x222222, -0.46, 0.05, 0, g, 8).rotation.z = Math.PI / 2; break;
+      case 'sac_poubelle': U.cyl(0.16, 0.2, 0.42, 0x1b1b1b, 0, 0.21, 0, g, 8); U.box(0.08, 0.1, 0.08, 0x333333, 0, 0.44, 0, g); break;
+      case 'hotdog': U.cyl(0.045, 0.045, 0.26, 0xe1b06a, 0, 0.05, 0, g, 8).rotation.z = Math.PI / 2; U.cyl(0.03, 0.03, 0.3, 0xa0412d, 0, 0.08, 0, g, 8).rotation.z = Math.PI / 2; U.box(0.22, 0.012, 0.02, 0xf1c40f, 0, 0.115, 0, g); break;
+      case 'nain': U.cyl(0.12, 0.15, 0.3, 0x2980b9, 0, 0.15, 0, g, 10); U.box(0.16, 0.14, 0.14, 0xf0c8a0, 0, 0.37, 0, g); U.cyl(0.0, 0.1, 0.24, 0xc0392b, 0, 0.55, 0, g, 10); U.box(0.14, 0.1, 0.06, 0xffffff, 0, 0.3, 0.07, g); break;
+      case 'buste': U.box(0.4, 0.3, 0.26, 0xecf0f1, 0, 0.15, 0, g); U.box(0.24, 0.3, 0.24, 0xecf0f1, 0, 0.45, 0, g); U.box(0.12, 0.03, 0.03, 0xbdc3c7, 0, 0.42, 0.125, g); break;
+      case 'tableau': U.box(0.7, 0.5, 0.05, 0x8b5a2b, 0, 0.3, 0, g); U.box(0.6, 0.4, 0.06, 0x27ae60, 0, 0.3, 0, g); U.box(0.12, 0.1, 0.07, 0x8d6e63, -0.12, 0.3, 0, g); U.box(0.12, 0.1, 0.07, 0x5d4037, 0.14, 0.28, 0, g); break;
+      case 'trophee': U.cyl(0.1, 0.08, 0.06, 0x5d4037, 0, 0.03, 0, g, 10); U.cyl(0.03, 0.03, 0.16, 0xd4ac0d, 0, 0.14, 0, g, 8); U.box(0.26, 0.08, 0.04, 0xd4ac0d, 0, 0.26, 0, g); break;
+      case 'lampe': U.cyl(0.08, 0.1, 0.06, 0x7f8c8d, 0, 0.03, 0, g, 10); U.cyl(0.07, 0.05, 0.3, 0xe84393, 0, 0.21, 0, g, 10); U.cyl(0.04, 0.07, 0.06, 0x7f8c8d, 0, 0.39, 0, g, 10); break;
       case 'soufflette': U.box(0.06, 0.16, 0.08, 0xf1c40f, 0, 0.08, 0, g); U.box(0.05, 0.04, 0.1, 0x2c3e50, 0, 0.13, -0.06, g); U.cyl(0.015, 0.015, 0.3, 0x95a5a6, 0, 0.16, 0.18, g).rotation.x = Math.PI / 2; U.cyl(0.02, 0.02, 0.05, 0x2980b9, 0, 0.0, 0, g, 8); break;
       case 'jerrican': U.box(0.3, 0.38, 0.16, 0x27ae60, 0, 0.19, 0, g); U.box(0.1, 0.06, 0.06, 0x222222, 0.08, 0.41, 0, g); break;
       case 'casque': { const m = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), U.mat(0xf1c40f)); g.add(m); break; }
@@ -92,7 +112,7 @@
         U.box(0.62, 0.12, 0.34, 0x2e86de, 0, 0.06, 0, g); U.box(0.6, 0.02, 0.32, 0x1b4f8a, 0, 0.125, 0, g);
         const b = U.cyl(0.07, 0.07, 0.55, (M[d.mat] || M.acier).color, -0.04, 0.17, -0.05, g, 10); b.rotation.z = Math.PI / 2;
         U.box(0.12, 0.06, 0.1, (T[d.tool] || T.plaquette).color, 0.18, 0.17, 0.09, g);
-        if (!opts.noLabel) { const l = U.label(`🧰 KIT #${d.oid}`, { size: 0.22, fontSize: 40, color: '#9fd0ff' }); l.position.y = 0.6; g.add(l); }
+        if (!opts.noLabel) { const l = U.label(`🧰 KIT ${ML.on(d.oid)}`, { size: 0.22, fontSize: 40, color: '#9fd0ff' }); l.position.y = 0.6; g.add(l); }
         break;
       }
       case 'meuleuse': U.cyl(0.05, 0.05, 0.32, 0x2c3e50, 0, 0.05, 0, g, 8).rotation.z = Math.PI / 2; U.cyl(0.11, 0.11, 0.015, 0xbdc3c7, 0.16, 0.08, 0, g, 16); U.box(0.08, 0.06, 0.1, 0xe67e22, -0.05, 0.1, 0, g); break;
@@ -119,7 +139,7 @@
       case 'palette': {
         U.box(1.2, 0.14, 1.0, 0x8d6e63, 0, 0.07, 0, g); for (const x of [-0.5, 0, 0.5]) U.box(0.12, 0.1, 1.0, 0x6d4c41, x, 0.02, 0, g);
         U.box(1.0, 0.7, 0.8, 0x95a5a6, 0, 0.5, 0, g); U.cyl(0.32, 0.32, 0.9, 0x7f8c8d, 0, 1.0, 0, g, 10).rotation.z = Math.PI / 2;
-        if (!opts.noLabel) { const o = ML.Game && ML.Game.order(d.oid); const l = U.label(`🏗 #${d.oid}` + (o ? ' → ' + ML.COMPANIES[o.client].name : ''), { size: 0.3, fontSize: 40, color: '#ffd257' }); l.position.y = 1.9; g.add(l); }
+        if (!opts.noLabel) { const o = ML.Game && ML.Game.order(d.oid); const l = U.label(`🏗 ${ML.on(d.oid)}` + (o ? ' → ' + ML.COMPANIES[o.client].name : ''), { size: 0.3, fontSize: 40, color: '#ffd257' }); l.position.y = 1.9; g.add(l); }
         break;
       }
       case 'bac_plein': case 'bac_vide':
@@ -138,12 +158,17 @@
         b.position.y = 0.35; b.castShadow = b.receiveShadow = true; g.add(b);
         if (!opts.noLabel) {
           let t = '';
-          if (it.type === 'caisse') { const o = ML.Game && ML.Game.order(d.oid); t = `#${d.oid}` + (o ? ' → ' + ML.COMPANIES[o.client].name : ''); }
+          if (it.type === 'caisse') { const o = ML.Game && ML.Game.order(d.oid); t = `${ML.on(d.oid)}` + (o ? ' → ' + ML.COMPANIES[o.client].name : ''); }
           else t = d.mat ? `${M[d.mat].label} ×${d.q}` : 'OUTILS';
           const l = U.label(t, { size: 0.22, fontSize: 40 }); l.position.y = 0.95; g.add(l); g.userData.label = l;
         }
         break;
       }
+    }
+    if (d.oc) {                                                         // V6 : occasion = rouillé + étiquette ♻ OCCAZ
+      const rust = new THREE.Color(0x7a4a1f);
+      g.traverse(o => { if (o.isMesh && o.material && o.material.color && !o.isSprite) { o.material = o.material.clone(); o.material.color.lerp(rust, 0.55); } });
+      if (!opts.noLabel) { const l = U.label('♻ OCCAZ', { size: 0.16, fontSize: 40, color: '#ffb066' }); l.position.y = 0.5; g.add(l); }
     }
     return g;
   };

@@ -17,7 +17,7 @@
     root = W.root = new THREE.Group(); ML.scene.add(root);
     ML.colliders.length = 0; W.targets = []; W.machines = {}; W.radars = []; W.lights = []; W.lampHeads = null;
     ML.mapRects = []; W.up = upgrades || {}; W.owned = mach || ML.MACHINES.filter(m => !m.ext).map(m => m.id); W.partCars = [];
-    W.day = (opts && opts.day) || 1; W.ext = !!W.up.extension; W.staff = []; W.interiors = []; W.show = {}; W.reels = [];
+    W.day = (opts && opts.day) || 1; W.ext = !!W.up.extension; W.staff = []; W.interiors = []; W.dancers = []; W.boxers = []; ML.LOC = ML.LOC || {}; W.show = {}; W.reels = [];
     W.black = !(opts && opts.race) && W.day % ML.ECO.black.every === 0;                // V5.2 : Black Friday (prix affichés au centre commercial)
     ML.carBlocks = [{ minX: -5.4, maxX: 5.4, minZ: 13.1, maxZ: 15.2 }];                 // V5.2 : voitures interdites dans l'atelier (transpalette et fenwick : oui)
     W.reno = W.day >= ML.PROGRESS.reno3 ? 3 : W.day >= ML.PROGRESS.reno2 ? 2 : 1;      // l'atelier se refait une beauté avec les jours
@@ -27,6 +27,7 @@
     ML.LOC = { comp: city.companies, hides: city.hides.slice(), perches: city.perches, radars: city.radars };
     W.terrain(city); W.ground(city); W.atelier(); W.furniture(); ML.Decor.atelier(W); W.machinesBuild();
     for (const k in city.companies) W.company(k, ML.COMPANIES[k], city.companies[k]);
+    if (ML.LOC.noirSpot) ML.LOC.comp.noir = ML.LOC.noirSpot;              // V6 : le comptoir au black (pas un bâtiment de la ville)
     W.decor(city); W.bounds(); W.vie52(city);
     ML.Decor.end();
     ML.LOC.hides = ML.LOC.hides.filter(h => !U.inCollider(h.x, h.z, 0.5) && !ML.riverAt(h.x, h.z, 1));
@@ -263,7 +264,8 @@
       parkSlots: [{ x: -21, z: 23, h: 0 }, { x: -25, z: 23, h: 0 }, { x: -29, z: 23, h: 0 }],
       aiSpots: { tony: { x: 16.5, z: 16, yaw: Math.PI }, jojo: { x: 15.5, z: 9.5, yaw: -Math.PI / 2 } },
       hooks: [{ type: 'extincteur', x: -19.2, y: 0, z: 2.6 }, { type: 'extincteur', x: 19.2, y: 0, z: -11.5 }, { type: 'cle', x: -19.2, y: 0.95, z: 4.6 },
-              { type: 'cle', x: -19.2, y: 0.95, z: 5.4 }, { type: 'soufflette', x: -19.2, y: 0.95, z: 6.3, h: 0 }, { type: 'soufflette', x: -19.2, y: 0.95, z: 7.1, h: 1 }],
+              { type: 'cle', x: -19.2, y: 0.95, z: 5.4 }, { type: 'soufflette', x: -19.2, y: 0.95, z: 6.3, h: 0 }, { type: 'soufflette', x: -19.2, y: 0.95, z: 7.1, h: 1 },
+              { type: 'grande_cle', x: -19.2, y: 0.95, z: 1.4 }, { type: 'batte_bb', x: 7.2, y: 0.95, z: 13.3 }],   // V6 : grande clé (perturbateurs) + batte (conflits)
       reels: [{ x: -19.45, y: 2.15, z: 6.3 }, { x: -19.45, y: 2.15, z: 7.1 }],            // enrouleurs d'air comprimé (la soufflette y est attachée)
       hoseLen: W.ext ? 58 : 46,                                       // longueur du tuyau (on ne sort pas de l'atelier avec)
       doorIn: { x: 0, z: 12 },
@@ -352,7 +354,14 @@
     U.box(1, 0.5, 0.6, 0xf1c40f, -7, 0.25, 13, root); U.boxCollider(-7, 13, 1, 0.6, 'casques');
     const lk = U.label('Casques', { size: 0.24 }); lk.position.set(-7, 1, 13); add(lk);
     W.targets.push({ id: 'casques', x: -7, y: 0.6, z: 12.4, r: 2.4 });
-    // améliorations de décoration (campagne)
+    // V6 : PLANNING magnétique (dans le bureau) : se met à jour avec les vraies commandes
+    { const PX = 14.0, PY = 1.75, PZ = -13.7;
+      U.box(4.6, 2.15, 0.06, 0xbdc3c7, PX, PY, PZ - 0.03, root, false); U.box(4.4, 0.06, 0.16, 0x95a5a6, PX, PY - 1.08, PZ + 0.06, root, false);
+      for (const [dx, c] of [[-1.6, 0x2980b9], [-1.45, 0xc0392b], [-1.3, 0x111111]]) U.box(0.12, 0.03, 0.03, c, PX + dx, PY - 1.03, PZ + 0.08, root, false);
+      const c = document.createElement('canvas'); c.width = 1024; c.height = 470;
+      const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 2.02), new THREE.MeshLambertMaterial({ map: t, emissive: 0x1a1a1a, emissiveMap: t })); m.position.set(PX, PY, PZ + 0.005); add(m);
+      W.plan = { c, t, last: '' }; W.planningDraw(null); }
     if (W.up.babyfoot) { U.box(1.4, 0.9, 0.8, 0x27ae60, -18, 0.45, -9.5, root); U.boxCollider(-18, -9.5, 1.4, 0.8, 'babyfoot'); }
     if (W.up.frigo) { U.box(0.8, 1.9, 0.8, 0xecf0f1, -19.3, 0.95, 8.4, root); U.boxCollider(-19.3, 8.4, 0.8, 0.8, 'frigo'); W.targets.push({ id: 'frigo', x: -19, y: 1, z: 8.4, r: 2.4 }); }
     if (W.up.plantes) for (const [x, z] of [[19, 13], [-19, -13.3], [19, -13.3]]) { U.cyl(0.35, 0.25, 0.6, 0x8d6e63, x, 0.3, z, root); const p = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 0), U.mat(0x27ae60)); p.position.set(x, 1.1, z); add(p); }
@@ -362,12 +371,52 @@
   /* ---------- Machines ---------- */
   W.machinesBuild = () => { for (const def of ML.MACHINES) if (W.owned.includes(def.id)) W.buildMachine(def); };
   /** Machines achetées en cours de partie : construites dès qu'elles apparaissent dans l'état de l'hôte */
+  /** V6 : tableau de planning (colonnes = machines, aimants = commandes O-xxxx) */
+  W.planningDraw = S => {
+    const P = W.plan; if (!P) return;
+    const cols = ML.MACHINE_ORDER.filter(id => S ? S.machines[id] : ['T1', 'F1'].includes(id)).slice(0, 8), rows = ['EN COURS', 'PRÉVU', 'À LANCER'];
+    const cell = { }; cols.forEach(id => { cell[id] = [[], [], []]; });
+    const todo = [];
+    if (S) for (const o of S.orders) {
+      const st = o.steps[o.si], mag = { t: ML.on(o.id), c: ML.MATERIALS[o.mat] ? ML.MATERIALS[o.mat].css : '#ccc', blk: !!o.blk, late: o.dl - S.rt < o.dur * 0.25 };
+      if (o.m && cell[o.m] && st === 'usinage') cell[o.m][0].push(mag);
+      else if (o.plan && cell[o.plan] && st === 'usinage') cell[o.plan][1].push(mag);
+      else if (st === 'usinage') { const f = cols.find(id => ML.MACHINES.find(d => d.id === id).type === o.mtype); if (f) cell[f][2].push(mag); else todo.push(mag); }
+      else todo.push(Object.assign(mag, { t: mag.t + ' ' + ({ fonderie: '🔥', chaudro: '⚙', tth: '♨', livraison: '🚚' }[st] || '') }));
+    }
+    const key = JSON.stringify([cols, cell, todo, S && S.co ? S.co.day : 0]); if (key === P.last) return; P.last = key;
+    const g = P.c.getContext('2d'), Wd = P.c.width, Hd = P.c.height;
+    g.fillStyle = '#fbfcfc'; g.fillRect(0, 0, Wd, Hd);
+    g.fillStyle = '#1a2340'; g.font = 'bold 34px Arial'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText('PLANNING ATELIER', 18, 30);
+    g.font = 'italic 22px Arial'; g.fillStyle = '#c0392b'; g.textAlign = 'right'; g.fillText(S && S.campaign && S.co ? `jour ${S.co.day} — « on tient les délais »` : '« on tient les délais »', Wd - 18, 30);
+    const x0 = 150, y0 = 62, cw = cols.length ? (Wd - x0 - 170) / cols.length : 100, rh = (Hd - y0 - 10) / 3;
+    g.strokeStyle = '#2c3e50'; g.lineWidth = 2; g.font = 'bold 22px Arial'; g.fillStyle = '#2c3e50'; g.textAlign = 'center';
+    cols.forEach((id, i) => { g.fillStyle = id[0] === 'T' ? '#1f4e9a' : '#1e7d4a'; g.fillRect(x0 + i * cw + 2, y0, cw - 4, 30); g.fillStyle = '#fff'; g.fillText(id, x0 + i * cw + cw / 2, y0 + 16); });
+    g.fillStyle = '#7f8c8d'; g.fillRect(Wd - 168, y0, 160, 30); g.fillStyle = '#fff'; g.fillText('ATTENTE', Wd - 88, y0 + 16);
+    rows.forEach((r, j) => { const y = y0 + 34 + j * rh; g.strokeStyle = '#d5dbdb'; g.beginPath(); g.moveTo(10, y); g.lineTo(Wd - 10, y); g.stroke(); g.fillStyle = '#2c3e50'; g.textAlign = 'left'; g.font = 'bold 19px Arial'; g.fillText(r, 14, y + rh / 2 - 6); });
+    for (let i = 0; i <= cols.length; i++) { g.strokeStyle = '#d5dbdb'; g.beginPath(); g.moveTo(x0 + i * cw, y0 + 34); g.lineTo(x0 + i * cw, Hd - 8); g.stroke(); }
+    const magnet = (m, x, y, w) => { g.fillStyle = m.blk ? '#222' : m.c; g.fillRect(x, y, w, 30); g.strokeStyle = m.late ? '#e74c3c' : 'rgba(0,0,0,.35)'; g.lineWidth = m.late ? 4 : 1.5; g.strokeRect(x, y, w, 30); g.fillStyle = m.blk ? '#ffd257' : '#111'; g.font = 'bold 18px monospace'; g.textAlign = 'center'; g.fillText(m.t, x + w / 2, y + 16); };
+    cols.forEach((id, i) => cell[id].forEach((L, j) => L.slice(0, 3).forEach((m, k) => magnet(m, x0 + i * cw + 6, y0 + 40 + j * rh + k * 34, cw - 12))));
+    todo.slice(0, 9).forEach((m, k) => magnet(m, Wd - 162, y0 + 40 + k * 36, 148));
+    if (!cols.length) { g.fillStyle = '#c0392b'; g.font = 'bold 30px Arial'; g.textAlign = 'center'; g.fillText('AUCUNE MACHINE — achète-en au PC !', (x0 + Wd - 170) / 2, Hd / 2); }
+    // traces de feutre
+    g.strokeStyle = 'rgba(41,128,185,.35)'; g.lineWidth = 3; g.beginPath(); g.moveTo(30, Hd - 30); g.quadraticCurveTo(70, Hd - 60, 120, Hd - 28); g.stroke();
+    P.t.needsUpdate = true;
+  };
+  /** V6 : couleur + étiquette selon la gamme (occasion = jaunie, haut de gamme = blanc éclatant) */
+  W.machineLooks = S => {
+    for (const id in W.machines) {
+      const m = W.machines[id], M = S.machines[id]; if (!M || !m.paint) continue; const mo = M.mo || 'std'; if (m.mo === mo) continue; m.mo = mo;
+      const MM = ML.MMODELS[mo]; m.paint.color.setHex(MM.paint); m.paint.emissive && m.paint.emissive.setHex(mo === 'pro' ? 0x0a1a2a : 0);
+      if (m.label && m.label.setText) m.label.setText(mo === 'std' ? id : `${id} · ${MM.icon} ${MM.tag}`, mo === 'occaz' ? '#e0c27a' : mo === 'pro' ? '#8fe1ff' : '#ffffff');
+    }
+  };
   W.syncMachines = S => { for (const id in S.machines) if (!W.machines[id]) { const def = ML.MACHINES.find(m => m.id === id); if (def) W.buildMachine(def, true); } };
   W.buildMachine = (def, fresh) => {
     {
       const g = add(new THREE.Group()); g.position.set(def.x, 0, def.z);
       const m = { def, group: g, lightMat: new THREE.MeshLambertMaterial({ color: 0x777777, emissive: 0x222222 }) };
-      const paint = U.mat(0xdfe6ec), dark = U.mat(0x223344);
+      const paint = m.paint = new THREE.MeshLambertMaterial({ color: 0xdfe6ec }), dark = U.mat(0x223344);   // V6 : peinture propre à la machine (gamme)
       if (def.type === 'fraiseuse') {
         U.box(2.25, 0.4, 2.25, 0x34495e, 0, 0.2, 0, g); U.box(2.2, 2.2, 2.2, paint, 0, 1.5, 0, g);
         U.box(1.2, 0.9, 0.04, dark, 0, 1.5, -1.12, g); U.box(0.25, 0.9, 0.55, 0x2c3e50, 1.25, 1.5, -0.6, g);
@@ -422,15 +471,15 @@
       const nm = opId ? op.name.split(' ')[0] : 'sans opérateur';
       let txt = `${id} ${ML.MTYPE[m.def.type]} · ${nm}`;
       if (!opId) txt = `${id} · SANS OPÉRATEUR (embauche au PC)`;
-      else if (st.plan && !j) txt += ` · prévu #${st.plan}`;
+      else if (st.plan && !j) txt += ` · prévu ${ML.on(st.plan)}`;
       if (status === 'panne') txt = `${id} EN PANNE : clé à molette !`;
       else if (status === 'off') txt = `${id} · plus de courant`;
       else if (status === 'usure') txt = `${id} · outil usé : ${ML.TOOLS[j ? j.need : 'plaquette'].label} neuve !`;
-      else if (j) txt = `${id} · #${j.oid} ` + (!j.tool ? `→ ${ML.TOOLS[j.need].label} ?` : `${Math.floor(100 * j.prog / j.total)}%` + (status === 'stop' ? ' · opérateur absent !' : ''));
+      else if (j) txt = `${id} · ${ML.on(j.oid)} ` + (!j.tool ? `→ ${ML.TOOLS[j.need].label} ?` : `${Math.floor(100 * j.prog / j.total)}%` + (status === 'stop' ? ' · opérateur absent !' : ''));
       m.label.setText(txt, status === 'run' ? '#9dffb8' : status === 'idle' ? '#dddddd' : status === 'stop' || status === 'panne' ? '#ff9f9f' : '#ffd27a');
     }
-    for (const k in W.rackLabels) { const n = S.stock[k]; W.rackBars[k].forEach((b, i) => (b.visible = i < n)); W.rackLabels[k].setText(`${ML.MATERIALS[k].label} : ${n}`, n ? '#fff' : '#ff6b6b'); }
-    for (const k in W.drawerLabels) { const n = S.stock[k]; W.drawerLabels[k].setText(`${ML.TOOLS[k].label} : ${n}`, n ? '#fff' : '#ff6b6b'); }
+    for (const k in W.rackLabels) { const n = S.stock[k], oc = S.stock[k + '_oc'] || 0; W.rackBars[k].forEach((b, i) => (b.visible = i < n + oc)); const t = `${ML.MATERIALS[k].label} : ${n}` + (oc ? ` +♻${oc}` : ''); if (W.rackLabels[k]._t !== t) { W.rackLabels[k]._t = t; W.rackLabels[k].setText(t, n ? '#fff' : oc ? '#ffb066' : '#ff6b6b'); } }
+    for (const k in W.drawerLabels) { const n = S.stock[k], oc = S.stock[k + '_oc'] || 0, t = `${ML.TOOLS[k].label} : ${n}` + (oc ? ` +♻${oc}` : ''); if (W.drawerLabels[k]._t !== t) { W.drawerLabels[k]._t = t; W.drawerLabels[k].setText(t, n ? '#fff' : oc ? '#ffb066' : '#ff6b6b'); } }
     // feux tricolores (cycle calculé à partir du temps de jeu : identique chez tous)
     for (const L of W.lights) { const g = W.lightGreen(L.node, 0, rt || 0); L.red.material = g ? W.lightOff : W.lightRed; L.green.material = g ? W.lightGreenMat : W.lightOff; }
     // radars : flash
@@ -439,7 +488,8 @@
       if (off !== !!r.off) { r.off = off; r.head.rotation.z = off ? 1.2 : 0; r.head.position.y = off ? 2.3 : 3.3; r.lamp.visible = !off; r.label.setText(off ? '🪚 RADAR HS' : 'RADAR 60'); }
       r.flash = Math.max(0, (r.flash || 0) - dt); r.lamp.material = r.flash > 0 ? W.flashOn : W.flashOff;
     }
-    W.vieVisuals(dt, S);
+    W.vieVisuals(dt, S); W.machineLooks(S); W.v6Anim(dt);
+    W._plT = (W._plT || 0) - dt; if (W._plT < 0) { W._plT = 1; W.planningDraw(S); }
     // showroom : « VENDU » sur les véhicules déjà achetés
     for (const k in W.show) { const t2 = (S.owned || []).includes(k) ? '✔ DÉJÀ À VOUS' : ''; if (W.show[k].label._t !== t2) { W.show[k].label._t = t2; W.show[k].label.setText(t2); } }
   };
@@ -534,7 +584,7 @@
   }
   W.shell = (key, C, P, g, tex) => {
     const t = 0.35, hw = C.w / 2, hd = C.d / 2, h = C.h, dx = hw - 3, d0 = dx - DOOR / 2, d1 = dx + DOOR / 2, Fr = frameOf(P), F = ML.Decor.frame(P.x, P.z, P.rot);
-    const inner = { client: 0xf4f1ea, concession: 0xffffff, police: 0xe8eef5, mall: 0xfdf6ec, gym: 0xeef7f4 }[C.kind] || 0xf0f0f0;
+    const inner = { client: 0xf4f1ea, concession: 0xffffff, police: 0xe8eef5, mall: 0xfdf6ec, gym: 0xeef7f4, pmu: 0xf3e3c3, casino: 0x3b0f1a, gages: 0xd7c4a3, boite: 0x14112a, arene: 0x55524c }[C.kind] || 0xf0f0f0;
     const wl = (lx, lz, w, d) => { U.box(w, h, d, tex, lx, h / 2, lz, g); Fr.col(lx, lz, w, d); };
     wl(0, -hd + t / 2, C.w, t); wl(-hw + t / 2, 0, t, C.d); wl(hw - t / 2, 0, t, C.d);
     wl((-hw + d0) / 2, hd - t / 2, d0 + hw, t); wl((d1 + hw) / 2, hd - t / 2, hw - d1, t);
@@ -559,6 +609,7 @@
     else if (C.kind === 'police') W.inGendarmerie(key, C, P, F, Fr);
     else if (C.kind === 'mall') W.inMall(key, C, P, F, Fr);
     else if (C.kind === 'gym') W.inGym(key, C, P, F, Fr);
+    else if (W.inV6[C.kind]) W.inV6[C.kind](key, C, P, F, Fr);         // V6 : PMU, casino, prêteur, boîte de nuit, combats
   };
   /** Employé de décor (assis à son bureau ou debout) */
   W.addStaff = (Fr, lx, lz, ry, look, seated) => {
@@ -764,16 +815,43 @@
       } else if (!f.espacil) ML.LOC.houses.push(d);
     }
     // poste de préparation d'usinage (allumé quand il est acheté au PC)
-    const PX = -5.5, PZ = 9.6, g = add(new THREE.Group()); g.position.set(PX, 0, PZ);
+    const PX = -3.3, PZ = -12.9, g = add(new THREE.Group()); g.position.set(PX, 0, PZ); g.rotation.y = Math.PI;   // V6 : contre le mur du fond, entre les racks et l'armoire à outils
     U.box(3.4, 0.85, 1.1, 0x5d6d7e, 0, 0.425, 0, g); U.box(3.5, 0.08, 1.2, 0x2e86de, 0, 0.89, 0, g);
     U.box(3.4, 1.5, 0.08, 0x34495e, 0, 1.65, 0.56, g); U.box(3.5, 0.3, 0.3, 0x2e86de, 0, 2.5, 0.45, g);
     for (let i = 0; i < 7; i++) U.box(0.08, 0.32, 0.04, [0xffd23f, 0x3fa7ff, 0xff7a3f][i % 3], -1.3 + i * 0.43, 1.75, 0.5, g, false);
     for (const x of [-1.2, 0, 1.2]) U.box(0.85, 0.02, 0.6, 0x1b4f8a, x, 0.935, 0.05, g, false);
     U.boxCollider(PX, PZ, 3.4, 1.1, 'prepa');
     W.prepaLabel = U.label('', { size: 0.34, color: '#9fd0ff' }); W.prepaLabel.position.set(PX, 3.1, PZ); add(W.prepaLabel);
-    W.targets.push({ id: 'prepa', x: PX, y: 1, z: PZ - 1.1, r: 2.2 });
-    ML.LOC.prepa = { x: PX, z: PZ, spots: [-1.2, 0, 1.2].map(dx => ({ x: PX + dx, y: 0.95, z: PZ + 0.05 })) };
-    W.floorText('POSTE DE PRÉPARATION', 'kits brut + outil', 3.6, 1.0, PX, PZ - 1.3, { bg: 'rgba(46,134,222,0.55)', color: '#fff', y: 0.046 });
+    W.targets.push({ id: 'prepa', x: PX, y: 1, z: PZ + 1.1, r: 2.2 });
+    ML.LOC.prepa = { x: PX, z: PZ, spots: [-1.2, 0, 1.2].map(dx => ({ x: PX + dx, y: 0.95, z: PZ - 0.05 })) };
+    W.floorText('POSTE DE PRÉPARATION', 'kits brut + outil', 3.6, 1.0, PX, PZ + 1.4, { bg: 'rgba(46,134,222,0.55)', color: '#fff', y: 0.046 });
+    // ---------- V6 ----------
+    // comptoir AU BLACK derrière l'atelier (Jean-Mi), on y va par le côté gauche
+    { const BX = -11, BZ = -18.6, bg = add(new THREE.Group()); bg.position.set(BX, 0, BZ);
+      U.box(3.2, 0.95, 0.8, 0x4e342e, 0, 0.48, 0.5, bg); U.box(3.4, 0.08, 1.0, 0x3e2723, 0, 0.99, 0.5, bg);     // établi branlant
+      U.box(3.6, 0.08, 2.6, 0x37474f, 0, 2.6, -0.2, bg); for (const x of [-1.7, 1.7]) U.box(0.1, 2.6, 0.1, 0x263238, x, 1.3, 0.9, bg);   // auvent
+      U.box(1.0, 0.7, 0.7, 0x5d4037, -2.4, 0.35, -0.6, bg); U.box(0.8, 0.6, 0.6, 0x6d4c41, -2.4, 1.0, -0.6, bg);   // cartons
+      U.boxCollider(BX, BZ + 0.5, 3.2, 0.8, 'noir');
+      const lb = U.label('🕶 JEAN-MI — pièces au black (chut !)', { size: 0.34, color: '#c8c8c8', bg: 'rgba(0,0,0,0.75)' }); lb.position.set(BX, 3.2, BZ + 0.5); add(lb);
+      ML.LOC.noirSpot = { x: BX, z: BZ, hx: 1.6, hz: 0.6, npc: { x: BX, z: BZ - 0.4, yaw: 0 }, dock: { x: BX, z: BZ + 1.8 } };
+      W.floorText('PAS DE FACTURE', 'pas de question', 3.0, 0.9, BX, BZ + 2.3, { bg: 'rgba(0,0,0,0.6)', color: '#bbb', y: 0.046 }); }
+    // planque (bâche) : les caisses au black y sont invisibles pour la police
+    { const QX = -18.6, QZ = -3.2; U.box(1.2, 0.9, 2.2, 0x2e4a2e, QX, 0.45, QZ, root); U.box(1.3, 0.05, 2.3, 0x3b5e3b, QX, 0.92, QZ, root); U.boxCollider(QX, QZ, 1.2, 2.2, 'planque');
+      W.targets.push({ id: 'planque', x: QX + 0.9, y: 0.8, z: QZ, r: 2.2 }); ML.LOC.planque = { x: QX, z: QZ };
+      W.planqueLabel = U.label('', { size: 0.26, color: '#9fd39f' }); W.planqueLabel.position.set(QX, 1.6, QZ); add(W.planqueLabel); }
+    // distributeur de snacks + banquette de sieste
+    U.box(0.9, 1.9, 0.8, 0xc0392b, -19.25, 0.95, 10.4, root); U.box(0.6, 1.2, 0.04, 0x1b2631, -18.82, 1.15, 10.4, root).rotation.y = Math.PI / 2;
+    U.boxCollider(-19.25, 10.4, 0.9, 0.8, 'distrib'); W.targets.push({ id: 'distrib', x: -18.3, y: 1.1, z: 10.4, r: 1.6 });
+    const ld = U.label(`🍫 DISTRIBUTEUR · ${ML.V6.snack} €`, { size: 0.24, color: '#fff', bg: 'rgba(192,57,43,0.85)' }); ld.position.set(-19, 2.25, 10.4); add(ld);
+    W.targets.push({ id: 'sieste', x: -17, y: 0.6, z: 12.6, r: 1.8 });
+    // pile de sacs-poubelle (pour Dennis) à côté de la benne
+    for (let i = 0; i < 5; i++) U.cyl(0.2, 0.25, 0.5, 0x1b1b1b, -9.8 + (i % 3) * 0.45, 0.25 + Math.floor(i / 3) * 0.42, 19.6 + (i % 2) * 0.3, root, 8);
+    U.boxCollider(-9.4, 19.7, 1.4, 0.9, 'poubelles'); W.targets.push({ id: 'poubelles', x: -9.4, y: 0.6, z: 20.6, r: 1.8 });
+    // stand de hot-dogs (Mehdi) devant l'atelier
+    { const HX = 13.5, HZ = 27.5; U.box(2.2, 1.0, 1.0, 0xe74c3c, HX, 0.5, HZ, root); U.box(2.4, 0.08, 1.2, 0xecf0f1, HX, 1.04, HZ, root);
+      for (const x of [-1.05, 1.05]) U.box(0.06, 1.4, 0.06, 0x7f8c8d, HX + x, 1.75, HZ - 0.4, root); U.box(2.6, 0.1, 1.6, 0xf1c40f, HX, 2.45, HZ - 0.2, root);
+      U.boxCollider(HX, HZ, 2.2, 1.0, 'hotdog'); const lh = U.label(`🌭 HOT-DOGS ${ML.V6.hotdog} €`, { size: 0.36, color: '#fff', bg: 'rgba(231,76,60,0.9)' }); lh.position.set(HX, 3.1, HZ); add(lh);
+      ML.LOC.hotdog = { x: HX, z: HZ + 1.0, yaw: Math.PI }; }
     // toilettes : cabine de chantier, dehors à gauche de l'atelier
     const TX = -24, TZ = 10, tg = add(new THREE.Group()); tg.position.set(TX, 0, TZ);
     U.box(2.2, 2.5, 2.2, 0x2e86de, 0, 1.25, 0, tg); U.box(2.4, 0.15, 2.4, 0x1b4f8a, 0, 2.58, 0, tg); U.box(2.3, 0.2, 2.3, 0x1b4f8a, 0, 0.1, 0, tg);
@@ -861,6 +939,57 @@
     F.sh('cyl', 0.02, 1.2, 0.02, -6, C.h - 0.7, 2, 0x333333); F.sh('cyl', 0.35, 1.3, 0.35, -6, C.h - 2, 2, 0xc0392b); F.col(-6, 2, 0.7, 0.7);
     const p1 = Fr.L(-hw + 0.45, 1); ML.Decor.sign('NO PAIN NO GAIN', 'l\'endurance, ça se travaille', '#16a085', '#fff', 3.6, 1.2, p1.x, 2.6, p1.z, Fr.a + Math.PI / 2, { border: '#fff' });
     W.addStaff(Fr, 4, 1.6, Math.PI, randLook(r), false);
+  };
+
+  /* ---------- V6 : intérieurs des distractions en ville ---------- */
+  W.inV6 = {};
+  const counter = (F, Fr, P, x, z, col, top) => { F.box(3.0, 1.0, 0.8, x, 0.5, z, col); F.box(3.1, 0.08, 0.9, x, 1.04, z, top || 0xffffff); F.col(x, z, 3.0, 0.8); P.npc = Object.assign(Fr.L(x, z - 0.9), { yaw: Fr.a }); };
+  W.inV6.pmu = (key, C, P, F, Fr) => {
+    const hw = C.w / 2, hd = C.d / 2, dx = hw - 3; counter(F, Fr, P, dx - 3.5, hd - 4.2, 0x27ae60);
+    for (let i = 0; i < 3; i++) { F.box(2.2, 1.3, 0.1, -hw + 3 + i * 3, 2.6, -hd + 0.45, 0x111111); F.glass(2.0, 1.1, 0.02, -hw + 3 + i * 3, 2.6, -hd + 0.52, 0x2ecc71); }
+    for (const x of [-hw + 2.5, -hw + 6]) { F.sh('cyl', 0.9, 1.05, 0.9, x, 0.52, 0, 0x8d6e63); F.col(x, 0, 0.9, 0.9); }
+    const sg = Fr.L(0, -hd + 0.5); ML.Decor.sign('🐎 COURSE EN DIRECT', 'Hippodrome de Kerplouz', '#145a32', '#fff', 6, 1.0, sg.x, 4.0, sg.z, Fr.a, { glow: true });
+  };
+  W.inV6.casino = (key, C, P, F, Fr) => {
+    const hw = C.w / 2, hd = C.d / 2; F.box(C.w - 1, 0.04, C.d - 1, 0, 0.07, 0, 0x7b1f2b);
+    F.sh('cyl', 3.4, 0.9, 2.0, 0, 0.45, -1.5, 0x145a32); F.sh('cyl', 3.6, 0.1, 2.2, 0, 0.92, -1.5, 0x5d4037); F.col(0, -1.5, 3.4, 2.0);   // table de blackjack
+    P.npc = Object.assign(Fr.L(0, -3.0), { yaw: Fr.a + Math.PI });
+    for (let i = 0; i < 4; i++) { F.box(1.0, 1.8, 0.8, -hw + 1.2 + i * 1.3, 0.9, -hd + 1, 0xd4ac0d); F.glass(0.7, 0.6, 0.02, -hw + 1.2 + i * 1.3, 1.3, -hd + 1.42, 0xff5e5e); F.col(-hw + 1.2 + i * 1.3, -hd + 1, 1.0, 0.8); }
+    const sg = Fr.L(0, -hd + 0.5); ML.Decor.sign('♠ BLACKJACK ♥', 'la maison gagne toujours', '#d4ac0d', '#111', 5, 1.0, sg.x, 4.2, sg.z, Fr.a, { glow: true });
+  };
+  W.inV6.gages = (key, C, P, F, Fr) => {
+    const hw = C.w / 2, hd = C.d / 2, dx = hw - 3; counter(F, Fr, P, dx - 2.5, hd - 4.2, 0x5d4037, 0xd7ccc8);
+    for (let i = 0; i < 3; i++) { F.box(3.2, 2.4, 0.6, -hw + 2.2 + i * 3.6, 1.2, -hd + 0.7, 0x6d4c41); F.col(-hw + 2.2 + i * 3.6, -hd + 0.7, 3.2, 0.6); for (let j = 0; j < 3; j++) F.box(0.5, 0.4, 0.4, -hw + 1.3 + i * 3.6 + j * 0.9, 0.7 + (j % 2) * 0.8, -hd + 0.75, [0xe84393, 0x2980b9, 0xf1c40f][j]); }
+    const sg = Fr.L(0, -hd + 0.4); ML.Decor.sign('TOUT EST À VENDRE', '(même ce qui ne sert à rien)', '#5d4037', '#ffd257', 5, 1.0, sg.x, 3.4, sg.z, Fr.a, {});
+  };
+  W.inV6.boite = (key, C, P, F, Fr) => {
+    const hw = C.w / 2, hd = C.d / 2, dx = hw - 3; F.box(C.w - 1, 0.04, C.d - 1, 0, 0.07, 0, 0x1a1a2e);
+    counter(F, Fr, P, -hw + 3, hd - 4.5, 0x111111, 0xe84393);                                   // bar
+    for (let i = 0; i < 9; i++) F.box(1.6, 0.03, 1.6, -3 + (i % 3) * 1.7, 0.1, -1 + Math.floor(i / 3) * 1.7, [0xe84393, 0x00cec9, 0xfdcb6e][i % 3], { glow: true });   // piste lumineuse
+    F.box(7, 0.6, 3, 0, 0.3, -hd + 2, 0x2d3436); F.col(0, -hd + 2, 7, 3);                     // scène
+    for (const x of [-3.6, 3.6]) F.sh('cyl', 0.08, 3, 0.08, x, 2.1, -hd + 2, 0xbdc3c7);
+    const z1 = Fr.L(-3.8, -hd + 0.6), z2 = Fr.L(3.8, -hd + 4.2);
+    ML.LOC.stage = { minX: Math.min(z1.x, z2.x), maxX: Math.max(z1.x, z2.x), minZ: Math.min(z1.z, z2.z), maxZ: Math.max(z1.z, z2.z), door: Fr.L(dx, hd + 2.5) };
+    W.dancers = W.dancers || [];
+    for (const x of [-1.5, 1.5]) { const v = W.addStaff(Fr, x, -hd + 2, 0, { skin: 0xf0c8a0, shirt: 0xe84393, pants: 0x111111, hair: 0x111111, height: 1.75, longHair: x < 0 }, false); v.group.position.y = 0.6; W.dancers.push(v); }
+    for (const x of [-4.6, 4.6]) { const b = W.addStaff(Fr, x, -hd + 3.9, Math.PI, { skin: 0x8d5524, shirt: 0x111111, pants: 0x111111, hair: 0x111111, height: 2.0, width: 1.4, glasses: true }, false); }
+    const sg = Fr.L(0, -hd + 0.5); ML.Decor.sign('LE COPEAU CLUB', 'défense de monter sur scène', '#e84393', '#fff', 5, 1.0, sg.x, 4.6, sg.z, Fr.a, { glow: true });
+  };
+  W.inV6.arene = (key, C, P, F, Fr) => {
+    const hw = C.w / 2, hd = C.d / 2, dx = hw - 3; counter(F, Fr, P, dx - 2, hd - 4.4, 0x3e2723, 0x8d6e63);
+    F.box(6, 0.5, 6, -2, 0.25, -2, 0x8d6e63); F.col(-2, -2, 6, 6);                                // ring
+    for (const [x, z] of [[-5, -5], [1, -5], [-5, 1], [1, 1]]) F.sh('cyl', 0.15, 1.6, 0.15, x, 1.05, z, 0xc0392b);
+    for (const y of [0.9, 1.3]) { F.box(6, 0.04, 0.04, -2, y, -5, 0xecf0f1); F.box(6, 0.04, 0.04, -2, y, 1, 0xecf0f1); F.box(0.04, 0.04, 6, -5, y, -2, 0xecf0f1); F.box(0.04, 0.04, 6, 1, y, -2, 0xecf0f1); }
+    W.boxers = [W.addStaff(Fr, -3, -2, Math.PI / 2, { skin: 0xc68642, shirt: 0xc0392b, pants: 0xc0392b, hair: 0x111111, height: 1.85, width: 1.3, gloves: 0xc0392b }, false), W.addStaff(Fr, -1, -2, -Math.PI / 2, { skin: 0xf0c8a0, shirt: 0x2980b9, pants: 0x2980b9, hair: 0xe0b050, height: 1.8, width: 1.25, gloves: 0x2980b9 }, false)];
+    for (const v of W.boxers) v.group.position.y = 0.5;
+    const tp = Fr.L(-2, 1.9); W.targets.push({ id: 'ring', x: tp.x, y: 1.0, z: tp.z, r: 2.2 });
+    const sg = Fr.L(0, -hd + 0.5); ML.Decor.sign('HANGAR 13', 'premier round : on ne parle pas du hangar', '#212121', '#e74c3c', 5, 1.0, sg.x, 5, sg.z, Fr.a, {});
+  };
+  /** V6 : animation des danseurs et des boxeurs (décor) */
+  W.v6Anim = dt => {
+    W._v6t = (W._v6t || 0) + dt; const t = W._v6t;
+    for (const [i, v] of (W.dancers || []).entries()) { v.armL.rotation.x = -2.4 + Math.sin(t * 4 + i) * 0.6; v.armR.rotation.x = -2.4 - Math.sin(t * 4 + i) * 0.6; v.group.position.y = 0.6 + Math.abs(Math.sin(t * 4 + i)) * 0.15; }
+    for (const [i, v] of (W.boxers || []).entries()) { v.armL.rotation.x = -1.4 + Math.sin(t * 6 + i * 2) * 0.6; v.armR.rotation.x = -1.4 - Math.sin(t * 6 + i * 2) * 0.6; }
   };
 
   W.bounds = () => {

@@ -30,6 +30,7 @@
     punch: v => { noise(0.12, 0.6 * v, 600); tone(120, 0.12, 'sine', 0.4 * v, 60); },
     whoosh: v => noise(0.18, 0.15 * v, 2500),
     clang: v => { tone(880, 0.25, 'triangle', 0.18 * v, 620); tone(1320, 0.18, 'triangle', 0.1 * v); },
+    splash: v => { noise(0.9, 0.55 * v, 900); tone(140, 0.5, 'sine', 0.3 * v, 60); },
     bong: v => { tone(180, 0.6, 'triangle', 0.5 * v, 90); noise(0.2, 0.5 * v, 400); },
     pickup: v => { tone(660, 0.06, 'square', 0.08 * v); setTimeout(() => tone(990, 0.06, 'square', 0.08 * v), 60); },
     drop: v => tone(220, 0.08, 'square', 0.08 * v, 140),

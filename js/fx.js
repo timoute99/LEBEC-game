@@ -35,6 +35,8 @@
     }
   };
 
+  /** V6 : plouf (voiture dans la rivière) */
+  F.splash = (x, z) => { const p = new THREE.Vector3(x, 0.3, z); F.emit('spray', p, { x: 0, y: 1.3, z: 0 }, 60); F.emit('blow', p, { x: 0, y: 0.8, z: 0 }, 30); };
   /** V5.2 : explosion (Bleuenn) */
   F.boom = (x, z) => {
     const p = new THREE.Vector3(x, 1.4, z);

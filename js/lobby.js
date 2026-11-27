@@ -81,7 +81,7 @@
   L.screen = id => {
     if (id !== 'scr-profile') L.cur = id;
     L.show(); for (const k of SCREENS) $(k).classList.toggle('hidden', k !== id);
-    const pv = id === 'scr-profile'; L.el.classList.toggle('preview', pv); if (ML.Main.preview) ML.Main.preview(pv);
+    const pv = id === 'scr-profile'; if (!pv) { L.tryOn = {}; L.pvView = 'perso'; } L.el.classList.toggle('preview', pv); if (ML.Main.preview) ML.Main.preview(pv);
     if (id === 'scr-solo' || id === 'scr-room') L.tip();
   };
   L.init = () => {
@@ -289,13 +289,15 @@
   };
   L.renderProfile = () => {
     const P = A.prof, sw = (arr, cur, k) => arr.map(c => `<button class="sw ${c === cur ? 'on' : ''}" data-k="${k}" data-v="${c}" style="background:#${c.toString(16).padStart(6, '0')}"></button>`).join('');
-    const cats = { tenue: '👕 Tenues', chapeau: '🎩 Chapeaux', klaxon: '📯 Klaxons', peinture: '🎨 Peinture Mégane', aileron: '🏎 Aileron', flammes: '🔥 Flammes', jantes: '✨ Jantes' };
-    let shop = '';
+    const cats = { tenue: '👕 Tenues', pantalon: '👖 Pantalons', chaussures: '👟 Chaussures', chapeau: '🎩 Chapeaux', lunettes: '🕶 Lunettes', sac: '🎒 Sacs & cape', klaxon: '📯 Klaxons', peinture: '🎨 Peinture des véhicules', aileron: '🏎 Aileron', flammes: '🔥 Flammes', jantes: '✨ Jantes' };
+    const CARC = ['peinture', 'aileron', 'flammes', 'jantes'];
+    L.tryOn = L.tryOn || {}; L.pvView = L.pvView || 'perso';
+    let shop = `<div class="pv-sw"><b>Aperçu :</b> <button class="sec tiny ${L.pvView === 'perso' ? 'on' : ''}" data-pv="perso">👤 Mon perso</button><button class="sec tiny ${L.pvView === 'car' ? 'on' : ''}" data-pv="car">🚗 Ma voiture</button>${Object.keys(L.tryOn).length ? ' <button class="sec tiny" data-pv="reset">↺ Enlever les essais</button>' : ''}<br><span class="dim small">Clique un article pour l'<b>essayer</b> (aperçu 3D), re-clique pour l'acheter.</span></div>`;
     for (const cat in cats) {
       const items = Object.keys(ML.SHOP).filter(k => ML.SHOP[k].cat === cat);
       shop += `<div class="shop-cat"><h4>${cats[cat]}</h4>` + items.map(k => {
-        const it = ML.SHOP[k], own = A.owns(k), eq = P.eq[cat] === k;
-        return `<button class="shop-it ${own ? 'own' : ''} ${eq ? 'eq' : ''}" data-id="${k}">${U.esc(it.name)}<span>${eq ? '✔ porté' : own ? 'équiper' : '🪙 ' + it.price}</span></button>`;
+        const it = ML.SHOP[k], own = A.owns(k), eq = P.eq[cat] === k, tr = L.tryOn[cat] === k;
+        return `<button class="shop-it ${own ? 'own' : ''} ${eq ? 'eq' : ''} ${tr ? 'try' : ''}" data-id="${k}">${U.esc(it.name)}<span>${eq ? '✔ porté' : own ? 'équiper' : tr ? '👀 essai · acheter 🪙 ' + it.price : '🪙 ' + it.price}</span></button>`;
       }).join('') + (P.eq[cat] ? `<button class="shop-it off" data-off="${cat}">Retirer</button>` : '') + '</div>';
     }
     const ach = Object.keys(ML.ACH).map(k => `<span class="ach ${P.ach.includes(k) ? 'on' : ''}" title="${U.esc(ML.ACH[k][1])}">🏆 ${U.esc(ML.ACH[k][0])}</span>`).join('');
@@ -314,9 +316,13 @@
     ML.Main.preview(true);
     for (const b of $('prof-body').querySelectorAll('.shop-it[data-id]')) b.onclick = () => {
       const id = b.dataset.id, it = ML.SHOP[id];
-      if (A.owns(id)) A.equip(it.cat, id); else { const err = A.buy(id); if (err) return ML.HUD.toast(err); ML.HUD.toast(`Acheté : ${it.name} !`); }
+      L.pvView = CARC.includes(it.cat) ? 'car' : it.cat === 'klaxon' ? L.pvView : 'perso';
+      if (A.owns(id)) { A.equip(it.cat, id); delete L.tryOn[it.cat]; }
+      else if (L.tryOn[it.cat] !== id) { L.tryOn[it.cat] = id; if (it.cat === 'klaxon') ML.Sfx.horn(id); L.renderProfile(); return; }   // 1er clic : on ESSAIE
+      else { const err = A.buy(id); if (err) return ML.HUD.toast(err); delete L.tryOn[it.cat]; A.equip(it.cat, id); ML.HUD.toast(`Acheté et équipé : ${it.name} !`); }
       if (it.cat === 'klaxon') ML.Sfx.horn(id); L.renderProfile(); L.renderAccount();
     };
+    for (const b of $('prof-body').querySelectorAll('[data-pv]')) b.onclick = () => { if (b.dataset.pv === 'reset') L.tryOn = {}; else L.pvView = b.dataset.pv; L.renderProfile(); };
     for (const b of $('prof-body').querySelectorAll('[data-off]')) b.onclick = () => { A.equip(b.dataset.off, null); L.renderProfile(); };
   };
 
@@ -359,7 +365,12 @@
   };
   L.cfgRoles = p => (p === 'h' ? { solo: L.myRole } : L.resolveRoles());
   /** Journée hors campagne : petit atelier de départ, 1 500 € pour investir, nouvelle ville */
-  L.freeCfg = (mode, diff, traitor, roles) => mode === 'debutant' ? Object.assign(L.freeCfg('coop', 'facile', false, roles), { beginner: true }) : ({ mode, day: 1, E: ML.Company.fresh(mode === 'coop' ? 'Journée libre' : 'Mécanique Lebec', mode === 'course' ? 0 : ML.ECO.freeMoney), city: (Math.random() * 1e9) >>> 0, traitor, diff, roles });
+  L.freeCfg = (mode, diff, traitor, roles) => {
+    if (mode === 'debutant') { const c = L.freeCfg('coop', 'facile', false, roles); c.E.mach = ['T1', 'F1']; c.E.mo = { T1: 'std', F1: 'std' }; c.E.money = ML.ECO.freeMoney - 1500; return Object.assign(c, { beginner: true }); }   // débutant : déjà 2 machines
+    const E = ML.Company.fresh(mode === 'coop' ? 'Journée libre' : 'Mécanique Lebec', mode === 'course' ? 0 : ML.ECO.freeMoney);
+    if (mode !== 'coop' && mode !== 'course') { E.mach = ['T1', 'F1']; E.mo = { T1: 'std', F1: 'std' }; E.money = 1500; }     // inspection, traître : on garde l'atelier équipé
+    return { mode, day: 1, E, city: (Math.random() * 1e9) >>> 0, traitor, diff, roles };
+  };
   L.noop = () => {
   };
 

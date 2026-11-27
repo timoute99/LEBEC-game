@@ -1,4 +1,4 @@
-MÉCANIQUE LEBEC — usinage en équipe (V5.5, 1 à 6 joueurs)
+MÉCANIQUE LEBEC — usinage en équipe (V6.0, 1 à 6 joueurs)
 ==========================================================
 En ligne : https://lebec-game.onrender.com
 
@@ -38,6 +38,22 @@ MODES
   avec le code peut la reprendre ; l'Inspecteur vient quand l'atelier est prêt, le réussir
   termine le jeu) · Inspection (boss : règles absurdes qui changent) · Course de Mégane
   (5 manches) · Mode traître (3 joueurs minimum : un joueur payé par UsiFlash, vote à la fin).
+
+NOUVEAU EN V6.0
+  - Départ sans machine (plus d'argent) ; machines en 3 gammes (occasion / standard / haut de gamme).
+  - Bruts et outils d'occasion (moins chers, plus risqués) ; AKINOX INGENIEURING (brut pas cher, délai
+    variable, parfois annulé : on le sait au bout de quelques secondes).
+  - Marché noir (Jean-Mi, comptoir derrière l'atelier), réputation black, contrôles de police (planque
+    sous la bâche, faux programme sur la machine, amendes).
+  - Perturbateurs : grande clé à molette (Johan Bois, Lean Manufacturing, squatteurs), batte (saboteur,
+    racketteur, mauvais payeurs), Dennis (sacs-poubelle à lancer). Le videur bloque squatteurs et saboteurs.
+  - Faim / fatigue (hot-dogs, distributeur, sieste) ; évanouissement si on oublie.
+  - Lieux : PMU, casino (blackjack), prêteur sur gages, boîte de nuit, Hangar 13 (combats).
+  - Solo : tous les rôles. Mode admin F9 (pseudos de ADMIN_USERS, hôte de la partie).
+  - Tickets : n° d'O seulement (O-0012), HUD allégé, mini-carte centrée et nette, tutoriel fermable.
+  - Atelier : bureau vitré + planning magnétique dynamique, îlots, vestiaires, affiches.
+  - Boutique : chaussures, pantalons, lunettes, sacs ; essayage avant achat (aperçu 3D perso / voiture).
+  - Corrections : poste de prépa déplacé, GPS à travers le pare-brise, rivière, clignotement du PC.
 
 NOUVEAU EN V5.5
   - PC : encadré orange « 🧱 BRUTS À ACHETER » (Commandes + Fournisseurs) avec bouton Commander, état de la

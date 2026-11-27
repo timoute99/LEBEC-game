@@ -6,6 +6,24 @@
    serveur : page admin https://lebec-game.onrender.com/admin, onglet Retours.
    ===================================================================== */
 ML.PATCH = [
+  { v: 'V6.0', d: 'novembre 2026', t: 'La grosse mise à jour : marché noir, relous, faim, casino… et un atelier vide au départ', l: [
+    '🏭 Une partie commence avec un ATELIER VIDE et plus d\'argent : achète tes machines au PC, en 3 gammes (♻ occasion pas chère mais fragile, standard, ⭐ haut de gamme rapide et fiable).',
+    '♻ Bruts et outils d\'OCCASION : moitié prix, rouillés, mais usure, pannes et pièces ratées plus fréquentes.',
+    '📠 AKINOX INGENIEURING : bruts de fonderie / mécano-soudé pas chers, délai très variable… et parfois rien n\'arrive (tu le sais tout de suite).',
+    '🕶 MARCHÉ NOIR : Jean-Mi, derrière l\'atelier, paie cash des pièces sans facture. Attention aux CONTRÔLES DE POLICE : planque sous la bâche, faux programme sur la machine, sinon grosse amende.',
+    '🔧 La GRANDE clé à molette chasse Johan Bois, Lean Manufacturing et les SQUATTEURS. 🏏 La BATTE règle les conflits : saboteur, racketteur, mauvais payeurs (et les gens volent en ragdoll).',
+    '👦 Dennis tague l\'atelier : lance-lui des sacs-poubelle. 💸 Un racketteur traîne dans la rue.',
+    '🍔 Faim et 💤 fatigue : mange (stand de hot-dogs, distributeur) et fais la sieste, sinon tu t\'évanouis.',
+    '🎰 En ville : PMU (courses de chevaux), casino (blackjack), prêteur sur gages, boîte de nuit, combats clandestins au Hangar 13.',
+    '🎩 En solo, tu as TOUS les rôles (les PNJ aident quand même).',
+    '🎫 Tickets redessinés : plus de nom de pièce, seulement le n° d\'O (O-0012), le client, les puces et l\'avancement. HUD allégé (plus de météo ni de satisfaction).',
+    '🗺 Mini-carte centrée sur toi, nette et lisible, avec des flèches vers les objectifs ; grande carte (M) en haute résolution.',
+    '🏢 Atelier mieux fini : bureau vitré du chef avec un PLANNING magnétique qui suit les vraies commandes, îlots signalés, vestiaires, affiches, servantes, pharmacie.',
+    '👟 Nouveaux articles : chaussures, pantalons (même le short), lunettes, sac à dos, banane, cape. Tout s\'ESSAIE avant d\'acheter (aperçu 3D du perso et de la voiture).',
+    '📘 Le tutoriel se ferme ou se réduit (boutons ✕ / ▁, touche J, ou Échap → « Fermer le tutoriel »).',
+    '🛠 Corrections : le poste de préparation n\'est plus au milieu de l\'atelier, la ligne GPS violette se voit enfin à travers le pare-brise, le PC ne « clignote » plus en ajoutant une commande, tomber dans la rivière remorque la voiture (et le colis est perdu), le tuning s\'applique bien aux véhicules.',
+    '🛠 Mode ADMIN (F9) pour tester : argent illimité, commandes et événements à la demande.'
+  ] },
   { v: 'V5.5', d: 'novembre 2026', t: 'Bruts de fonderie et mécano-soudé enfin évidents', l: [
     '🧱 Sur le PC, un grand encadré orange « BRUTS À ACHETER » (dans 📥 Commandes et 🛒 Fournisseurs) : un bouton « 🛒 Commander » par pièce, le prix, où il arrive, et le compte à rebours de la livraison.',
     '✅ Les demandes de fonderie / mécano-soudé ont un bouton « Accepter + commander le brut » : un seul clic.',

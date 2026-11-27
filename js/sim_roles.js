@@ -24,14 +24,18 @@
     const L = ML.LOC.comp.casse;
     K.dog = L ? { x: L.dock.x, z: L.dock.z, h: 0, home: { x: L.dock.x, z: L.dock.z }, st: 'idle', sleep: 0, flee: 0, tgt: null } : null;
     const roles = Object.values(S.pl).map(P => ML.ROLES[P.role].name);
+    if (K.solo()) K.all('🎩 Tu joues seul : tu as TOUS les rôles (maintenance, magasinier, cariste, livreur…). Les PNJ de secours font quand même le boulot si tu n\'y vas pas… mais lentement.', 'info'); else
     K.all('👷 Rôles : ' + Object.values(S.pl).map(P => `${P.name} = ${ML.ROLES[P.role].icon} ${ML.ROLES[P.role].name}`).join(' · '), 'info');
     const missing = ['medecin', 'cariste', 'livreur', 'maintenance', 'magasinier'].filter(r => !K.hasRole(r)).map(r => ML.ROLES[r].name);
-    if (missing.length && roles.length) K.all(`🐢 Personne n'est ${missing.join(', ')} : des PNJ s'en chargeront… lentement.`, 'info');
+    if (!Object.keys(S.machines).length) { K.big('🏭 ATELIER VIDE : ACHÈTE TES MACHINES !', '#ffd257'); K.all('🎩 Lebec : « L\'atelier est vide ! File au 💻 PC, appli 🏭 Boutique Atelier, et choisis tes machines : 🔧 occasion pas chère, ⚙️ standard, ou 💎 haut de gamme. Au moins un TOUR et une FRAISEUSE ! »', 'warn'); }   // V6
+    if (missing.length && roles.length && !K.solo()) K.all(`🐢 Personne n'est ${missing.join(', ')} : des PNJ s'en chargeront… lentement.`, 'info');
   };
   K.role = pid => (S.pl[pid] ? S.pl[pid].role : null);
-  K.hasRole = r => Object.values(S.pl).some(P => P.role === r && !P.ko);
+  K.solo = () => Object.keys(S.pl).length === 1;                          // V6 : seul = tous les rôles
+  K.can = (pid, r) => K.role(pid) === r || K.solo();
+  K.hasRole = r => !K.solo() && Object.values(S.pl).some(P => P.role === r && !P.ko);   // en solo, les PNJ de secours passent quand même
   const needRole = (pid, r, what) => {
-    if (K.role(pid) === r) return true;
+    if (K.can(pid, r)) return true;
     K.note(pid, `⛔ ${what} : réservé au rôle ${ML.ROLES[r].icon} ${ML.ROLES[r].name}.` + (K.hasRole(r) ? ' Appelle-le (T : ping) !' : ' Un PNJ va s\'en occuper… lentement.'), 'warn');
     return false;
   };
@@ -109,7 +113,7 @@
       K.momoT[o.id] = K.momoT[o.id] || S.rt;
       if (S.rt - K.momoT[o.id] > 25 && cam && !cam.dr && K.bedFree(cam) >= 4 && Math.hypot(cam.x - o.x, cam.z - o.z) < 35) {
         delete K.momoT[o.id]; cam.bed.push(K.strip(o)); K.removeItem(o);
-        K.all(`🚜 Momo a chargé la palette #${o.d.oid} dans le camion (enfin).`, 'good');
+        K.all(`🚜 Momo a chargé la palette ${ML.on(o.d.oid)} dans le camion (enfin).`, 'good');
       }
     }
     // livreur absent : Momo livre ce qu'il y a dans le camion
@@ -260,13 +264,13 @@
     return false;
   };
   mod.machineUse = (pid, P, sel, held, mid, M) => {
-    if (M.broken && K.role(pid) !== 'maintenance' && held && held.type === 'cle') { needRole(pid, 'maintenance', 'Réparer'); return true; }
+    if (M.broken && !K.can(pid, 'maintenance') && held && held.type === 'cle') { needRole(pid, 'maintenance', 'Réparer'); return true; }
     if (M.bin === false || M.chips >= 100) { K.note(pid, `🗑 ${mid} est bloquée : bac à copeaux ${M.bin === false ? 'absent' : 'PLEIN'} (rôle maintenance).`, 'warn'); return true; }
     return false;
   };
   mod.npcUse = (pid, P, ps, sel, held, n) => {
     const comp = K.compOf(n.id), C2 = comp && COMP[comp];
-    if (C2 && (C2.kind === 'matiere' || C2.kind === 'outils') && P.role !== 'magasinier') { K.say(n, 'Je ne traite qu\'avec le MAGASINIER de chez Lebec !'); needRole(pid, 'magasinier', 'Commander'); return true; }
+    if (C2 && (C2.kind === 'matiere' || C2.kind === 'outils') && !K.can(pid, 'magasinier')) { K.say(n, 'Je ne traite qu\'avec le MAGASINIER de chez Lebec !'); needRole(pid, 'magasinier', 'Commander'); return true; }
     if (['docteur', 'gege', 'momo', 'sylvie'].includes(n.id)) { K.say(n, ML.line(n.id)); return true; }
     return false;
   };

@@ -11,11 +11,11 @@
   const ID = /^[a-z0-9_]{1,24}$/;
   const pick = a => a[Math.floor(Math.random() * a.length)];
 
-  /** Entreprise de départ : T1 + F1, un seul opérateur qui jongle, le vieux Kangoo */
+  /** Entreprise de départ (V6) : AUCUNE machine (on les choisit au PC), un opérateur qui jongle, le vieux Kangoo */
   Co.fresh = (name, money) => ({
     v: 4, name: String(name || 'Mécanique Lebec').slice(0, 30), code: null, city: (Math.random() * 1e9) >>> 0,
     day: 1, money: money === undefined ? ML.ECO.startMoney : money, rep: ML.ECO.startRep,
-    mach: ['T1', 'F1'], staff: [pick(['amaury', 'matis', 'marius'])], ai: {}, veh: ['kangoo'], up: {},
+    mach: [], mo: {}, staff: [pick(['amaury', 'matis', 'marius'])], ai: {}, veh: ['kangoo'], up: {},
     stock: { acier: 4, alu: 3, inox: 2, plaquette: 3, fraise: 2, foret: 2 },
     insp: null, inspNext: 0, won: false, tot: { ca: 0, served: 0, days: 0, best: 0 }, log: []
   });
@@ -28,14 +28,14 @@
     const E = {
       v: 4, name: String(d.name || F.name).replace(/[<>&"`]/g, '').slice(0, 30), code: d.code ? String(d.code).toUpperCase().slice(0, 8) : null,
       city: num(d.city, F.city, 1, 4294967295), day: num(d.day, 1, 1, 9999), money: num(d.money, F.money, -999999, 99999999), rep: num(d.rep, F.rep, 0, 100),
-      mach: list(d.mach, x => ML.MACHINES.some(m => m.id === x)) || F.mach,
+      mach: list(d.mach, x => ML.MACHINES.some(m => m.id === x)) || F.mach, mo: {},
       staff: list(d.staff, x => !!ML.STAFF[x]) || F.staff,
       ai: {}, veh: list(d.veh, x => !!ML.VEHICLES[x]) || F.veh, up: {}, stock: {},
       insp: d.insp === 'due' ? 'due' : null, inspNext: num(d.inspNext, 0, 0, 9999), won: !!d.won, bankrupt: !!d.bankrupt,
       tot: { ca: num(d.tot && d.tot.ca, 0, 0, 1e9), served: num(d.tot && d.tot.served, 0, 0, 1e7), days: num(d.tot && d.tot.days, 0, 0, 1e5), best: num(d.tot && d.tot.best, 0, -1e7, 1e9) },
       log: Array.isArray(d.log) ? d.log.slice(-8).map(x => String(x).slice(0, 120)) : []
     };
-    if (!E.mach.length) E.mach = F.mach;
+    for (const id of E.mach) E.mo[id] = d.mo && ML.MMODELS[d.mo[id]] ? d.mo[id] : 'std';    // V6 : gamme de chaque machine
     if (!E.veh.includes('kangoo')) E.veh.unshift('kangoo');
     for (const k in ML.AI_STAFF) if (d.ai && d.ai[k]) E.ai[k] = true;
     for (const k in ML.CATALOG) if (d.up && d.up[k] && !ML.CATALOG[k].mach && !ML.CATALOG[k].veh) E.up[k] = num(d.up[k], 1, 1, ML.CATALOG[k].max || 1);

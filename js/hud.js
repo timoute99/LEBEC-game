@@ -25,7 +25,7 @@
       if (a === 'perso') ML.Lobby.inGameProfile();
       if (a === 'save') ML.Camp.saveNow();
       if (a === 'news') ML.Lobby.showNews(true);
-      if (a === 'tuto') { ML.Tuto.start(true); ML.Input.lock(); }
+      if (a === 'tuto') { if (ML.Tuto.on) { ML.Tuto.finish(true); H.showPause(true); } else { ML.Tuto.start(true); ML.Input.lock(); } }
       if (a === 'menu') { if (confirm(G.solo ? 'Quitter la partie et revenir au menu principal ? (en campagne, l\'atelier est sauvegardé toutes les minutes)' : G.isHost ? 'Quitter la partie ? Un autre joueur reprendra l\'atelier.' : 'Quitter la partie et revenir au menu principal ?')) ML.Lobby.leaveGame(); }
     };
     H.el.pause.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'pz-name') { e.preventDefault(); $('pz-name').nextElementSibling.click(); } });
@@ -48,7 +48,7 @@
         <button class="sec" data-pz="perso">👕 Changer mon perso (tenue, chapeau…)</button>
         ${G.isHost && G.game && ['coop', 'campagne', 'inspection'].includes(G.game.mode) ? `<button class="sec" data-pz="save">💾 Enregistrer la partie${ML.Account.logged() ? ' sur mon compte' : ''}</button>` : ''}
         <button class="sec" data-pz="news">📰 Nouveautés · idée · signaler un bug</button>
-        <button class="sec" data-pz="tuto">📘 Revoir le tutoriel</button>
+        <button class="sec" data-pz="tuto">${ML.Tuto && ML.Tuto.on ? '✕ Fermer le tutoriel' : '📘 Revoir le tutoriel'}</button>
         <button class="sec" data-pz="menu">🏠 Menu principal</button>
         <p class="dim small">${G.solo ? 'Le jeu continue de tourner en fond.' : 'En multijoueur, la partie continue pour les autres !'}</p></div>`;
       H.el.pause.classList.toggle('hidden', false); return;
@@ -88,7 +88,7 @@
     if (me) {
       H.el.hp.style.width = me.hp + '%'; H.el.hp.style.background = me.hp < 30 ? '#e74c3c' : me.hp < 60 ? '#f39c12' : '#3ecf6e';
       H.el.hpbox.title = me.hp + ' PV';
-      const rb = ML.ROLES[me.role]; const rh = `${rb.icon} ${rb.name}`; if (H._rb2 !== rh) { H.el.rolebadge.innerHTML = rh; H.el.rolebadge.style.borderColor = rb.css; H.el.rolebadge.title = rb.desc; H._rb2 = rh; }
+      const rb = ML.ROLES[me.role], soloAll = Object.keys(S.pl).length === 1; const rh = soloAll ? '🎩 Tous les rôles (solo)' : `${rb.icon} ${rb.name}`; if (H._rb2 !== rh) { H.el.rolebadge.innerHTML = rh; H.el.rolebadge.style.borderColor = rb.css; H.el.rolebadge.title = rb.desc; H._rb2 = rh; }
       H.el.ko.classList.toggle('hidden', !me.ko);
     }
     if (ML.ui.modal === 'map') H.drawBigMap(S);
@@ -123,7 +123,6 @@
     H.el.score.textContent = S.mode === 'course' ? S.score : `${S.money.toLocaleString('fr-FR')} €`; H.el.score.classList.toggle('neg', S.money < 0);
     const np = (S.props || []).length + (S.parts || []).filter(p => p.st === 'wait').length;
     H.el.props.textContent = np ? `📥 ${np} demande${np > 1 ? 's' : ''} au PC` : ''; H.el.props.classList.toggle('hidden', !np);
-    H.el.sat.style.width = S.sat + '%'; H.el.sat.style.background = S.sat < 30 ? '#e74c3c' : S.sat < 55 ? '#f39c12' : '#3ecf6e';
     H.el.finds.textContent = `★ ${S.finds.got}/${S.finds.total}`;
     const inv = S.pl[G.me] ? S.pl[G.me].inv : [];
     H.slots.forEach((s, i) => {
@@ -135,7 +134,7 @@
     H.renderTickets(S); H.renderTeam(S); H.renderEvents(S); H.renderRace(S);
     const gt = ML.GPS.target ? `📍 Repère : ${Math.round(ML.GPS.dist)} m` : ''; if (gt !== H._gps) { H.el.gps.textContent = gt; H.el.gps.classList.toggle('hidden', !gt); H._gps = gt; }
     // V5 : météo + garde à vue
-    const W = ML.WEATHER[S.weather], DT2 = S.mode !== 'course' && ML.DAYTYPES[S.dayType], wt = (W ? `${W.icon} ${W.name}` : '') + (DT2 ? ` · ${DT2.icon} ${DT2.name}` : ''); if (wt !== H._wx) { H.el.wx.textContent = wt; H._wx = wt; }
+    
     const jl = G.jailUntil ? Math.ceil((G.jailUntil - performance.now()) / 1000) : 0, jt = jl > 0 ? `🚔 GARDE À VUE : ${jl} s` : '';
     if (jt !== H._jail) { H.el.jail.textContent = jt; H.el.jail.classList.toggle('hidden', !jt); H._jail = jt; }
     H.drawMap(S);
@@ -172,14 +171,16 @@
       const left = Math.max(0, o.dl - S.rt), frac = left / o.dur, C = ML.COMPANIES[o.client], st = o.steps[o.si], pr = progress(o, S);
       const col = frac > 0.5 ? '#3ecf6e' : frac > 0.25 ? '#f39c12' : '#e74c3c';
       const steps = o.steps.map((s, i) => `<span class="${i < o.si ? 'done' : i === o.si ? 'cur' : ''}">${STEP_ICON[s]}</span>`).join('<i>›</i>');
-      return `<div class="ticket ${frac < 0.25 ? 'urgent' : ''}" style="--c:#${new THREE.Color(C.roof).getHexString()}">
-        <div class="tk-head"><b>#${o.id}</b> ${U.esc(o.client === 'part' ? '🙋 ' + ML.PEOPLE[o.who].name : C.name)}<span>${Math.ceil(left)} s</span></div>
-        <div class="tk-part">${U.esc(o.part)} <span class="tk-price">${o.client === 'sae' ? '🎓 SAE' : o.price + ' €'}</span>${o.plan && !o.m ? ` <span class="tk-plan">→ ${o.plan}</span>` : ''}</div>
-        <div class="tk-chips"><span style="background:${ML.MATERIALS[o.mat].css};color:#111">${ML.MATERIALS[o.mat].label}</span><span>${ML.MTYPE[o.mtype]}</span><span style="background:${ML.TOOLS[o.tool].css};color:#111">${ML.TOOLS[o.tool].label}</span></div>
+      const tl = Math.ceil(left), tm = tl >= 60 ? `${Math.floor(tl / 60)}:${String(tl % 60).padStart(2, '0')}` : `${tl} s`;
+      const cli = o.client === 'part' ? '🙋 ' + ML.PEOPLE[o.who].name.split(' ')[0] : o.client === 'noir' ? '🕶 Jean-Mi' : C.name;
+      return `<div class="ticket ${frac < 0.25 ? 'urgent' : ''} ${o.blk ? 'blk' : ''}" style="--c:#${new THREE.Color(C.roof).getHexString()};--t:${col}">
+        <div class="tk-head"><b class="tk-on">${ML.on(o.id)}</b><span class="tk-t">⏱ ${tm}</span></div>
+        <div class="tk-cl">${U.esc(cli)}<span class="tk-price">${o.client === 'sae' ? '🎓 SAE' : o.price + ' €'}</span></div>
+        <div class="tk-chips"><span style="background:${ML.MATERIALS[o.mat].css};color:#111">${ML.MATERIALS[o.mat].label}</span><span>${o.plan && !o.m ? o.plan : ML.MTYPE[o.mtype]}</span><span style="background:${ML.TOOLS[o.tool].css};color:#111">${ML.TOOLS[o.tool].label}</span>${o.size === 'l' ? '<span>🏗 XL</span>' : ''}</div>
         <div class="tk-steps">${steps}</div>
         <div class="tk-now">${U.esc(pr.txt)}</div>
         <div class="tk-prog" title="avancement"><i style="width:${pr.pct.toFixed(0)}%"></i></div>
-        <div class="tk-who">${pr.who ? `<i style="background:${ML.COLORS[(pr.who.idx || 0) % 6].css}"></i>👷 ${U.esc(pr.who.name)}` : '<span class="dim">👷 personne pour l\'instant</span>'}</div>
+        ${pr.who ? `<div class="tk-who"><i style="background:${ML.COLORS[(pr.who.idx || 0) % 6].css}"></i>${U.esc(pr.who.name)}</div>` : ''}
         <div class="tk-bar"><i style="width:${(frac * 100).toFixed(1)}%;background:${col}"></i></div></div>`;
     }).join('') || (S.mode === 'course' ? '' : `<div class="ticket empty">${(S.props || []).length ? '📥 Des demandes attendent au PC de gestion : accepte-les !' : 'Pas de commande pour l\'instant…'}</div>`);
     if (html !== H._tk) { H.el.tickets.innerHTML = html; H._tk = html; }
@@ -211,7 +212,7 @@
     if (Q && Q.st === 'ask') out.push(`<span class="ev part">🙋 ${U.esc(Q.who)} demande un service à l'entrée (${Q.reward} €)</span>`);
     if (Q && Q.st === 'go') out.push(`<span class="ev quest">🙋 Service pour ${U.esc(Q.who)} : ${Q.need ? 'apporter ' + ML.Items.TYPES[Q.need].icon : Q.carry ? 'livrer ' + ML.Items.TYPES[Q.carry].icon : ''} → ${U.esc(Q.at.name)}${G0.p ? ` (${Math.round(Math.hypot(G0.p.pos.x - Q.at.x, G0.p.pos.z - Q.at.z))} m)` : ''} <b>${Math.max(0, Math.ceil(Q.until - S.rt))} s</b>${Q.carry ? ` <span class="dim">${Q.phone && !Object.values(S.pl).some(P => (P.inv || []).some(x => x && x.type === Q.carry)) ? '· à prendre au COMPTOIR' : ''}</span>` : ''}</span>`);
     const A = S.sae;
-    if (A && A.st === 'prod') out.push(`<span class="ev sae">🎓 ${U.esc(A.code)} : ${A.oids.length} × ${U.esc(A.part)} · jury vers ${ML.Sim.K.clockAt ? ML.Sim.K.clockAt(A.jury) : ''}</span>`);
+    if (A && A.st === 'prod') out.push(`<span class="ev sae">🎓 ${U.esc(A.code)} : ${A.oids.length} pièces · jury vers ${ML.Sim.K.clockAt ? ML.Sim.K.clockAt(A.jury) : ''}</span>`);
     if (A && A.st === 'jury') out.push(`<span class="ev sae">🎓 JURY au marbre : ${A.got.length}/${A.oids.length} pièces <b>${Math.max(0, Math.ceil(A.end - S.rt))} s</b></span>`);
     const stopped = Object.keys(S.machines).filter(id => S.machines[id].stopped); if (stopped.length) out.push(`<span class="ev hot">⏹ Arrêt d'urgence : ${stopped.join(', ')} (E pour redémarrer)</span>`);
     if (S.black && S.mode !== 'course') out.push('<span class="ev black">🛍 BLACK FRIDAY</span>');
@@ -232,8 +233,8 @@
   H.notify = (text, type) => {
     const d = document.createElement('div'); d.className = 'notif ' + (type || ''); d.textContent = text;
     H.el.notifs.appendChild(d);
-    while (H.el.notifs.children.length > 6) H.el.notifs.firstChild.remove();
-    setTimeout(() => d.remove(), 7000);
+    while (H.el.notifs.children.length > 4) H.el.notifs.firstChild.remove();
+    setTimeout(() => d.classList.add("out"), 5600); setTimeout(() => d.remove(), 6200);
   };
   H.subtitle = (name, text) => { H.el.subtitle.innerHTML = `<b>${U.esc(name)} :</b> ${U.esc(text)}`; clearTimeout(H._st); H._st = setTimeout(() => { H.el.subtitle.innerHTML = ''; }, Math.max(4500, String(text).length * 75)); };
   H.big = (text, color) => { const b = H.el.big; b.textContent = text; b.style.color = color || '#ff3b30'; b.style.opacity = 1; clearTimeout(H._bg); H._bg = setTimeout(() => { b.style.opacity = 0; }, 2200); };
@@ -305,8 +306,8 @@
       ML.ui.modal = 'map'; ML.Input.unlock(); H.showPause(false); H.bigBg = null;
       const cv = H.el.bigmap.querySelector('canvas');
       cv.onclick = e => {
-        const r = cv.getBoundingClientRect(), k = H.bigK; if (!k) return;
-        const x = (e.clientX - r.left) * cv.width / r.width / k.s + MAPC.minX, z = (e.clientY - r.top) * cv.height / r.height / k.s + MAPC.minZ;
+        const r = cv.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width * (MAPC.maxX - MAPC.minX) + MAPC.minX, z = (e.clientY - r.top) / r.height * (MAPC.maxZ - MAPC.minZ) + MAPC.minZ;
         ML.GPS.set(x, z); ML.Game.intent({ a: 'ping', x: Math.round(x), z: Math.round(z) }); H.toast('📍 Repère posé : suis le trajet violet !');
       };
       cv.oncontextmenu = e => { e.preventDefault(); ML.GPS.clear(); H.toast('Repère effacé.'); };
@@ -315,44 +316,20 @@
   H.drawBigMap = S => {
     if (!S) return;
     const cv = H.el.bigmap.querySelector('canvas'), G = ML.Game, city = ML.World.city;
-    const W = Math.min(innerWidth * 0.92, (innerHeight * 0.88) * (MAPC.maxX - MAPC.minX) / (MAPC.maxZ - MAPC.minZ)), s = W / (MAPC.maxX - MAPC.minX), Hh = s * (MAPC.maxZ - MAPC.minZ);
-    if (cv.width !== Math.round(W)) { cv.width = Math.round(W); cv.height = Math.round(Hh); H.bigBg = null; }
+    const W = Math.round(Math.min(innerWidth * 0.92, (innerHeight * 0.88) * (MAPC.maxX - MAPC.minX) / (MAPC.maxZ - MAPC.minZ))), s = W / (MAPC.maxX - MAPC.minX), Hh = Math.round(s * (MAPC.maxZ - MAPC.minZ));
+    const R = Math.min(2.5, Math.max(1.5, devicePixelRatio || 1));          // V6 : carte nette (haute résolution)
+    if (cv.width !== Math.round(W * R)) { cv.width = Math.round(W * R); cv.height = Math.round(Hh * R); cv.style.width = W + 'px'; cv.style.height = Hh + 'px'; H.bigBg = null; }
     H.bigK = { s };
     const X = x => (x - MAPC.minX) * s, Z = z => (z - MAPC.minZ) * s;
-    if (!H.bigBg) {
-      const bg = document.createElement('canvas'); bg.width = cv.width; bg.height = cv.height; const x = bg.getContext('2d');
-      x.fillStyle = '#3f5f35'; x.fillRect(0, 0, bg.width, bg.height);
-      x.lineCap = 'round';
-      for (const e of city.edges) { const A = city.nodes[e.a], B = city.nodes[e.b]; x.strokeStyle = e.ring ? '#c9ccd1' : '#2b2f36'; x.lineWidth = city.RW * 2 * s; x.beginPath(); x.moveTo(X(A.x), Z(A.z)); x.lineTo(X(B.x), Z(B.z)); x.stroke(); }
-      for (const n of city.nodes) if (n.cul) { x.fillStyle = '#2b2f36'; x.beginPath(); x.arc(X(n.x), Z(n.z), (city.RW + 3.5) * s, 0, 7); x.fill(); }
-      // V5 : relief (ombrage) et rivière
-      const T2 = ML.World.hgt;
-      if (T2) for (let j = 0; j < T2.nz; j += 2) for (let i = 0; i < T2.nx; i += 2) { const h = T2.hv[j * T2.nx + i]; if (h > 1.5) { x.fillStyle = `rgba(255,255,220,${Math.min(0.28, h / 40)})`; x.fillRect(X(T2.x0 + i * T2.S), Z(T2.z0 + j * T2.S), 2 * T2.S * s + 1, 2 * T2.S * s + 1); } }
-      for (const r of ML.mapRects) if (r.river) { x.strokeStyle = '#3d86c6'; x.lineWidth = 2 * 9.7 * s; x.lineJoin = x.lineCap = 'round'; x.beginPath(); r.river.forEach((q, i) => (i ? x.lineTo(X(q.x), Z(q.z)) : x.moveTo(X(q.x), Z(q.z)))); x.stroke(); }
-      for (const e of city.edges) { const A = city.nodes[e.a], B = city.nodes[e.b]; x.strokeStyle = e.ring ? '#c9ccd1' : '#2b2f36'; x.lineWidth = city.RW * 2 * s; x.beginPath(); x.moveTo(X(A.x), Z(A.z)); x.lineTo(X(B.x), Z(B.z)); x.stroke(); }
-      for (const b of city.bridges || []) { x.fillStyle = '#e8e2d0'; x.save(); x.translate(X(b.x), Z(b.z)); x.rotate(Math.atan2(b.uz, b.ux)); x.fillRect(-b.len * s / 2, -(city.RW + 2) * s, b.len * s, (city.RW + 2) * 2 * s); x.restore(); }
-      for (const r of ML.mapRects) if (!r.line && !r.comp && !r.river) { x.fillStyle = r.c; x.fillRect(X(r.x - r.w / 2), Z(r.z - r.d / 2), r.w * s, r.d * s); if (r.name === 'Espacil') { x.fillStyle = '#fff'; x.font = `bold ${Math.max(8, 2.6 * s)}px Arial`; x.textAlign = 'center'; x.fillText('Espacil', X(r.x), Z(r.z)); } }
-      x.font = `${Math.max(9, 3.2 * s)}px Arial`; x.textAlign = 'center'; x.textBaseline = 'middle';
-      for (const l of city.labels || []) {
-        x.save(); x.translate(X(l.x), Z(l.z)); let a = l.a; if (a > Math.PI / 2) a -= Math.PI; if (a < -Math.PI / 2) a += Math.PI; x.rotate(a);
-        x.fillStyle = 'rgba(255,255,255,0.85)'; x.fillText(l.name, 0, 0); x.restore();
-      }
-      for (const k in ML.LOC.comp) {
-        const L = ML.LOC.comp[k], C = ML.COMPANIES[k];
-        x.fillStyle = '#' + new THREE.Color(C.roof).getHexString(); x.fillRect(X(L.x - L.hx), Z(L.z - L.hz), L.hx * 2 * s, L.hz * 2 * s);
-        x.font = `bold ${Math.max(10, 3.6 * s)}px Arial`; x.lineWidth = 3; x.strokeStyle = '#000'; x.strokeText(C.name, X(L.x), Z(L.z)); x.fillStyle = '#fff'; x.fillText(C.name, X(L.x), Z(L.z));
-      }
-      x.fillStyle = '#a2a8ad'; x.fillRect(X(-20), Z(-14), 40 * s, 28 * s); x.fillStyle = '#ffd257'; x.font = `bold ${Math.max(11, 4 * s)}px Arial`; x.fillText('ATELIER LEBEC', X(0), Z(0));
-      H.bigBg = bg;
-    }
-    const c = cv.getContext('2d'); c.drawImage(H.bigBg, 0, 0);
+    if (!H.bigBg) { H.bigBg = cityCanvas(s * R, Math.max(10, 3.3 * s) * R); }
+    const c = cv.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(H.bigBg, 0, 0); c.setTransform(R, 0, 0, R, 0, 0);
     const dot = (x, z, col, r, txt) => { c.fillStyle = col; c.beginPath(); c.arc(X(x), Z(z), r, 0, 7); c.fill(); if (txt) { c.font = 'bold 12px Arial'; c.textAlign = 'left'; c.lineWidth = 3; c.strokeStyle = '#000'; c.strokeText(txt, X(x) + r + 2, Z(z)); c.fillStyle = '#fff'; c.fillText(txt, X(x) + r + 2, Z(z)); } };
     // objectifs des tickets
     const t = performance.now() / 300;
     for (const o of S.orders) {
       const st = o.steps[o.si], k = st === 'livraison' ? o.client : st === 'tth' || ((st === 'fonderie' || st === 'chaudro') && !o.q) ? st : null; if (!k || !ML.LOC.comp[k]) continue;
       const L = ML.LOC.comp[k]; c.strokeStyle = '#ffd257'; c.lineWidth = 3; c.beginPath(); c.arc(X(L.dock.x), Z(L.dock.z), 10 + Math.sin(t) * 3, 0, 7); c.stroke();
-      c.font = 'bold 12px Arial'; c.textAlign = 'center'; c.fillStyle = '#ffd257'; c.fillText(`#${o.id} ${st === 'livraison' ? 'livrer' : ML.STEP[st]}`, X(L.dock.x), Z(L.dock.z) - 16);
+      c.font = 'bold 12px Arial'; c.textAlign = 'center'; c.fillStyle = '#ffd257'; c.fillText(`${ML.on(o.id)} ${st === 'livraison' ? 'livrer' : ML.STEP[st]}`, X(L.dock.x), Z(L.dock.z) - 16);
     }
     if (S.race && ML.LOC.comp[S.race.target]) { const L = ML.LOC.comp[S.race.target]; c.strokeStyle = '#ff3b30'; c.lineWidth = 4; c.beginPath(); c.arc(X(L.dock.x), Z(L.dock.z), 14 + Math.sin(t) * 3, 0, 7); c.stroke(); }
     ML.Cars.list.forEach((car, i) => { const sc = S.cars[i]; if (sc) dot(car.pos.x, car.pos.z, '#' + new THREE.Color(sc.color).getHexString(), 5, sc.kind === 'megane' ? 'Mégane' : sc.kind === 'camion' ? 'Camion' : sc.kind === 'fenwick' ? 'Fenwick' : ''); });
@@ -370,43 +347,80 @@
     if (ML.GPS.target) { c.font = 'bold 13px Arial'; c.textAlign = 'center'; c.lineWidth = 3; c.strokeStyle = '#000'; const t = `📍 ${Math.round(ML.GPS.dist)} m`; c.strokeText(t, X(ML.GPS.target.x), Z(ML.GPS.target.z) - 14); c.fillStyle = '#e9c7ff'; c.fillText(t, X(ML.GPS.target.x), Z(ML.GPS.target.z) - 14); }
   };
 
-  /* ---------- Mini-carte ---------- */
-  const MAPC = ML.CFG.MAP, MAP = { W: 180, Hh: 196 };
-  const mx = x => (x - MAPC.minX) / (MAPC.maxX - MAPC.minX) * MAP.W, mz = z => (z - MAPC.minZ) / (MAPC.maxZ - MAPC.minZ) * MAP.Hh;
+  /* ---------- Mini-carte (V6 : centrée sur le joueur, haute résolution) ---------- */
+  const MAPC = ML.CFG.MAP, MAP = { W: 190, Hh: 190, VS: 1.1, BS: 4, R: 2 };
+  /** Dessine toute la ville dans un canvas, à s px par mètre ; fs = taille de police de base (px du canvas) */
+  function cityCanvas(s, fs) {
+    const city = ML.World.city, bg = document.createElement('canvas');
+    bg.width = Math.round((MAPC.maxX - MAPC.minX) * s); bg.height = Math.round((MAPC.maxZ - MAPC.minZ) * s);
+    const x = bg.getContext('2d'), X = v => (v - MAPC.minX) * s, Z = v => (v - MAPC.minZ) * s;
+    x.fillStyle = '#3f5f35'; x.fillRect(0, 0, bg.width, bg.height);
+    const T2 = ML.World.hgt;
+    if (T2) for (let j = 0; j < T2.nz; j += 2) for (let i = 0; i < T2.nx; i += 2) { const h = T2.hv[j * T2.nx + i]; if (h > 1.5) { x.fillStyle = `rgba(255,255,220,${Math.min(0.28, h / 40)})`; x.fillRect(X(T2.x0 + i * T2.S), Z(T2.z0 + j * T2.S), 2 * T2.S * s + 1, 2 * T2.S * s + 1); } }
+    for (const r of ML.mapRects) if (r.river) { x.strokeStyle = '#3d86c6'; x.lineWidth = 2 * 9.7 * s; x.lineJoin = x.lineCap = 'round'; x.beginPath(); r.river.forEach((q, i) => (i ? x.lineTo(X(q.x), Z(q.z)) : x.moveTo(X(q.x), Z(q.z)))); x.stroke(); }
+    x.lineCap = 'round';
+    // bord clair puis chaussée : routes lisibles
+    for (const pass of [0, 1]) for (const e of city.edges) { const A = city.nodes[e.a], B = city.nodes[e.b]; x.strokeStyle = pass ? (e.ring ? '#c9ccd1' : '#30343b') : 'rgba(255,255,255,.28)'; x.lineWidth = (city.RW * 2 + (pass ? 0 : 1.6)) * s; x.beginPath(); x.moveTo(X(A.x), Z(A.z)); x.lineTo(X(B.x), Z(B.z)); x.stroke(); }
+    for (const n of city.nodes) if (n.cul) { x.fillStyle = '#30343b'; x.beginPath(); x.arc(X(n.x), Z(n.z), (city.RW + 3.5) * s, 0, 7); x.fill(); }
+    for (const b of city.bridges || []) { x.fillStyle = '#e8e2d0'; x.save(); x.translate(X(b.x), Z(b.z)); x.rotate(Math.atan2(b.uz, b.ux)); x.fillRect(-b.len * s / 2, -(city.RW + 2) * s, b.len * s, (city.RW + 2) * 2 * s); x.restore(); }
+    for (const r of ML.mapRects) if (!r.line && !r.comp && !r.river) { x.fillStyle = r.c; x.fillRect(X(r.x - r.w / 2), Z(r.z - r.d / 2), r.w * s, r.d * s); }
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = `italic ${Math.round(fs * 0.68)}px Arial`;
+    for (const l of city.labels || []) {
+      x.save(); x.translate(X(l.x), Z(l.z)); let a = l.a; if (a > Math.PI / 2) a -= Math.PI; if (a < -Math.PI / 2) a += Math.PI; x.rotate(a);
+      x.fillStyle = 'rgba(255,255,255,0.7)'; x.fillText(l.name, 0, 0); x.restore();
+    }
+    const lab = (t, px, pz, f, col) => { x.font = `bold ${Math.round(f)}px Arial`; x.lineJoin = 'round'; x.lineWidth = Math.max(3, f * 0.28); x.strokeStyle = 'rgba(0,0,0,.85)'; x.strokeText(t, px, pz); x.fillStyle = col; x.fillText(t, px, pz); };
+    for (const k in ML.LOC.comp) {
+      const L = ML.LOC.comp[k], C = ML.COMPANIES[k]; if (!C || C.virtual) continue;
+      x.fillStyle = '#' + new THREE.Color(C.roof).getHexString(); x.strokeStyle = 'rgba(0,0,0,.5)'; x.lineWidth = Math.max(1, s * 0.4);
+      x.fillRect(X(L.x - L.hx), Z(L.z - L.hz), L.hx * 2 * s, L.hz * 2 * s); x.strokeRect(X(L.x - L.hx), Z(L.z - L.hz), L.hx * 2 * s, L.hz * 2 * s);
+      lab((C.icon ? C.icon + ' ' : '') + C.name, X(L.x), Z(L.z), fs, '#fff');
+    }
+    x.fillStyle = '#a2a8ad'; x.fillRect(X(-20), Z(-14), 40 * s, 28 * s); x.strokeStyle = '#ffd257'; x.lineWidth = Math.max(2, s * 0.6); x.strokeRect(X(-20), Z(-14), 40 * s, 28 * s);
+    lab('ATELIER LEBEC', X(0), Z(0), fs * 1.15, '#ffd257');
+    return bg;
+  }
   H.buildMap = () => {
-    const c = document.createElement('canvas'); c.width = MAP.W; c.height = MAP.Hh; const x = c.getContext('2d');
-    x.fillStyle = '#3f5f35'; x.fillRect(0, 0, MAP.W, MAP.Hh);
-    for (const r of ML.mapRects) if (r.river) { x.strokeStyle = '#3d86c6'; x.lineWidth = 6; x.lineCap = x.lineJoin = 'round'; x.beginPath(); r.river.forEach((q, i) => (i ? x.lineTo(mx(q.x), mz(q.z)) : x.moveTo(mx(q.x), mz(q.z)))); x.stroke(); }
-    x.strokeStyle = '#2b2f36'; x.lineWidth = 3.2; x.lineCap = 'round';
-    for (const r of ML.mapRects) if (r.line) { x.beginPath(); x.moveTo(mx(r.line[0]), mz(r.line[1])); x.lineTo(mx(r.line[2]), mz(r.line[3])); x.stroke(); }
-    const kx = MAP.W / (MAPC.maxX - MAPC.minX), kz = MAP.Hh / (MAPC.maxZ - MAPC.minZ);
-    for (const r of ML.mapRects) if (!r.line && !r.river) { x.fillStyle = r.c; x.fillRect(mx(r.x - r.w / 2), mz(r.z - r.d / 2), Math.max(1, r.w * kx), Math.max(1, r.d * kz)); }
-    x.font = 'bold 8px Arial'; x.textAlign = 'center';
-    for (const k in ML.LOC.comp) { const L = ML.LOC.comp[k], n = ML.COMPANIES[k].name.split(' ')[0] === 'Boulangerie' ? 'Boulang.' : ML.COMPANIES[k].name.split(' ')[0]; x.fillStyle = '#000'; x.fillText(n, mx(L.x) + 1, mz(L.z) + 3); x.fillStyle = '#fff'; x.fillText(n, mx(L.x), mz(L.z) + 2); }
-    x.fillStyle = '#ffd257'; x.fillText('ATELIER', mx(0), mz(0) + 3);
-    H.mapBg = c;
+    const cv = H.el.minimap; cv.width = MAP.W * MAP.R; cv.height = MAP.Hh * MAP.R; cv.style.width = MAP.W + 'px'; cv.style.height = MAP.Hh + 'px';
+    H.mapBg = cityCanvas(MAP.BS, 10.5 * MAP.BS / MAP.VS);
   };
   H.drawMap = S => {
     const G = ML.Game, ctx = H.el.minimap.getContext('2d');
     if (!H.mapBg) return;
-    ctx.drawImage(H.mapBg, 0, 0);
+    const me = G.p.car !== null ? ML.Cars.list[G.p.car].pos : G.p.pos, cx = me.x, cz = me.z, VS = MAP.VS, BS = MAP.BS;
+    const mx = x => (x - cx) * VS + MAP.W / 2, mz = z => (z - cz) * VS + MAP.Hh / 2;
+    ctx.setTransform(MAP.R, 0, 0, MAP.R, 0, 0); ctx.fillStyle = '#34502c'; ctx.fillRect(0, 0, MAP.W, MAP.Hh);
+    const vw = MAP.W / VS, vh = MAP.Hh / VS;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(H.mapBg, (cx - vw / 2 - MAPC.minX) * BS, (cz - vh / 2 - MAPC.minZ) * BS, vw * BS, vh * BS, 0, 0, MAP.W, MAP.Hh);
     const dot = (x, z, col, r) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(mx(x), mz(z), r, 0, 7); ctx.fill(); };
-    if (S.race && ML.LOC.comp[S.race.target]) { const L = ML.LOC.comp[S.race.target], t = performance.now() / 300; ctx.strokeStyle = '#ffd257'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mx(L.dock.x), mz(L.dock.z), 5 + Math.sin(t) * 2, 0, 7); ctx.stroke(); }
-    ML.GPS.paint(ctx, mx, mz, 2.2);
-    for (const t of ML.Cars.traffic) if (t.visible) dot(t.position.x, t.position.z, '#95a5a6', 1.5);
-    if (ML.Cars.police && ML.Cars.police.visible) dot(ML.Cars.police.position.x, ML.Cars.police.position.z, Math.floor(performance.now() / 200) % 2 ? '#2255ff' : '#ff2222', 3.2);
-    ML.Cars.list.forEach((c, i) => { const sc = S.cars[i]; dot(c.pos.x, c.pos.z, sc ? '#' + new THREE.Color(sc.color).getHexString() : '#fff', sc && sc.kind === 'tp' ? 2 : 3); });
-    for (const id in G.itemViews) { const iv = G.itemViews[id]; if (iv.type === 'find' || U.inWorkshop(iv.mesh.position)) continue; dot(iv.mesh.position.x, iv.mesh.position.z, '#7fd3ff', 1.8); }
+    // objectifs : anneau jaune, ou flèche au bord s'ils sont hors champ
+    const t = performance.now() / 300, goals = [];
+    for (const o of S.orders) { const st = o.steps[o.si], k = st === 'livraison' ? o.client : st === 'tth' || ((st === 'fonderie' || st === 'chaudro') && !o.q) ? st : null; if (k && ML.LOC.comp[k] && ML.LOC.comp[k].dock) goals.push(ML.LOC.comp[k].dock); }
+    if (S.race && ML.LOC.comp[S.race.target]) goals.push(ML.LOC.comp[S.race.target].dock);
+    for (const g of goals) {
+      const gx = mx(g.x), gz = mz(g.z), m = 9;
+      if (gx > m && gx < MAP.W - m && gz > m && gz < MAP.Hh - m) { ctx.strokeStyle = '#ffd257'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(gx, gz, 6 + Math.sin(t) * 2, 0, 7); ctx.stroke(); }
+      else { const a = Math.atan2(gz - MAP.Hh / 2, gx - MAP.W / 2), ex = Math.min(MAP.W - m, Math.max(m, gx)), ez = Math.min(MAP.Hh - m, Math.max(m, gz));
+        ctx.save(); ctx.translate(ex, ez); ctx.rotate(a); ctx.fillStyle = '#ffd257'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(-4, 4.5); ctx.lineTo(-4, -4.5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
+    }
+    ML.GPS.paint(ctx, mx, mz, 2.6);
+    for (const tr of ML.Cars.traffic) if (tr.visible) dot(tr.position.x, tr.position.z, '#cfd6db', 1.8);
+    if (ML.Cars.police && ML.Cars.police.visible) dot(ML.Cars.police.position.x, ML.Cars.police.position.z, Math.floor(performance.now() / 200) % 2 ? '#2255ff' : '#ff2222', 3.6);
+    ML.Cars.list.forEach((c, i) => { const sc = S.cars[i]; dot(c.pos.x, c.pos.z, sc ? '#' + new THREE.Color(sc.color).getHexString() : '#fff', sc && sc.kind === 'tp' ? 2.2 : 3.4); });
+    for (const id in G.itemViews) { const iv = G.itemViews[id]; if (iv.type === 'find' || U.inWorkshop(iv.mesh.position)) continue; dot(iv.mesh.position.x, iv.mesh.position.z, '#7fd3ff', 2); }
     const bl = Math.floor(performance.now() / 260) % 2;
     for (const p of ML.Fx.pings) { dot(p.g.position.x, p.g.position.z, '#ffffff', bl ? 6 : 4.5); dot(p.g.position.x, p.g.position.z, '#ff2d2d', bl ? 4.5 : 3.2); }
-    const L = G.npcViews.lebec; if (L && L.seen) dot(L.pos.x, L.pos.z, L.st === 'c' ? '#ff0000' : '#2c5aa0', 2.5);
+    const L = G.npcViews.lebec; if (L && L.seen) dot(L.pos.x, L.pos.z, L.st === 'c' ? '#ff0000' : '#2c5aa0', 2.8);
     for (const pid in S.pl) {
       const c = ML.COLORS[S.pl[pid].idx % 6].css;
       if (pid === G.me) {
-        const pos = G.p.car !== null ? ML.Cars.list[G.p.car].pos : G.p.pos, a = G.p.car !== null ? ML.Cars.list[G.p.car].h : G.p.yaw + Math.PI;
-        ctx.save(); ctx.translate(mx(pos.x), mz(pos.z)); ctx.rotate(-a); ctx.fillStyle = c; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.moveTo(0, 6); ctx.lineTo(4, -4); ctx.lineTo(-4, -4); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
-      } else { const a = G.avatars[pid]; if (a && a.seen) dot(a.pos.x, a.pos.z, c, 3); }
+        const a = G.p.car !== null ? ML.Cars.list[G.p.car].h : G.p.yaw + Math.PI;
+        ctx.save(); ctx.translate(MAP.W / 2, MAP.Hh / 2); ctx.rotate(-a); ctx.fillStyle = c; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(0, 8); ctx.lineTo(5, -5); ctx.lineTo(0, -2.5); ctx.lineTo(-5, -5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+      } else { const a = G.avatars[pid]; if (a && a.seen) dot(a.pos.x, a.pos.z, c, 3.4); }
     }
+    ctx.font = 'bold 10px Arial'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillText('N ↑ · M : carte', MAP.W - 5, MAP.Hh - 5);
   };
 })();

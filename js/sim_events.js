@@ -16,7 +16,7 @@
     S = K.S; rng = K.rng; npcs = K.npcs; const g = cfg.game || {};
     S.evs = {}; K.sched = []; K.vcd = {}; K.lastPos = {};
     if (S.mode !== 'course') {
-      const pool = K.shuffle(['audit', 'coupure', 'sabotage', 'herve', 'fred', 'mathieu', 'panne', 'johan', 'bleuenn']);   // V5.2 : + Johan Bois, Bleuenn (sim_vie.js)
+      const pool = K.shuffle(['audit', 'coupure', 'sabotage', 'herve', 'fred', 'mathieu', 'panne', 'johan', 'bleuenn', 'squat', 'dennis']);   // V6 : + squatteurs, Dennis   // V5.2 : + Johan Bois, Bleuenn (sim_vie.js)
       const ev = K.D.events, n = S.mode === 'inspection' ? Math.max(1, ev[0]) : ev[0] + Math.floor(rng() * (ev[1] - ev[0] + 1));
       const times = []; for (let i = 0; i < n; i++) times.push(60 + rng() * 340);
       times.sort((a, b) => a - b).forEach((t, i) => K.sched.push({ k: pool[i], t: Math.max(t, (K.sched.length ? K.sched[K.sched.length - 1].t : 0) + 45) }));
@@ -113,7 +113,7 @@
   function escaped(n) {
     if (n.carry) {
       const o = S.orders.find(x => x.id === n.carry.d.oid);
-      if (o) { o.si = o.steps.indexOf(o.src || 'usinage'); o.m = null; o.q = false; K.all(`😡 UsiFlash a volé la caisse #${o.id} : il faut la refaire !`, 'warn'); }
+      if (o) { o.si = o.steps.indexOf(o.src || 'usinage'); o.m = null; o.q = false; K.all(`😡 UsiFlash a volé la caisse ${ML.on(o.id)} : il faut la refaire !`, 'warn'); }
       n.carry = null;
     }
     n.active = false; n.state = 'away'; delete S.evs.sabotage; Sim.dirty = true;
@@ -234,9 +234,9 @@
           if (nc) {                          // pièce mauvaise bien détectée : rebut, on relance l'usinage
             P.inv[sel] = null; const o = S.orders.find(x => x.id === held.d.oid);
             if (o) { o.si = o.steps.indexOf('usinage'); o.m = null; o.q = false; }
-            K.all(`📏 ${P.name} a détecté une pièce NON CONFORME (#${held.d.oid}) : rebut, on la relance en usinage.`, 'good');
+            K.all(`📏 ${P.name} a détecté une pièce NON CONFORME (${ML.on(held.d.oid)}) : rebut, on la relance en usinage.`, 'good');
           } else { held.d.ctl = true; K.note(pid, '📏 Contrôle OK : caisse marquée « contrôlée » (+5 à la livraison).', 'good'); }
-        } else if (!nc) { P.inv[sel] = null; const o = S.orders.find(x => x.id === held.d.oid); if (o) { o.si = o.steps.indexOf('usinage'); o.m = null; o.q = false; } K.all(`📏 ${P.name} a jeté une pièce… qui était bonne ! (#${held.d.oid} à refaire)`, 'warn'); }
+        } else if (!nc) { P.inv[sel] = null; const o = S.orders.find(x => x.id === held.d.oid); if (o) { o.si = o.steps.indexOf('usinage'); o.m = null; o.q = false; } K.all(`📏 ${P.name} a jeté une pièce… qui était bonne ! (${ML.on(held.d.oid)} à refaire)`, 'warn'); }
         else K.note(pid, '📏 Hmm… tu es sûr·e ? (elle a l\'air un peu hors tolérance)', 'warn');
         Sim.dirty = true; return true;
       }
@@ -262,6 +262,8 @@
   };
   mod.npcHit = (n, by) => {
     if (n.id === 'saboteur') {
+      if (K.hitWith !== 'batte_bb') { K.say(n, 'Hé hé, même pas peur.'); if (S.pl[by]) K.note(by, '🏏 Sors la BATTE DE BASEBALL (râtelier à l\'entrée) !', 'warn'); return true; }   // V6
+      K.ev({ e: 'nrag', id: n.id });
       if (n.carry) { K.spawnItem(n.carry, n.x, 0.8, n.z, [0, 2, 0]); n.carry = null; K.all(`👊 ${S.pl[by] ? S.pl[by].name : '?'} a fait lâcher la caisse au saboteur !`, 'good'); }
       K.say(n, 'Aïe ! Je me casse !'); n.state = 'flee'; n.fleeT = 18; return true;
     }

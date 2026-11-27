@@ -66,7 +66,7 @@
   G.buildAvatar = p => {
     const c = ML.COLORS[p.idx % 6], L = G.looks[p.id] || {};
     const role = ML.ROLES[(G.S && G.S.pl[p.id] && G.S.pl[p.id].role) || (G.game.roles || {})[p.id]] || ML.ROLES.poly, suit = L.suit !== undefined ? L.suit : 0x1f4e9a;
-    const v = ML.People.build({ skin: L.skin !== undefined ? L.skin : ML.SKINS[p.idx % 5], shirt: L.shirt || suit, pants: suit, hair: L.hair !== undefined ? L.hair : ML.HAIRS[p.idx % 6], height: L.height || 1.78, width: L.width || 1, beard: L.beard, glasses: L.glasses },
+    const v = ML.People.build({ skin: L.skin !== undefined ? L.skin : ML.SKINS[p.idx % 5], shirt: L.shirt || suit, pants: L.pants !== undefined ? L.pants : suit, shorts: L.shorts, shoes: L.shoes, bigShoes: L.bigShoes, gl: L.gl, bag: L.bag, hair: L.hair !== undefined ? L.hair : ML.HAIRS[p.idx % 6], height: L.height || 1.78, width: L.width || 1, beard: L.beard, glasses: L.glasses },
       { name: role.icon + ' ' + p.name, nameColor: c.css, helmet: L.hat ? null : 0xf5f5f5, hat: L.hat, vest: role.color });
     return v;
   };
@@ -236,12 +236,13 @@
       case 'led': G.ledger.push(e.l); if (G.ledger.length > 400) G.ledger.shift(); break;
       case 'wx': if (ML.WEATHER[e.w]) ML.HUD.notify(`${ML.WEATHER[e.w].icon} Météo : ${ML.WEATHER[e.w].name}`, 'info'); break;
       case 'fuel': { const c = ML.Cars.list[e.car]; if (c) c.fuel = e.f; break; }
+      case 'sink': { if (e.pid !== G.me) ML.Fx.splash(e.x, e.z); break; }   // V6
       case 'drive': break;
       case 'vote': ML.HUD.showVote(e.players, e.until); break;
       case 'voted': ML.HUD.notify(`🗳 ${e.n} vote(s) reçu(s)…`); break;
       case 'end': G.onEnd(e.res); break;
       // --- V5.2 ---
-      case 'tip': ML.HUD.evTip(e.k); break;
+      case 'tip': if (mine) ML.HUD.evTip(e.k); break;
       case 'boom': {
         ML.Fx.boom(e.x, e.z); ML.Sfx.at('boom', e.x, e.z);
         const d = Math.hypot(G.p.pos.x - e.x, G.p.pos.z - e.z); if (d < 40) { ML.HUD.flash('rgba(255,180,60,0.7)'); G.shake = Math.max(G.shake || 0, 1.2 * (1 - d / 40)); }
@@ -355,6 +356,13 @@
       const W = S && ML.WEATHER[S.weather];
       const r = ML.Cars.drive(c, dt, can, { frozen: sc && sc.frozen > S.rt, rain: !!(W && W.wet), wet: W && W.wet ? W.wet : 0, puddle: onPud });
       ML.Sfx.setEngine(true, c.speed);
+      if (r.sunk) {                                                  // V6 : plouf — la voiture repart à l'atelier, toi tu restes sur la berge
+        const x = c.pos.x, z = c.pos.z; G.intent({ a: 'sink', car: p.car, x, z });
+        const q = { x, z }; for (let i = 0; i < 6 && ML.riverPush(q, 0.8); i++); p.car = null; G.camMode = G.camMode || 'chase';
+        p.pos.set(q.x, ML.gy(q.x, q.z), q.z); c.speed = 0; c.local = false; ML.Sfx.setEngine(false, 0);
+        ML.Fx.splash(x, z);
+        return;
+      }
       G.spillT -= dt;
       // V4.1 : les caisses ne tombent QUE si on percute le décor à plus de 70 km/h (19,4 m/s)
       if (sc && sc.bed.length && sc.kind !== 'tp' && G.spillT <= 0 && r.crash > 19.4) { G.spillT = 1.5; G.intent({ a: 'spill', car: p.car, side: r.side }); ML.HUD.notify('💥 Gros choc : des caisses sont tombées !', 'warn'); }
@@ -546,7 +554,8 @@
     G.renderHoses(); G.renderSelfInCar(dt);
     ML.Cars.list.forEach((c, i) => {
       const sc = G.S && G.S.cars[i];
-      if (sc && sc.dr && G.looks[sc.dr]) ML.Cars.tune(c, G.looks[sc.dr].tune, sc.color);
+      // V6 : le tuning reste sur le véhicule garé (dernier conducteur, sinon le patron de la partie)
+      if (sc) { const who = sc.dr && G.looks[sc.dr] ? sc.dr : c.lastDr && G.looks[c.lastDr] ? c.lastDr : G.looks[G.host] ? G.host : G.me; c.lastDr = who; if (G.looks[who]) ML.Cars.tune(c, G.looks[who].tune, sc.color); }
       if (c.label) c.label.visible = !(G.p.car === i || (G.p.ride && G.p.ride.car === i));
       ML.Cars.render(c, dt, sc ? sc.bed : [], sc ? sc.load : null);
     });

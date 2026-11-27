@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mécanique Lebec — en équipe (V5.5)</title>
+<title>Mécanique Lebec — en équipe (V6.0)</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -17,12 +17,9 @@
 <!-- ================= HUD ================= -->
 <div id="hud" class="hidden">
   <div id="tl" class="box">
-    <div id="clock">07:00</div>
-    <div id="wx" class="wx"></div>
-    <div class="row">💶 Caisse <b id="score">0</b></div>
+    <div class="tl-top"><div id="clock">07:00</div><b id="finds" title="Trouvailles cachées">★ 0/6</b></div>
+    <div class="tl-money">💶 <b id="score">0</b></div>
     <div id="props" class="props hidden"></div>
-    <div class="gauge"><span>Satisfaction client</span><div class="bar"><i id="sat"></i></div></div>
-    <div class="row"><span class="dim">Trouvailles cachées</span><b id="finds">★ 0/6</b></div>
   </div>
   <div id="tickets"></div>
   <div id="evbar"></div>
@@ -200,7 +197,7 @@
   </div>
 </div>
 <div id="toasts"></div>
-<div id="version">V5.5</div>
+<div id="version">V6.0</div>
 
 <!-- Three.js r128 + chargeur glTF (copies locales : marche hors ligne et en double-clic) -->
 <script src="lib/three.min.js"></script>
@@ -231,7 +228,8 @@
 <script src="js/sim_city.js"></script>    <!-- véhicules, circulation, radars, police, course -->
 <script src="js/sim_events.js"></script>  <!-- visiteurs, inspection, traître -->
 <script src="js/sim_vie.js"></script>  <!-- V5.2 : Johan, Bleuenn, toilettes, quêtes, SAE, prépa, radars, centre commercial, sport -->
-<script src="js/sim_eco.js"></script>     <!-- économie : PC de gestion, achats, particuliers, personnel IA -->
+<script src="js/sim_eco.js"></script>
+<script src="js/sim_v6.js"></script>      <!-- V6 : faim, black, perturbateurs, distractions, admin -->     <!-- économie : PC de gestion, achats, particuliers, personnel IA -->
 <script src="js/minigames.js"></script>
 <script src="js/account.js"></script>     <!-- profil, jetons, succès -->
 <script src="js/dialogue.js"></script>
@@ -240,6 +238,7 @@
 <script src="js/erp.js"></script>         <!-- fenêtre du PC de gestion -->
 <script src="js/game.js"></script>        <!-- session : joueur local + synchro -->
 <script src="js/lobby.js"></script>
+<script src="js/v6.js"></script>         <!-- V6 : interface des nouveautés (black, lieux, faim, admin F9) -->
 <script src="js/stats.js"></script>       <!-- V5.4 : statistiques pour la page admin -->
 <script src="js/main.js"></script>
 </body>

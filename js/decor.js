@@ -111,6 +111,124 @@
   }
   D.sign = (...a) => sign(...a);
   D.frame = (cx, cz, rot) => frame(cx, cz, rot);                       // V5 : intérieurs (world.js)
+
+  /** V6 : affiche dessinée à la main (canvas) */
+  function poster(w, h, x, y, z, ry, draw, opt) {
+    const c = document.createElement('canvas'); c.width = 512; c.height = Math.round(512 * h / w); const g = c.getContext('2d');
+    draw(g, c.width, c.height);
+    const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: t, emissive: opt && opt.glow ? 0x222222 : 0, emissiveMap: opt && opt.glow ? t : null }));
+    m.position.set(x, y, z); m.rotation.y = ry || 0; root.add(m);
+    // petit cadre / punaises
+    return m;
+  }
+  const txt = (g, t, x, y, f, col, al) => { g.font = f; g.fillStyle = col; g.textAlign = al || 'center'; g.textBaseline = 'middle'; g.fillText(t, x, y); };
+  /** V6 : atelier plus « fini » : bureau vitré, îlots signalés, vestiaires, affiches, liseré d'allée */
+  D.atelierV6 = (P, ext) => {
+    // ---------- BUREAU VITRÉ (chef + méthodes) : coin arrière droit ----------
+    const OZ = -5.4, X0 = 10.8, X1 = 19.8, ZB = -13.75, D0 = 10.8, D1 = 12.8;
+    const part = (x0, z0, x1, z1) => {
+      const ax = Math.abs(x1 - x0) > Math.abs(z1 - z0), len = ax ? Math.abs(x1 - x0) : Math.abs(z1 - z0), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+      const S = (a, b) => (ax ? [len, a, b] : [b, a, len]);
+      box(...S(1.0, 0.1), cx, 0.5, cz, 0x50657a);                                   // allège pleine
+      glass(...S(1.5, 0.03), cx, 1.78, cz, 0xd6ecff);                              // vitrage
+      box(...S(0.07, 0.12), cx, 2.57, cz, 0xc8cdd2); box(...S(0.05, 0.13), cx, 1.03, cz, 0xc8cdd2);
+      const n = Math.max(1, Math.round(len / 1.5)); for (let i = 0; i <= n; i++) box(0.08, 2.6, 0.08, x0 + (x1 - x0) * i / n, 1.3, z0 + (z1 - z0) * i / n, 0xc8cdd2);
+      // bande adhésive anti-collision sur la vitre
+      box(...S(0.06, 0.035), cx, 1.55, cz, 0x2c3e50);
+      U.boxCollider(cx, cz, ax ? len : 0.22, ax ? 0.22 : len, 'cloison');
+    };
+    part(D1, OZ, X1, OZ); part(X0, ZB, X0, OZ - 0.05);
+    box(D1 - D0, 0.42, 0.12, (D0 + D1) / 2, 2.39, OZ, 0xc8cdd2);                    // imposte au-dessus de la porte
+    box(0.05, 2.15, 0.95, D1 - 0.08, 1.08, OZ - 0.5, 0xc8cdd2); glass(0.02, 1.4, 0.7, D1 - 0.08, 1.35, OZ - 0.5, 0xd6ecff);   // porte (ouverte)
+    box(0.04, 0.04, 0.16, D1 - 0.12, 1.05, OZ - 0.9, 0x7f8c8d);
+    sign('BUREAU', 'F. Lebec · méthodes · planning', '#1a2340', '#ffd257', 1.9, 0.38, (D0 + D1) / 2, 2.39, OZ + 0.07, 0, {});
+    sign('FRAPPEZ\nAVANT D\'ENTRER', '(ou pas, c\'est ouvert)', '#ffffff', '#2c3e50', 0.62, 0.42, D1 + 0.55, 1.55, OZ + 0.03, 0, { border: '#2c3e50' });
+    box(X1 - X0, 0.012, -ZB + OZ, (X0 + X1) / 2, 0.036, (OZ + ZB) / 2, 0x8193a6);   // lino du bureau
+    // poste de travail du chef : écran, clavier, lampe, mug, dossiers, téléphone
+    box(0.62, 0.4, 0.04, 12.25, 1.13, -7.72, 0x1e1e1e); box(0.56, 0.34, 0.01, 12.25, 1.13, -7.745, 0x2e86de);
+    box(0.06, 0.18, 0.06, 12.25, 0.88, -7.7, 0x2c3e50); box(0.25, 0.02, 0.18, 12.25, 0.81, -7.7, 0x2c3e50);
+    box(0.48, 0.02, 0.15, 12.15, 0.81, -8.25, 0x34495e); box(0.07, 0.02, 0.1, 12.6, 0.81, -8.25, 0x34495e);
+    cyl(0.045, 0.1, 11.3, 0.86, -8.2, 0xffffff); cyl(0.05, 0.02, 11.3, 0.91, -8.2, 0x4e342e);
+    for (let i = 0; i < 4; i++) box(0.3, 0.04, 0.22, 13.0, 0.82 + i * 0.045, -8.0, [0xe74c3c, 0x2980b9, 0xf1c40f, 0x27ae60][i], { ry: (i - 1.5) * 0.08 });
+    box(0.2, 0.06, 0.16, 11.25, 0.83, -7.75, 0x111111); cyl(0.02, 0.4, 13.0, 1.0, -7.6, 0x7f8c8d, { rz: 0.4 }); box(0.16, 0.08, 0.16, 12.9, 1.2, -7.6, 0x111111);
+    // fauteuil visiteur
+    box(0.5, 0.08, 0.5, 14.2, 0.46, -6.6, 0x2c3e50); box(0.5, 0.55, 0.08, 14.2, 0.78, -6.36, 0x2c3e50); for (const dx of [-0.2, 0.2]) for (const dz of [-0.2, 0.2]) box(0.04, 0.44, 0.04, 14.2 + dx, 0.22, -6.6 + dz, 0x7f8c8d);
+    // classeurs (étagère contre la cloison)
+    box(0.42, 2.0, 2.6, 11.12, 1.0, -11.8, 0x95a5a6);
+    for (let y = 0.25; y < 2; y += 0.48) { box(0.4, 0.03, 2.55, 11.13, y - 0.18, -11.8, 0x7f8c8d); for (let i = 0; i < 9; i++) box(0.3, 0.36, 0.08, 11.13, y + 0.02, -12.95 + i * 0.27 + (rng() - 0.5) * 0.03, [0xe74c3c, 0x2980b9, 0xf1c40f, 0x27ae60, 0x8e44ad, 0xecf0f1][Math.floor(rng() * 6)], { rz: (rng() - 0.5) * 0.1 }); }
+    U.boxCollider(11.12, -11.8, 0.45, 2.6, 'classeurs');
+    // table de réunion ronde + 3 chaises
+    cyl(0.65, 0.05, 17.4, 0.76, -9.4, 0xecf0f1); cyl(0.06, 0.74, 17.4, 0.38, -9.4, 0x7f8c8d); cyl(0.3, 0.03, 17.4, 0.02, -9.4, 0x7f8c8d);
+    for (const a of [0.4, 2.5, 4.4]) { const cx = 17.4 + Math.cos(a) * 0.95, cz = -9.4 + Math.sin(a) * 0.95; box(0.44, 0.06, 0.44, cx, 0.46, cz, 0x2e86de, { ry: -a }); box(0.44, 0.48, 0.05, cx + Math.cos(a) * 0.2, 0.72, cz + Math.sin(a) * 0.2, 0x2e86de, { ry: Math.PI / 2 - a }); cyl(0.03, 0.44, cx, 0.22, cz, 0x7f8c8d); }
+    U.boxCollider(17.4, -9.4, 1.3, 1.3, 'table');
+    box(0.5, 0.03, 0.35, 17.2, 0.8, -9.3, 0xffffff, { ry: 0.3 }); cyl(0.04, 0.09, 17.7, 0.83, -9.6, 0xc0392b);
+    // porte-manteau + corbeille
+    cyl(0.025, 1.8, 19.2, 0.9, -6.1, 0x4e342e); cyl(0.2, 0.03, 19.2, 0.02, -6.1, 0x4e342e); for (const a of [0, 2.1, 4.2]) box(0.25, 0.03, 0.03, 19.2 + Math.cos(a) * 0.1, 1.72, -6.1 + Math.sin(a) * 0.1, 0x4e342e, { ry: -a });
+    box(0.5, 0.9, 0.25, 19.15, 1.25, -6.05, 0x1e5799);                              // bleu de travail accroché
+    cyl(0.18, 0.35, 13.6, 0.18, -9.2, 0x7f8c8d);
+    // tableau de bord (indicateurs) sur le mur de droite
+    poster(2.0, 1.3, 19.72, 1.9, -9.2, -Math.PI / 2, (g, W, H) => {
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H); g.strokeStyle = '#2c3e50'; g.lineWidth = 8; g.strokeRect(4, 4, W - 8, H - 8);
+      txt(g, 'INDICATEURS ATELIER', W / 2, 34, 'bold 30px Arial', '#2c3e50');
+      const bars = [['OTD', 0.98, '#27ae60'], ['TRS', 0.71, '#f39c12'], ['Rebut', 0.12, '#e74c3c'], ['Café', 1.0, '#6d4c41']];
+      bars.forEach(([n, v, c], i) => { const x = 60 + i * 110, y0 = H - 50; g.fillStyle = '#ecf0f1'; g.fillRect(x, 70, 60, y0 - 70); g.fillStyle = c; g.fillRect(x, y0 - (y0 - 70) * v, 60, (y0 - 70) * v); txt(g, n, x + 30, y0 + 22, 'bold 20px Arial', '#2c3e50'); txt(g, Math.round(v * 100) + ' %', x + 30, y0 - (y0 - 70) * v - 14, 'bold 16px Arial', '#2c3e50'); });
+      txt(g, '(OTD arrondi par F. Lebec)', W / 2, 62, 'italic 15px Arial', '#7f8c8d');
+    });
+    // ---------- ÎLOTS : panneaux suspendus double face ----------
+    const hang = (t, sub, bg, x, z, w) => { for (const r of [0, Math.PI]) sign(t, sub, bg, '#fff', w || 3.6, 0.7, x, 4.85, z + (r ? -0.02 : 0.02), r, { border: '#fff' }); for (const dx of [-1.4, 1.4]) cyl(0.012, 1.6, x + dx * (w || 3.6) / 3.6, 6.0, z, 0x222222); };
+    hang('ÎLOT TOURNAGE', 'T1 · T2 · T3', '#1f4e9a', -4, -6);
+    hang('ÎLOT FRAISAGE', 'F1 · F2 · F3', '#1e7d4a', -4, 4);
+    hang('STOCK BRUTS', 'acier · alu · inox', '#7f6000', -12, -11.6, 3.2);
+    hang('EXPÉDITION', 'contrôle au marbre avant !', '#8e44ad', 11.5, 9.4, 3.2);
+    // ---------- liseré jaune le long de l'allée centrale ----------
+    for (const z of [-3.42, 1.32]) box(ext ? 49 : 36, 0.012, 0.1, ext ? 4.5 : -2, 0.039, z, 0xf1c40f);
+    // passages piétons (zébras) vers le bureau et l'expédition
+    for (let i = 0; i < 5; i++) { box(0.35, 0.012, 1.4, 11.2 + i * 0.6, 0.04, -4.25, 0xffffff); }
+    // ---------- vestiaires (casiers) : mur avant, à gauche de la porte ----------
+    for (let i = 0; i < 6; i++) {
+      const x = -11.0 + i * 0.47, c = i % 2 ? 0x5d7f9c : 0x4f6f8a;
+      box(0.45, 1.85, 0.5, x, 0.95, 13.42, c); box(0.42, 1.8, 0.02, x, 0.95, 13.16, c, { jit: 0.06 });
+      for (let k = 0; k < 4; k++) box(0.22, 0.025, 0.01, x, 1.6 + k * 0.06, 13.145, 0x2c3e50);
+      box(0.03, 0.12, 0.03, x + 0.15, 1.0, 13.14, 0xbdc3c7); box(0.2, 0.06, 0.005, x, 1.42, 13.143, 0xffffff);
+    }
+    box(2.9, 0.06, 0.55, -9.83, 1.9, 13.42, 0x3d566e); box(2.6, 0.08, 0.3, -9.83, 0.45, 12.9, 0x8d6e63); for (const dx of [-1.1, 1.1]) box(0.06, 0.4, 0.25, -9.83 + dx, 0.22, 12.9, 0x2c3e50);
+    U.boxCollider(-9.83, 13.3, 2.9, 0.8, 'casiers');
+    sign('VESTIAIRES', 'un casier = un cadenas', '#3d566e', '#fff', 1.6, 0.35, -9.83, 2.25, 13.7, Math.PI, {});
+    // ---------- armoire à pharmacie ----------
+    box(0.6, 0.7, 0.18, 9.4, 1.6, 13.62, 0xffffff); box(0.36, 0.1, 0.01, 9.4, 1.6, 13.52, 0x27ae60); box(0.1, 0.36, 0.01, 9.4, 1.6, 13.52, 0x27ae60);
+    sign('PREMIERS SECOURS', '', '#27ae60', '#fff', 0.9, 0.22, 9.4, 2.1, 13.71, Math.PI, {});
+    // ---------- affiches ----------
+    poster(1.6, 1.15, -1.3, 3.3, -13.72, 0, (g, W, H) => {
+      g.fillStyle = '#fdfefe'; g.fillRect(0, 0, W, H); g.fillStyle = '#c0392b'; g.fillRect(0, 0, W, 70); txt(g, 'LES 5S', W / 2, 36, 'bold 42px Arial', '#fff');
+      ['Trier', 'Ranger', 'Nettoyer', 'Standardiser', 'Respecter (le poly)'].forEach((t, i) => { g.fillStyle = '#c0392b'; g.beginPath(); g.arc(46, 110 + i * 54, 20, 0, 7); g.fill(); txt(g, 'S', 46, 111 + i * 54, 'bold 22px Arial', '#fff'); txt(g, t, 84, 111 + i * 54, 'bold 28px Arial', '#2c3e50', 'left'); });
+    });
+    poster(1.5, 1.2, -19.72, 3.0, -1.0, Math.PI / 2, (g, W, H) => {
+      g.fillStyle = '#f1c40f'; g.fillRect(0, 0, W, H); g.fillStyle = '#111'; g.fillRect(0, 0, W, 64); txt(g, '⚠ AU TOUR', W / 2, 34, 'bold 38px Arial', '#f1c40f');
+      ['cheveux attachés', 'pas de gants', 'carter fermé', 'clé retirée du mandrin !'].forEach((t, i) => txt(g, '• ' + t, 30, 110 + i * 60, 'bold 30px Arial', '#111', 'left'));
+    });
+    poster(0.8, 1.1, 19.72, 2.5, 3.9, -Math.PI / 2, (g, W, H) => {
+      g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.fillStyle = '#c0392b'; g.fillRect(0, 0, W, 90); txt(g, 'NOVEMBRE', W / 2, 46, 'bold 52px Arial', '#fff');
+      g.strokeStyle = '#bdc3c7'; g.lineWidth = 2; for (let r = 0; r < 5; r++) for (let c = 0; c < 7; c++) { g.strokeRect(20 + c * 67, 120 + r * 100, 67, 100); txt(g, String(r * 7 + c + 1 <= 30 ? r * 7 + c + 1 : ''), 40 + c * 67, 140 + r * 100, '20px Arial', '#555'); }
+      g.strokeStyle = '#e74c3c'; g.lineWidth = 5; g.beginPath(); g.arc(20 + 4 * 67 + 33, 120 + 3 * 100 + 50, 30, 0, 7); g.stroke();
+      txt(g, 'Garage Pasquier', W / 2, H - 40, 'italic 30px Arial', '#7f8c8d');
+    });
+    // tableau en liège (coin café) : mots du chef
+    box(0.04, 1.0, 1.5, -19.74, 2.75, 9.0, 0x8d6e63);
+    poster(1.42, 0.92, -19.71, 2.75, 9.0, Math.PI / 2, (g, W, H) => {
+      g.fillStyle = '#c8a26a'; g.fillRect(0, 0, W, H); for (let i = 0; i < 400; i++) { g.fillStyle = `rgba(90,60,30,${Math.random() * 0.25})`; g.fillRect(Math.random() * W, Math.random() * H, 3, 3); }
+      const notes = [['#fff59d', 'Qui a fini\nle café ??'], ['#b3e5fc', 'Pot de départ\nde personne\nvendredi'], ['#f8bbd0', 'NE PAS\ntoucher au T1\n(Amaury)'], ['#c8e6c9', 'Clé à molette\ngéante = pour\nles relous !']];
+      notes.forEach(([c, t], i) => { const x = 20 + i * 122, y = 30 + (i % 2) * 40; g.save(); g.translate(x + 50, y + 60); g.rotate((i - 1.5) * 0.06); g.fillStyle = c; g.fillRect(-50, -55, 108, 120); t.split('\n').forEach((l, k) => txt(g, l, 4, -25 + k * 26, 'bold 18px Arial', '#333')); g.fillStyle = '#e74c3c'; g.beginPath(); g.arc(4, -48, 6, 0, 7); g.fill(); g.restore(); });
+    });
+    // servantes (chariots d'outils) au bout de chaque emplacement machine
+    for (const def of ML.MACHINES) {
+      if (def.ext && !ext) continue;
+      const x = def.x + (def.type === 'tour' ? (def.len + 1.4) / 2 + 0.55 : 2.2), z = def.z + (def.type === 'tour' ? 0.35 : -0.35);
+      box(0.55, 0.85, 0.45, x, 0.5, z, 0xc0392b); for (let k = 0; k < 3; k++) box(0.5, 0.02, 0.01, x, 0.35 + k * 0.22, z + 0.226, 0x7f8c8d);
+      box(0.6, 0.04, 0.5, x, 0.95, z, 0x2c3e50); for (const dx of [-0.2, 0.2]) for (const dz of [-0.16, 0.16]) cyl(0.04, 0.06, x + dx, 0.04, z + dz, 0x111111);
+      U.boxCollider(x, z, 0.6, 0.5, 'servante');
+    }
+  };
   const stripes = (L, vertical, x, y, z, ax, n, o) => {               // bande jaune / noire (sécurité)
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) / n - 0.5, col = i % 2 ? 0x111111 : 0xf1c40f;
@@ -181,9 +299,9 @@
     }
     U.boxCollider(-19.35, -5.25, 0.85, 4.5, 'rayonnage');
     // --- fûts d'huile + bac de rétention, palettes ---
-    box(2.4, 0.15, 1.3, 17.6, 0.08, -12.6, 0xf1c40f);
-    [[16.9, 0x2980b9], [17.6, 0xc0392b], [18.3, 0x2980b9]].forEach(([x, c]) => { cyl(0.33, 0.95, x, 0.62, -12.6, c); cyl(0.34, 0.06, x, 0.85, -12.6, 0x7f8c8d); cyl(0.34, 0.06, x, 0.4, -12.6, 0x7f8c8d); });
-    U.boxCollider(17.6, -12.6, 2.4, 1.3, 'futs');
+    box(2.4, 0.15, 1.3, 17.2, 0.08, 12.6, 0xf1c40f);                       // V6 : déplacés près de la porte (le coin du fond devient le bureau)
+    [[16.5, 0x2980b9], [17.2, 0xc0392b], [17.9, 0x2980b9]].forEach(([x, c]) => { cyl(0.33, 0.95, x, 0.62, 12.6, c); cyl(0.34, 0.06, x, 0.85, 12.6, 0x7f8c8d); cyl(0.34, 0.06, x, 0.4, 12.6, 0x7f8c8d); });
+    U.boxCollider(17.2, 12.6, 2.4, 1.3, 'futs');
     for (let i = 0; i < 4; i++) { box(1.2, 0.12, 1.0, 18.6, 0.08 + i * 0.15, 10.2, 0xb5835a, { jit: 0.1 }); box(1.2, 0.03, 0.12, 18.6, 0.15 + i * 0.15, 9.8, 0x8d6e63); }
     U.boxCollider(18.6, 10.2, 1.2, 1.0, 'palettes');
     // --- distributeur (croissants & café) ---
@@ -227,7 +345,6 @@
     sign('MÉCANIQUE LEBEC', 'usinage de précision · depuis 1987', '#1a2340', '#ffd257', 12, 2.4, -4, 10.9, 11.78, 0, { glow: true });
     sign("C'EST ÉCRIT DANS\nLE POLY !", '— F. Lebec, depuis 1987', '#2e8b57', '#fff', 7, 1.6, -12, 3.6, -13.72, 0, { border: '#ffd257' });
     sign('0 JOUR SANS\nACCIDENT', 'record : 0', '#ffffff', '#c0392b', 2.6, 1.6, -4, 3.3, -13.72, 0, { border: '#c0392b' });
-    sign('PLANNING', '#1 T1 ✔  #2 F1 ✔  #3 ???  #4 « Brieuc : flemme »', '#fdfefe', '#2c3e50', 3, 1.5, 13.5, 2.5, -13.72, 0, { border: '#7f8c8d' });
     sign('PORT DES EPI\nOBLIGATOIRE', 'casque · lunettes · chaussures', '#1f4e9a', '#fff', 2.8, 1.6, -19.72, 3.2, -10.5, Math.PI / 2, { border: '#fff' });
     sign('MIP / MAP', 'appui plan sur la Réf A !', '#ffd257', '#222', 2.8, 1.4, 19.72, 3.2, ext ? -8 : 1.2, -Math.PI / 2, { border: '#222' });
     if (ext) sign('→ EXTENSION EST', 'T4 · F4', '#1a2340', '#ffd257', 3, 0.8, 19.7, 5.2, 1.15, -Math.PI / 2, {});
@@ -235,6 +352,7 @@
     sign('QUALITÉ', 'un client content = Jacky content', '#27ae60', '#fff', 3, 1.2, 12.5, 3.3, 13.72, Math.PI, {});
     for (const [x, z, ry] of [[-19.72, 2.6, Math.PI / 2], [19.72, -11.5, -Math.PI / 2]]) sign('🧯', '', '#c0392b', '#fff', 0.6, 0.6, x, 2.2, z, ry, {});
 
+    if (D.atelierV6) D.atelierV6(P, ext);
     // ===== EXTÉRIEUR =====
     const green = P.outer, tr = P.trim;
     box(0.06, 1.0, 28.4, -20.24, 0.5, 0, green); box(40.5, 1.0, 0.06, 0, 0.5, -14.24, green);

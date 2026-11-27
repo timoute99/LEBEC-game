@@ -15,7 +15,13 @@
     const o = { group: g, h: 1.86 * s, anim: Math.random() * 6, pos: new THREE.Vector3(), target: new THREE.Vector3(), yaw: 0, tYaw: 0, speed: 0, heldKey: null };
     const limb = (x, y) => { const p = new THREE.Group(); p.position.set(x, y, 0); g.add(p); return p; };
     o.legL = limb(0.12 * w, 0.9 * s); o.legR = limb(-0.12 * w, 0.9 * s);
-    for (const lg of [o.legL, o.legR]) { U.box(0.17 * w, 0.9 * s, 0.2, look.pants, 0, -0.45 * s, 0, lg); U.box(0.19 * w, 0.09, 0.27, 0x222222, 0, -0.87 * s, 0.03, lg); }
+    for (const lg of [o.legL, o.legR]) {
+      if (look.shorts) { U.box(0.18 * w, 0.42 * s, 0.21, look.pants, 0, -0.21 * s, 0, lg); U.box(0.14 * w, 0.48 * s, 0.16, look.skin, 0, -0.64 * s, 0, lg); }
+      else U.box(0.17 * w, 0.9 * s, 0.2, look.pants, 0, -0.45 * s, 0, lg);
+      const sh = look.shoes !== undefined ? look.shoes : 0x222222, sm = look.shoes === 0xffd700 ? U.mat(0xffd700, 0x553300) : sh;   // V6 : chaussures de la boutique
+      if (look.bigShoes) U.box(0.23 * w, 0.14, 0.34, sm, 0, -0.86 * s, 0.05, lg); else U.box(0.19 * w, 0.09, 0.27, sm, 0, -0.87 * s, 0.03, lg);
+      if (look.shoes === 0xf5f5f5) U.box(0.195 * w, 0.025, 0.275, 0xe74c3c, 0, -0.84 * s, 0.03, lg);
+    }
     U.box(0.5 * w, 0.14 * s, 0.29 * w, look.pants, 0, 0.93 * s, 0, g);                         // ceinture
     o.torso = U.box(0.48 * w, 0.56 * s, 0.27 * w, look.shirt, 0, 1.22 * s, 0, g);
     U.box(0.2 * w, 0.06 * s, 0.28 * w, look.shirt, 0, 1.52 * s, 0, g);                         // col
@@ -50,10 +56,18 @@
     U.box(0.1 * s, 0.025, 0.02, 0x7a3b2e, 0, -0.09 * s, 0.151 * s, head);
     if (look.beard) { U.box(0.3 * s, 0.13 * s, 0.05, look.hair, 0, -0.12 * s, 0.15 * s, head); U.box(0.05, 0.16 * s, 0.25 * s, look.hair, 0.155 * s, -0.04 * s, 0.02, head); U.box(0.05, 0.16 * s, 0.25 * s, look.hair, -0.155 * s, -0.04 * s, 0.02, head); }
     if (look.mustache) U.box(0.17 * s, 0.045 * s, 0.03, 0x555555, 0, -0.06 * s, 0.158 * s, head);
-    if (look.glasses) U.box(0.27 * s, 0.07 * s, 0.02, 0x1a1a1a, 0, 0.04 * s, 0.168 * s, head);
+    if (look.gl === 'sun') { U.box(0.3 * s, 0.08 * s, 0.025, 0x111111, 0, 0.04 * s, 0.17 * s, head); U.box(0.02, 0.03, 0.2 * s, 0x111111, 0.15 * s, 0.05 * s, 0.07 * s, head); U.box(0.02, 0.03, 0.2 * s, 0x111111, -0.15 * s, 0.05 * s, 0.07 * s, head); }
+    else if (look.gl === 'avi') { for (const sx of [-1, 1]) { U.box(0.12 * s, 0.09 * s, 0.02, 0x3d2b12, 0.07 * s * sx, 0.035 * s, 0.172 * s, head); U.box(0.13 * s, 0.015, 0.025, U.mat(0xffd700, 0x553300), 0.07 * s * sx, 0.08 * s, 0.172 * s, head); } }
+    else if (look.gl === 'loupe') { for (const sx of [-1, 1]) { U.cyl(0.07 * s, 0.07 * s, 0.08, 0xeeeeee, 0.075 * s * sx, 0.04 * s, 0.2 * s, head, 10).rotation.x = Math.PI / 2; U.cyl(0.055 * s, 0.055 * s, 0.085, 0x9fd3ff, 0.075 * s * sx, 0.04 * s, 0.2 * s, head, 10).rotation.x = Math.PI / 2; } }
+    else if (look.glasses) U.box(0.27 * s, 0.07 * s, 0.02, 0x1a1a1a, 0, 0.04 * s, 0.168 * s, head);
     if (look.cap) { U.box(0.35 * s, 0.09 * s, 0.34 * s, look.cap, 0, 0.21 * s, 0, head); U.box(0.3 * s, 0.03, 0.16 * s, look.cap, 0, 0.17 * s, 0.22 * s, head); }
     if (look.mask) U.box(0.36 * s, 0.4 * s, 0.05, 0x2c3e50, 0, 0.0, 0.2 * s, head).rotation.x = -0.9;   // masque de soudeur relevé
     if (opts.helmet) { U.box(0.36 * s, 0.12 * s, 0.36 * s, opts.helmet, 0, 0.22 * s, 0, head); U.box(0.38 * s, 0.03, 0.4 * s, opts.helmet, 0, 0.16 * s, 0.02, head); }
+    switch (look.bag) {                                                    // V6 : sacs / cape (dans le dos)
+      case 'dos': U.box(0.36 * w, 0.42 * s, 0.16, 0x2e86de, 0, 1.2 * s, -0.21 * w, g); U.box(0.3 * w, 0.16 * s, 0.06, 0x1b4f8a, 0, 1.08 * s, -0.31 * w, g); for (const sx of [-1, 1]) U.box(0.05, 0.5 * s, 0.03, 0x1b4f8a, 0.13 * w * sx, 1.22 * s, 0.14 * w, g); break;
+      case 'banane': U.box(0.34 * w, 0.11 * s, 0.1, 0x39ff14, 0.03, 0.9 * s, 0.17 * w, g); U.box(0.52 * w, 0.03, 0.3 * w, 0x111111, 0, 0.94 * s, 0, g); break;
+      case 'cape': { const c = U.box(0.52 * w, 1.0 * s, 0.03, 0xc0392b, 0, 1.02 * s, -0.17 * w, g); c.rotation.x = 0.12; U.box(0.12, 0.08, 0.05, U.mat(0xffd700, 0x553300), 0, 1.52 * s, 0.15 * w, g); break; }
+    }
     switch (opts.hat) {                                                    // chapeaux de la boutique
       case 'cap': U.box(0.35 * s, 0.1 * s, 0.34 * s, 0xc0392b, 0, 0.22 * s, 0, head); U.box(0.3 * s, 0.03, 0.18 * s, 0xc0392b, 0, 0.18 * s, 0.23 * s, head); break;
       case 'beanie': U.box(0.36 * s, 0.16 * s, 0.34 * s, 0x1f4e9a, 0, 0.24 * s, 0, head); U.box(0.1, 0.08, 0.1, 0xffffff, 0, 0.36 * s, 0, head); break;

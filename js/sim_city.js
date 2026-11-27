@@ -15,7 +15,7 @@
     K.capOf = kind => kind === 'tp' ? C.TP.cap : kind === 'camion' ? C.CAMION.cap : kind === 'fenwick' ? 0 : kind === 'scooter' ? C.SCOOTER.cap : kind === 'kangoo' ? 2 : kind === 'ducato' ? 6 : S.up.grande_benne ? 6 : C.CAR.cap;
     K.bedUse = c => c.bed.reduce((a, it) => a + (c.kind === 'camion' && it.type === 'palette' ? 4 : 1), 0);
     K.bedFree = c => c.cap - K.bedUse(c);
-    const car = (kind, p, extra) => Object.assign({ x: p.x, z: p.z, h: p.h || 0, s: 0, dr: null, pass: [], bed: [], kind, name: ML.VEHICLES[kind].name, cap: K.capOf(kind), fuel: 100, color: ML.VEHICLES[kind].color, frozen: 0, load: null }, extra || {});
+    const car = (kind, p, extra) => Object.assign({ home: { x: p.x, z: p.z, h: p.h || 0 }, x: p.x, z: p.z, h: p.h || 0, s: 0, dr: null, pass: [], bed: [], kind, name: ML.VEHICLES[kind].name, cap: K.capOf(kind), fuel: 100, color: ML.VEHICLES[kind].color, frozen: 0, load: null }, extra || {});
     K.addCar = (kind, p) => { const c = car(kind, p, { fuel: kind === 'tp' || kind === 'fenwick' ? 100 : 80 }); S.cars.push(c); Sim.dirty = true; return c; };
     if (S.mode === 'course') {
       const n = Math.min(6, Math.max(2, S.n));
@@ -258,6 +258,19 @@
         K.say(n, ML.line('gendarme', 'caution', 'Caution payée. Qu\'on ne vous y reprenne pas.')); K.free(m.id, pid);
         K.all(`💶 ${P.name} a payé la caution de ${T2.name} (${ML.ECO.jail.bail} €).`, 'info'); return true;
       }
+      case 'sink': {                                                  // V6 : la voiture tombe dans la rivière
+        const c = S.cars[m.car | 0]; if (!c || c.dr !== pid) return true;
+        const lost = c.bed.splice(0); let nP = 0;
+        for (const it of lost) { const o = it.d && S.orders.find(x => x.id === it.d.oid); if (o) { o.si = o.steps.indexOf(o.src || 'usinage'); o.m = null; o.q = false; nP++; } }
+        for (const q of c.pass) { const Q = S.pl[q.pid]; if (Q) Q.ride = null; }
+        c.pass = []; c.dr = null; c.s = 0; P.car = null; const H = c.home || ML.LOC.carSpawn[0]; Object.assign(c, { x: H.x, z: H.z, h: H.h || 0, fuel: Math.max(c.fuel, 40) });
+        const dep = 120; K.fine(dep, `Dépanneuse : ${c.name} repêchée`, pid);
+        K.ev({ e: 'sink', car: m.car | 0, pid, x: +m.x || 0, z: +m.z || 0 }); K.sfx('splash', +m.x || 0, +m.z || 0);
+        K.big(`🌊 PLOUF ! ${c.name} est dans la rivière !`, '#4ea3ff');
+        const lostTx = nP ? (nP > 1 ? `, mais ${nP} caisses sont perdues : à REFAIRE` : ', mais la caisse est perdue : à REFAIRE') : '';
+        K.all(`🌊 ${P.name} a plongé ${c.name} dans la rivière. La dépanneuse l'a ramenée à l'atelier (−${dep} €)${lostTx}. ${P.name} rentre à pied, trempé·e !`, 'warn');
+        Sim.dirty = true; return true;
+      }
       case 'dry': K.stat(pid, 'dry'); K.all(`⛽ ${P.name} est en PANNE SÈCHE ! Un jerrican (station Total-Lebec) et E sur la voiture.`, 'warn'); return true;
     }
     return false;
@@ -276,7 +289,7 @@
         if (c.pass.filter(x => x.seat === 'cab').length >= (c.kind === 'camion' ? 1 : V.seats ? 1 : 0)) { K.note(pid, `Pas de place passager dans ${c.name}.`, 'warn'); return true; }
         c.pass.push({ pid, seat: 'cab' }); P.ride = i; Sim.dirty = true; K.note(pid, '🪑 Tu es passager·e : clic droit pour lancer, E pour descendre.', 'good'); return true;
       }
-      if (V.role && P.role !== V.role) { K.needRole(pid, V.role, `Conduire ${c.name}`); return true; }
+      if (V.role && !K.can(pid, V.role)) { K.needRole(pid, V.role, `Conduire ${c.name}`); return true; }
       if (P.inv.some(x => x && IT.bulky(x))) { K.note(pid, c.kind === 'tp' ? 'Pose ta caisse sur les fourches du transpalette (E à l\'arrière) avant de le conduire.' : 'Pose ta caisse dans la benne avant de conduire.', 'warn'); return true; }
       c.dr = pid; P.car = i; K.ev({ e: 'drive', to: pid, car: i }); Sim.dirty = true; return true;
     }
