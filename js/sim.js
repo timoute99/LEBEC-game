@@ -538,7 +538,7 @@
     if (n.id === 'lebec') { say(n, ML.line('lebec', 'frappe', "TU M'AS FRAPPÉ ?! COUP DE PELLE !!!"), true); S.anger = 100; K.stat(by, 'slap_lebec'); K.startChase(by); return; }
     if (ML.PEOPLE[n.id].op && ['pause', 'toPause', 'forgot', 'rant'].includes(n.state)) { K.backToWork(n); say(n, ML.line(n.id, 'claque', "Aïe ! OK OK, j'y retourne !")); }
     else say(n, ML.line(n.id, 'claque', ['Aïe !', 'Hé ! Ça va pas ?!', 'Ouille !']));
-    // V5.3 : Lebec ne punit que les claques aux gens de l'atelier (pas aux intrus : Johan, Bleuenn, Hervé, Mathieu, visiteurs…)
+    // V5.3 : Lebec ne punit que les claques aux gens de l'atelier (pas aux intrus : Johan, Lean Manufacturing, Hervé, Mathieu, visiteurs…)
     if (!ML.PEOPLE[n.id].visitor) K.witness(by, n.x, n.z);
     else if (npcs.lebec.active && Math.hypot(npcs.lebec.x - n.x, npcs.lebec.z - n.z) < 15 && rng() < 0.4) say(npcs.lebec, ['Bien fait !', 'Allez, dehors !', 'Ça, je l\'ai pas vu.'][Math.floor(rng() * 3)]);
   };

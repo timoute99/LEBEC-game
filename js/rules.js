@@ -134,7 +134,7 @@
       // --- V5.2 ---
       case 'johan': return (G.npcViews.johan || {}).st === 'r' ? '🦹 Johan Bois file avec une caisse : une CLAQUE (clic gauche) !' : '🦹 Johan Bois… (une claque le ferait fuir)';
       case 'vigile': return '🛡 Raymond, le vigile anti-Johan';
-      case 'bleuenn': return '💣 Bleuenn bricole… une CLAQUE (clic gauche) l\'arrêterait !';
+      case 'bleuenn': return '💣 Lean Manufacturing bricole… une CLAQUE (clic gauche) l\'arrêterait !';
       case 'garnier': case 'fanfrelat': return isPart(held) ? `🎓 Présenter la pièce #${held.d.oid} au jury de SAE` : `🎓 ${P_(n).name} (jury de SAE)`;
       case 'vendeuse': return '🛍 Sandra : les stands sont au fond (E sur un article pour l\'acheter)';
       case 'coach': return '🏃 Coach Bruno : E sur un tapis de course pour s\'entraîner';

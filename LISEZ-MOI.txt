@@ -1,4 +1,4 @@
-MÉCANIQUE LEBEC — usinage en équipe (V5.3, 1 à 6 joueurs)
+MÉCANIQUE LEBEC — usinage en équipe (V5.4, 1 à 6 joueurs)
 ==========================================================
 En ligne : https://lebec-game.onrender.com
 
@@ -39,6 +39,16 @@ MODES
   termine le jeu) · Inspection (boss : règles absurdes qui changent) · Course de Mégane
   (5 manches) · Mode traître (3 joueurs minimum : un joueur payé par UsiFlash, vote à la fin).
 
+NOUVEAU EN V5.4
+  - PAGE ADMIN : https://lebec-game.onrender.com/admin — joueurs en ligne (en partie / au menu, mode),
+    salons, visites et visiteurs uniques, temps de jeu (par jour et par compte), parties par mode,
+    heures de visite, comptes, entreprises, derniers retours, état du serveur. Rafraîchie toutes les 15 s.
+    Accès : se connecter avec un compte du jeu dont le pseudo figure dans la variable d'environnement
+    ADMIN_USERS de Render (pseudos séparés par des virgules). Aucune adresse IP n'est enregistrée.
+    Les stats sont stockées comme les comptes (fichier lebec-stats.json du dépôt privé, ou server/data/stats.json).
+  - Bleuenn est renommée « Lean Manufacturing ».
+  - Les journées reviennent à 8 minutes.
+
 NOUVEAU EN V5.3
   - PC de gestion = un vrai ordinateur « LebecOS » : bureau, icônes d'applications (Commandes, Fournisseurs,
     Boutique Atelier, Personnel, Bilan, Historique, Astuces), fenêtres, barre des tâches, menu Démarrer,
@@ -51,7 +61,7 @@ NOUVEAU EN V5.3
   - Comptes et sauvegardes : le serveur ne réécrit jamais les comptes s'il n'a pas pu les relire (fusion),
     réessaie tout seul, enregistre à l'arrêt ; le jeu garde le profil en local et le renvoie plus tard ;
     liste 🌍 de TOUTES les entreprises du serveur dans la boîte Campagne (jouables par tout le monde).
-  - Plus de pièces (+20, et des pièces propres à chaque client), journées de 7 min, difficulté Normal/Facile adoucie.
+  - Plus de pièces (+20, et des pièces propres à chaque client), journées de 7 min (revenues à 8 min en V5.4), difficulté Normal/Facile adoucie.
   - Grosses pièces dès le jour 2 (ou dès le début à 3 joueurs et +) ; fenwick 650 €, camion 1 500 €.
   - Services (quêtes) : validés en arrivant avec l'objet, distance affichée, 260 s, 60 à 140 €.
   - Soufflette utilisable dans la cour devant l'atelier ; frapper Johan Bois / Bleuenn ne fâche plus Lebec ;

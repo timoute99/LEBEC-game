@@ -8,7 +8,7 @@ window.ML = window.ML || {};
 ML.debug = /[?&]debug/.test(location.search);
 
 ML.CFG = {
-  SHIFT_SEC: 420,                      // une journée (7h → 19h) = 7 minutes réelles (V5.3 : plus courte)
+  SHIFT_SEC: 480,                      // une journée (7h → 19h) = 8 minutes réelles (V5.4 : on revient à 8 min)
   DAY_START: 7 * 60, DAY_END: 19 * 60,
   PLAYER: { eye: 1.65, r: 0.35, walk: 5.6, sprint: 8.8, stamina: 4 },
   CAR: { accel: 13, brake: 24, max: 27, rev: 7, steer: 0.55, wb: 2.6, cap: 4, fuelUse: 0.04 },
@@ -182,7 +182,7 @@ ML.DAYTYPES = {
 ML.EVENTS = {
   audit: 'Audit surprise de Jacky Foucher', coupure: 'Coupure de courant', sabotage: "Sabotage d'UsiFlash",
   herve: 'Hervé Lehec et sa convention', fred: 'Fred Castells et Arexis', mathieu: 'Mathieu Riou (il parle lentement)', panne: 'Grosse panne machine',
-  johan: 'Johan Bois, voleur de commandes', bleuenn: 'Bleuenn fait tout sauter'
+  johan: 'Johan Bois, voleur de commandes', bleuenn: 'Lean Manufacturing fait tout sauter'
 };
 /* V5.2 : CADRE D'ASTUCES affiché quand un événement commence (titre + que faire) */
 ML.EVTIPS = {
@@ -194,7 +194,7 @@ ML.EVTIPS = {
   mathieu: ['🐌 Mathieu Riou', ['Il bloque un opérateur avec ses « du coup ».', 'E sur Mathieu : écoute-le à sa place.', 'L\'opérateur repart travailler.']],
   panne: ['💥 Grosse panne', ['Éteins le feu : EXTINCTEUR (mur gauche), clic gauche maintenu.', 'Puis CLÉ À MOLETTE + rôle MAINTENANCE : E sur la machine.']],
   johan: ['🦹 Johan Bois', ['Il vole les caisses PRÊTES (expédition).', 'Claque-le pour qu\'il lâche la caisse !', 'Au PC : un VIGILE l\'empêche d\'entrer.']],
-  bleuenn: ['💣 Bleuenn a tout fait sauter', ['Plus de courant : TABLEAU ÉLECTRIQUE (mur droit).', 'Puis E sur CHAQUE machine pour la redémarrer.', 'Éteins les feux à l\'extincteur.']],
+  bleuenn: ['💣 Lean Manufacturing a tout fait sauter', ['Plus de courant : TABLEAU ÉLECTRIQUE (mur droit).', 'Puis E sur CHAQUE machine pour la redémarrer.', 'Éteins les feux à l\'extincteur.']],
   wc: ['🚽 Toilettes dégoûtantes', ['Les opérateurs ralentissent (et Lebec râle).', 'Cabine WC à gauche de l\'atelier, dehors.', 'E puis tape Espace pour nettoyer.']],
   quest: ['🙋 Quelqu\'un demande un service', ['Il arrive à l\'entrée (E sur lui) ou il appelle.', 'Prends l\'objet demandé (ou celui posé au COMPTOIR).', 'Va au repère (M) avec l\'objet en main : c\'est validé tout seul !']],
   sae: ['🎓 SAE du jour', ['Usine les pièces SAE (tickets violets).', 'Contrôle-les au MARBRE (meilleure note).', 'Apporte-les au JURY au marbre avant la fin.']]
@@ -288,7 +288,7 @@ ML.ECO = {
   jail: { peds: 3, sec: 45, bail: 150 },                        // 3 passants renversés → la gendarmerie te poursuit ; prison 45 s (caution 150 €)
   bonus: { audit: 30, mathieu: 10, fred: 10, herve: 20 },
   rep: { ok: 2, late: 1, fail: 3, expire: 1, part: 3, partFail: 3, audit: 3 },
-  stars: [80, 290, 600],                                       // bénéfice du jour pour 1, 2, 3 étoiles (× nb joueurs, machines…)
+  stars: [100, 350, 700],                                       // bénéfice du jour pour 1, 2, 3 étoiles (× nb joueurs, machines…)
   // --- V5.2 ---
   black: { every: 5, cat: 0.6, supply: 0.7, dealer: 0.75, mall: 0.5 },    // BLACK FRIDAY un jour sur 5 : multiplicateurs de prix
   radarWitness: 0.35,                                           // casser un radar : risque d'être vu (amende « vandal »)
@@ -495,7 +495,7 @@ ML.PEOPLE = {
   // --- V5.2 ---
   johan: { name: 'Johan Bois', role: 'Voleur de commandes', visitor: true, look: { skin: 0xeac39b, shirt: 0x2d3436, pants: 0x1e272e, hair: 0x6b4a2b, height: 1.8, cap: 0x2d3436 } },
   vigile: { name: 'Raymond', role: 'Vigile anti-Johan Bois', visitor: true, look: { skin: 0x8d5524, shirt: 0x111111, pants: 0x111111, hair: 0x111111, height: 1.95, width: 1.3 } },
-  bleuenn: { name: 'Bleuenn', role: 'Bricoleuse explosive', visitor: true, look: { skin: 0xf3cba5, shirt: 0xe67e22, pants: 0x34495e, hair: 0xa0522d, height: 1.66, longHair: true, glasses: true } },
+  bleuenn: { name: 'Lean Manufacturing', role: 'Bricoleuse explosive', visitor: true, look: { skin: 0xf3cba5, shirt: 0xe67e22, pants: 0x34495e, hair: 0xa0522d, height: 1.66, longHair: true, glasses: true } },
   garnier: { name: 'Garnier', role: 'Jury de SAE (prof)', visitor: true, look: { skin: 0xe8b98f, shirt: 0x34495e, pants: 0x2c3e50, hair: 0x555555, height: 1.8, glasses: true } },
   fanfrelat: { name: 'Fanfrelat', role: 'Jury de SAE (prof)', visitor: true, look: { skin: 0xf0c8a0, shirt: 0x8e44ad, pants: 0x2d2d2d, hair: 0x3b2a1a, height: 1.75 } },
   cardin: { name: 'Cardin', role: 'Un pote de l\'atelier', visitor: true, look: { skin: 0xf0c8a0, shirt: 0xc0392b, pants: 0x2c3e50, hair: 0x3b2a1a, height: 1.8 } },

@@ -281,7 +281,7 @@
     h += sec('🙋', 'Quêtes, SAE et visiteurs', [
       'Quand quelqu\'un demande un service, parle-lui (E). Si tu acceptes, un <b>repère</b> apparaît sur la carte (M) et un bandeau en haut de l\'écran donne la distance.',
       'Va au repère et appuie sur <b>E</b> dessus (ou apporte l\'objet demandé), puis reviens voir la personne.',
-      'Les visiteurs pénibles (Johan Bois, Bleuenn) peuvent être chassés à la claque : <b>Lebec ne t\'en voudra pas</b>.',
+      'Les visiteurs pénibles (Johan Bois, Lean Manufacturing) peuvent être chassés à la claque : <b>Lebec ne t\'en voudra pas</b>.',
       'La <b>soufflette</b> nettoie les taches dans l\'atelier <b>et devant la porte</b>.'
     ]);
     h += sec('🚗', 'Véhicules, essence, radars, gendarmes', [

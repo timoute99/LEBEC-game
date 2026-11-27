@@ -6,6 +6,12 @@
    serveur : https://lebec-game.onrender.com/retours (et /retours.txt).
    ===================================================================== */
 ML.PATCH = [
+  { v: 'V5.4', d: 'novembre 2026', t: 'Page admin, Lean Manufacturing, journées de 8 min', l: [
+    '📊 Nouvelle page ADMIN (/admin) : joueurs connectés en direct, visites et visiteurs uniques, temps de jeu par jour et par joueur, parties par mode, heures de pointe, entreprises, retours.',
+    '💣 Bleuenn s\'appelle maintenant LEAN MANUFACTURING (et bricole toujours n\'importe quoi sur le tableau électrique).',
+    '⏱ Les journées reviennent à 8 minutes (le reste de l\'équilibrage V5.3 est gardé).',
+    '🛠 Le serveur démarre plus vite après une mise en veille.'
+  ] },
   { v: 'V5.3', d: 'novembre 2026', t: 'Un vrai ordinateur, un mode débutant, et l\'atelier plus facile à prendre en main', l: [
     '💻 Le PC de gestion devient un VRAI ORDINATEUR (« LebecOS ») : un bureau avec des icônes d\'applications, des fenêtres, une barre des tâches, un menu Démarrer… et un 📌 pense-bête qui dit quoi faire maintenant.',
     '💡 Nouvelle appli ASTUCES sur le PC : le guide complet (mécano-soudé, fonderie, TTH, grosses pièces, événements, véhicules, argent, touches).',
@@ -17,7 +23,7 @@ ML.PATCH = [
     '🏗 Les GROSSES pièces arrivent dès le jour 2 (tout de suite à 3 joueurs et plus). Fenwick à 650 € et camion à 1 500 € : enfin utiles !',
     '🙋 Les services (clés de Trit, carton de Patrick…) marchent : il suffit d\'arriver sur place avec l\'objet. Distance affichée, plus de temps, plus de sous.',
     '💨 La soufflette va jusque dans la cour : on peut nettoyer les taches devant la porte.',
-    '🦹 Taper Johan Bois ou Bleuenn ne vaut plus de coups de pelle : Lebec ferme les yeux.',
+    '🦹 Taper Johan Bois ou Lean Manufacturing ne vaut plus de coups de pelle : Lebec ferme les yeux.',
     '🚗 Fini les murs invisibles en ville : les collisions des maisons suivent enfin leur vraie taille.'
   ] },
   { v: 'V5.2', d: 'novembre 2026', t: 'Vos idées : Johan Bois, Bleuenn, SAE, centre commercial, quêtes…', l: [

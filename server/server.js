@@ -28,6 +28,10 @@
 //   {t:'fb', q, kind:'idee'|'bug', text, name, ver, where}   (V5.1 : suggestions / bugs des joueurs)
 //     → {t:'fbr', q, ok, m?}        {t:'fblist', q} → {t:'fbr', q, ok, list}
 //   Lecture des retours : https://<serveur>/retours (page) ou /retours.txt (fichier texte).
+// 5) STATISTIQUES + PAGE ADMIN (V5.4) : le jeu envoie un petit « battement » POST /api/hb
+//    (visite, en jeu ou au menu, mode) toutes les 45 s. Page https://<serveur>/admin :
+//    connexion avec un compte du jeu dont le pseudo est dans la variable ADMIN_USERS
+//    (pseudos séparés par des virgules, à définir dans Render → Environment).
 // =====================================================================
 'use strict';
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
@@ -50,7 +54,7 @@ if (!SECRET) {
   try { SECRET = fs.readFileSync(f, 'utf8').trim(); } catch (e) { SECRET = crypto.randomBytes(32).toString('hex'); try { fs.writeFileSync(f, SECRET); } catch (e2) { /* lecture seule */ } }
 }
 /** Un fichier JSON stocké soit dans server/data, soit dans le dépôt GitHub privé (Render efface ses fichiers) */
-function makeStore(ghFile, localFile, label) {
+function makeStore(ghFile, localFile, label, delay = 2000) {
   // V5.3 : « ready » = fichier bien lu. Tant que ce n'est pas le cas, on n'écrit JAMAIS (sinon on écraserait tous les comptes
   // avec un fichier vide si GitHub ne répond pas au démarrage) et on réessaie toutes les 20 s. On fusionne ce qui a été lu
   // avec ce qui a pu être créé entre-temps.
@@ -62,7 +66,7 @@ function makeStore(ghFile, localFile, label) {
       else if (!(k in st.data)) st.data[k] = loaded[k];
     }
   };
-  const api = (method, body) => fetch(`https://api.github.com/repos/${GH.repo}/contents/${encodeURIComponent(ghFile)}`, { method, headers: { Authorization: `Bearer ${GH.token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'lebec-relay' }, body: body ? JSON.stringify(body) : undefined });
+  const api = (method, body) => fetch(`https://api.github.com/repos/${GH.repo}/contents/${encodeURIComponent(ghFile)}`, { method, headers: { Authorization: `Bearer ${GH.token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'lebec-relay' }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(20000) });
   st.load = async () => {
     if (useGitHub) {
       try {
@@ -71,7 +75,7 @@ function makeStore(ghFile, localFile, label) {
           const j = await r.json(); st.sha = j.sha;
           // les gros fichiers (> 1 Mo) n'ont pas de « content » : on passe par le blob
           let txt = j.content ? Buffer.from(j.content, 'base64').toString('utf8') : null;
-          if (!txt && j.git_url) { const b = await fetch(j.git_url, { headers: { Authorization: `Bearer ${GH.token}`, 'User-Agent': 'lebec-relay' } }); if (b.ok) txt = Buffer.from((await b.json()).content, 'base64').toString('utf8'); }
+          if (!txt && j.git_url) { const b = await fetch(j.git_url, { headers: { Authorization: `Bearer ${GH.token}`, 'User-Agent': 'lebec-relay' }, signal: AbortSignal.timeout(30000) }); if (b.ok) txt = Buffer.from((await b.json()).content, 'base64').toString('utf8'); }
           if (txt === null) throw new Error('contenu illisible');
           mergeIn(JSON.parse(txt) || {}); st.ready = true;
         } else if (r.status === 404) st.ready = true;                      // pas encore de fichier : on le créera
@@ -99,13 +103,79 @@ function makeStore(ghFile, localFile, label) {
       st.pending = true; setTimeout(() => { if (st.pending) st.save(); }, 30000);           // on réessaiera plus tard, sans rien perdre
     } else { ensureData(); try { fs.writeFileSync(path.join(DATA, localFile), txt); } catch (e) { console.warn('Écriture impossible', e.message); } }
   };
-  st.save = () => { clearTimeout(st.timer); st.dirty = true; st.timer = setTimeout(() => { st.dirty = false; write(); }, 2000); };
+  st.save = () => { clearTimeout(st.timer); st.dirty = true; st.timer = setTimeout(() => { st.dirty = false; write(); }, delay); };
   st.flush = async () => { if (st.dirty || st.pending) { clearTimeout(st.timer); st.dirty = false; await write(); } };
   return st;
 }
 const ACC = makeStore(process.env.GITHUB_PATH || 'lebec-accounts.json', 'accounts.json', 'Comptes');
 const SAVES = makeStore(process.env.GITHUB_SAVES || 'lebec-saves.json', 'saves.json', 'Sauvegardes');
 const FEED = makeStore(process.env.GITHUB_FEEDBACK || 'lebec-retours.json', 'retours.json', 'Retours');   // V5.1 : suggestions et bugs
+const STATS = makeStore(process.env.GITHUB_STATS || 'lebec-stats.json', 'stats.json', 'Statistiques', 60000);   // V5.4 : visites, temps de jeu (écrit au plus 1×/min)
+
+/* ======================= V5.4 : statistiques (visites, joueurs en ligne, temps de jeu) ======================= */
+const T0 = Date.now();
+const online = new Map();                                    // sid → { n, user, g, m, np, v, t0, last, ip }
+const dayKey = (t = Date.now()) => new Date(t).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
+const hourOf = (t = Date.now()) => +new Date(t).toLocaleString('en-GB', { timeZone: 'Europe/Paris', hour: '2-digit', hour12: false }) % 24;
+let uniqDay = '', uniqSet = new Set();
+function statDay() {
+  const D = STATS.data; D.days = D.days || {}; D.tot = D.tot || { v: 0, s: 0, g: 0 }; D.acc = D.acc || {};
+  const k = dayKey(); if (!D.days[k]) { D.days[k] = { v: 0, u: 0, s: 0, g: 0, p: 0, a: 0, h: new Array(24).fill(0), m: {} };
+    const ks = Object.keys(D.days).sort(); while (ks.length > 400) delete D.days[ks.shift()]; }
+  return D.days[k];
+}
+const onlineNow = () => { const lim = Date.now() - 100000; let n = 0; for (const [sid, o] of online) { if (o.last < lim) online.delete(sid); else n++; } return n; };
+function hb(req, m) {
+  const now = Date.now(), sid = String(m.sid || '').slice(0, 40); if (!sid) return;
+  const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  const d = statDay(), D = STATS.data; let o = online.get(sid);
+  const k = m.tok ? verify(String(m.tok)) : null, user = k && accounts[k] ? accounts[k].name : null;
+  if (!o) { o = { t0: now, last: now, g: 0 }; online.set(sid, o); }
+  const dt = Math.min(90, (now - o.last) / 1000);
+  if (o.g && m.e !== 'visit') { d.s += dt; D.tot.s += dt; if (k) { const A = D.acc[k] = D.acc[k] || { s: 0, g: 0, first: now }; A.s += dt; } }   // temps passé EN PARTIE
+  Object.assign(o, { last: now, g: m.g ? 1 : 0, m: String(m.m || '').slice(0, 24), np: Math.min(9, +m.np || 1), v: String(m.v || '').slice(0, 10), n: String(m.n || '').replace(/[<>&"'`]/g, '').slice(0, 16), user });
+  if (m.e === 'visit') {
+    d.v++; D.tot.v++; d.h[hourOf(now)]++;
+    if (uniqDay !== dayKey()) { uniqDay = dayKey(); uniqSet = new Set(); }
+    const hid = crypto.createHash('sha256').update(ip + uniqDay + (SECRET || '')).digest('hex').slice(0, 16);   // on ne garde jamais l'adresse IP
+    if (!uniqSet.has(hid)) { uniqSet.add(hid); d.u++; }
+  }
+  if (m.e === 'start') { d.g++; D.tot.g++; const md = o.m || '?'; d.m[md] = (d.m[md] || 0) + 1; if (k) { const A = D.acc[k] = D.acc[k] || { s: 0, g: 0, first: now }; A.g++; } }
+  if (k) D.acc[k].last = now;
+  d.p = Math.max(d.p, onlineNow());
+  STATS.save();
+}
+const ADMINS = () => String(process.env.ADMIN_USERS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+const adminFails = new Map();
+function adminData() {
+  const D = STATS.data, now = Date.now(); onlineNow(); statDay();
+  const days = Object.keys(D.days).sort().slice(-30).map(k => Object.assign({ d: k }, D.days[k]));
+  const H = new Array(24).fill(0); days.forEach(x => (x.h || []).forEach((v, i) => { H[i] += v; }));
+  const acc = Object.keys(accounts).map(k => { const a = accounts[k], st = D.acc[k] || {}, P = a.profile || {}; return { n: a.name, created: a.created || 0, last: st.last || 0, s: Math.round(st.s || 0), g: st.g || 0, days: (P.st || {}).days || 0, jetons: P.coins || 0, served: (P.st || {}).served || 0 }; });
+  const cos = Object.keys(SAVES.data).map(c => { const e = SAVES.data[c], x = e.d || {}; return { code: c, name: x.name || '?', day: x.day || 1, money: x.money || 0, rep: x.rep || 0, mach: (x.mach || []).length, t: e.t || 0, won: !!x.won }; });
+  return {
+    now, up: Math.round((now - T0) / 1000), storage: useGitHub ? 'GitHub' : 'fichier local', ready: { comptes: ACC.ready, sauvegardes: SAVES.ready, retours: FEED.ready, stats: STATS.ready },
+    mem: Math.round(process.memoryUsage().rss / 1048576),
+    online: [...online.entries()].map(([sid, o]) => ({ n: o.user || o.n || 'Anonyme', acc: !!o.user, g: o.g, m: o.m, np: o.np, v: o.v, since: o.t0, last: o.last })).sort((a, b) => b.g - a.g || a.since - b.since),
+    ws: clients.size, rooms: [...rooms.values()].map(r => ({ code: r.code, host: (clients.get(r.host) || {}).name || '?', n: r.players.length, names: r.players.map(id => (clients.get(id) || {}).name || '?'), state: r.state, priv: r.priv })),
+    today: D.days[dayKey()], days, hours: H, tot: Object.assign({ comptes: acc.length, entreprises: cos.length, retours: (FEED.data.list || []).length }, D.tot),
+    players: acc.sort((a, b) => b.s - a.s || b.last - a.last).slice(0, 200),
+    companies: cos.sort((a, b) => b.t - a.t).slice(0, 100),
+    retours: (FEED.data.list || []).slice(-8).reverse().map(x => ({ d: x.d, k: x.k, n: x.n, t: x.t.slice(0, 200) }))
+  };
+}
+function adminApi(req, m) {
+  const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(), now = Date.now();
+  const F = adminFails.get(ip) || { n: 0, t: now }; if (now - F.t > 600000) { F.n = 0; F.t = now; }
+  if (F.n >= 8) return { ok: false, m: 'Trop d\'essais : réessaie dans 10 minutes.' };
+  const L = ADMINS(); if (!L.length) return { ok: false, setup: 1, m: 'Aucun administrateur configuré. Dans Render → Environment, ajoute la variable ADMIN_USERS avec ton pseudo du jeu (plusieurs pseudos : séparés par des virgules), puis redémarre le service.' };
+  if (!m.tok && !m.user) return { ok: false, m: '' };
+  let k = null, token = null;
+  if (m.tok) { k = verify(String(m.tok)); token = m.tok; }
+  else { const u = String(m.user || '').trim().toLowerCase(), a = accounts[u]; if (a && hashPass(String(m.pass || ''), a.salt) === a.hash) { k = u; token = sign(u); } }
+  if (!k || !L.includes(k)) { if (!m.tok) { F.n++; adminFails.set(ip, F); } return { ok: false, m: k ? 'Ce compte n\'est pas administrateur.' : (m.tok ? 'Session expirée.' : (ACC.ready ? 'Pseudo ou mot de passe incorrect.' : 'Le serveur des comptes démarre, réessaie dans 30 s.')) }; }
+  return { ok: true, tok: token, me: accounts[k].name, data: adminData() };
+}
 
 /* ======================= Retours des joueurs (suggestions, bugs) ======================= */
 const FB_MAX = 3000;
@@ -198,7 +268,7 @@ function accountOp(m) {
       if (accounts[key]) return { ok: false, m: 'Ce pseudo est déjà pris.' };
       const salt = crypto.randomBytes(16).toString('hex');
       accounts[key] = { name: user, salt, hash: hashPass(String(m.pass), salt), created: Date.now(), profile: cleanProfile(m.profile, user) };
-      scheduleSave();
+      scheduleSave(); try { statDay().a++; STATS.save(); } catch (e) { /* stats facultatives */ }
       return { ok: true, token: sign(key), user, profile: accounts[key].profile };
     }
     case 'login': {
@@ -227,6 +297,18 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ ok: true, v: VERSION, rooms: rooms.size, players: clients.size, accounts: Object.keys(accounts).length, saves: Object.keys(SAVES.data).length, storage: useGitHub ? 'github' : 'fichier', ready: { comptes: ACC.ready, sauvegardes: SAVES.ready, retours: FEED.ready } }));
     return;
   }
+  if (url === '/api/hb' && req.method === 'OPTIONS') { res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type' }); res.end(); return; }
+  if ((url === '/api/hb' || url === '/admin/api') && req.method === 'POST') {           // V5.4 : statistiques + page admin
+    let body = ''; req.on('data', ch => { body += ch; if (body.length > 4000) req.destroy(); });
+    req.on('end', () => {
+      let m = {}; try { m = JSON.parse(body || '{}'); } catch (e) { /* vide */ }
+      let out = { ok: true };
+      try { if (url === '/api/hb') hb(req, m); else out = adminApi(req, m); } catch (e) { out = { ok: false, m: 'Erreur serveur.' }; console.warn('stats', e.message); }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(out));
+    });
+    return;
+  }
+  if (url === '/admin' || url === '/admin/') { fs.readFile(path.join(__dirname, 'admin.html'), (err, data) => { res.writeHead(err ? 500 : 200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }); res.end(err ? 'admin.html manquant' : data); }); return; }
   if (url === '/retours.txt') { res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end(fbText() || 'Aucun retour pour l\'instant.'); return; }
   if (url === '/retours') {
     const L = (FEED.data.list || []).slice().reverse();
@@ -347,6 +429,8 @@ wss.on('connection', ws => {
 setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; try { ws.ping(); } catch (e) { /* ignoré */ } } }, 15000);
 
 // V5.3 : Render arrête le serveur avec SIGTERM (mise en veille, redéploiement) : on écrit tout avant de partir
-for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { try { await Promise.race([Promise.all([ACC.flush(), SAVES.flush(), FEED.flush()]), new Promise(r => setTimeout(r, 8000))]); } finally { process.exit(0); } });
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { try { await Promise.race([Promise.all([ACC.flush(), SAVES.flush(), FEED.flush(), STATS.flush()]), new Promise(r => setTimeout(r, 8000))]); } finally { process.exit(0); } });
 accounts = ACC.data;                                                       // même objet pour toujours (les lectures fusionnent dedans)
-Promise.all([ACC.load(), SAVES.load(), FEED.load()]).then(() => { accounts = ACC.data; server.listen(PORT, () => console.log(`Mécanique Lebec V4 — serveur prêt : http://localhost:${PORT}/`)); });
+// V5.4 : on écoute TOUT DE SUITE (Render attend le port) ; les données arrivent derrière, les « ready » protègent les écritures
+server.listen(PORT, () => console.log(`Mécanique Lebec — serveur prêt : http://localhost:${PORT}/`));
+Promise.all([ACC.load(), SAVES.load(), FEED.load(), STATS.load()]).then(() => { accounts = ACC.data; });

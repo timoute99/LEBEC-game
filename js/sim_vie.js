@@ -113,7 +113,7 @@
   function bleuennStart() {
     const n = npcs.bleuenn; if (!n || n.active) return;
     visit('bleuenn', 2.3); K.say(n, ML.line('bleuenn'));
-    K.all('🧰 Bleuenn entre dans l\'atelier avec une rallonge et un drôle d\'appareil… (une claque l\'arrêterait peut-être ?)', 'warn');
+    K.all('🧰 Lean Manufacturing entre dans l\'atelier avec une rallonge et un drôle d\'appareil… (une claque l\'arrêterait peut-être ?)', 'warn');
     K.walkTo(n, PANEL.x - 1.1, PANEL.z, () => { n.state = 'bricole'; n.boomT = 4; n.faceYaw = Math.PI / 2; K.say(n, 'Juste un petit branchement…'); });
   }
   function boom(n) {
@@ -401,7 +401,7 @@
       K.say(n, 'Aïe ! Ça va, ça va, je m\'en vais !'); n.state = 'flee'; n.fleeT = 16; delete S.evs.johan; return true;
     }
     if (n.id === 'bleuenn' && (n.state === 'arrive' || n.state === 'bricole')) {
-      n.state = 'done'; K.all(`👋 ${name(by)} a empêché Bleuenn de brancher son engin : l'atelier est sauvé !`, 'good'); K.bonus(15, 'Explosion évitée', by);
+      n.state = 'done'; K.all(`👋 ${name(by)} a empêché Lean Manufacturing de brancher son engin : l'atelier est sauvé !`, 'good'); K.bonus(15, 'Explosion évitée', by);
       goAway(n, 'Bon, d\'accord, je range ma rallonge…'); return true;
     }
     return false;

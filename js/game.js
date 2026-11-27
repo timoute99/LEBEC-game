@@ -19,6 +19,7 @@
     Object.assign(G, { on: true, me: cfg.me, host: cfg.host, isHost: cfg.me === cfg.host, solo: !!cfg.solo, players: {}, S: null, ended: false, game, traitor: false, late: !!cfg.late,
       lastSnap: performance.now(), poseT: 0, fastT: 0, slowT: 0, cur: null, camMode: 'cab', sprayT: 0, fxT: 0, dryOnce: false, spillT: 0, auraT: 0, power: true, endShown: false, saveT: 60 });
     cfg.players.forEach(p => { G.players[p.id] = p; });
+    if (ML.Stats) setTimeout(() => { if (G.on) ML.Stats.ping(G.isHost ? 'start' : 'hb'); }, 800);   // V5.4 : une partie lancée (comptée une fois, par l'hôte)
     if (!game.E) game.E = ML.Company.fresh('', game.mode === 'course' ? 0 : ML.ECO.freeMoney);
     ML.World.build(game.city || cfg.seed, game.E.up || {}, game.E.mach, { day: game.E.day || game.day || 1 });
     G.ledger = []; G.jailUntil = 0; G.wx = null;

@@ -912,7 +912,7 @@ refoule:
 - Toi, Johan, tu fais demi-tour.
 
 [bleuenn]
-nom: Bleuenn
+nom: Lean Manufacturing
 rôle: Bricoleuse explosive
 personnalité: Arrive avec une rallonge et un appareil bizarre, le branche sur le tableau électrique… et tout saute.
 dans le jeu: BOUM : plus de courant, toutes les machines en arrêt d'urgence (E sur chacune). Une claque avant le branchement l'arrête.
