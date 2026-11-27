@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Admin — Mécanique Lebec</title>
+<title>Admin & retours — Mécanique Lebec</title>
 <style>
   :root { --bg: #10131b; --card: #1a1f2b; --line: #2b3242; --tx: #e8ebf2; --dim: #8d97ab; --or: #ff9f1a; --ok: #5ee08a; --bl: #4ea3ff; --rd: #ff6b6b; }
   * { box-sizing: border-box; }
@@ -54,12 +54,29 @@
   .fb { border-bottom: 1px solid #222838; padding: 7px 0; font-size: 14px; }
   .fb:last-child { border-bottom: none; }
   a { color: var(--bl); }
+  nav { display: flex; gap: 6px; }
+  nav button { background: transparent; color: var(--dim); border: 1px solid var(--line); font-weight: 700; }
+  nav button.on { background: var(--or); color: #111; border-color: var(--or); }
+  nav .nb { background: var(--rd); color: #fff; border-radius: 9px; padding: 0 6px; font-size: 11px; margin-left: 4px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .bar .search { flex: 1; min-width: 200px; margin: 0; }
+  .chip { background: #2a3142; color: var(--tx); font-weight: 600; padding: 6px 12px; }
+  .chip.on { background: var(--bl); color: #fff; }
+  .fbi { display: flex; gap: 12px; padding: 12px 4px; border-bottom: 1px solid #222838; }
+  .fbi:last-child { border-bottom: none; }
+  .fbi.done { opacity: .5; }
+  .fbi .tx { flex: 1; white-space: pre-wrap; word-break: break-word; }
+  .fbi .meta { font-size: 12px; color: var(--dim); margin-bottom: 4px; }
+  .fbi .acts { display: flex; flex-direction: column; gap: 6px; }
+  .fbi .acts button { padding: 5px 10px; font-size: 12px; }
+  .del { background: #3a2026; color: #ff9b9b; }
 </style>
 </head>
 <body>
 <header>
   <h1>⚙️ MÉCANIQUE <b>LEBEC</b> · Admin</h1>
   <span class="sp"></span>
+  <nav class="hidden" id="nav"><button data-v="dash" class="on">📊 Tableau de bord</button><button data-v="retours">💬 Retours <span class="nb hidden" id="nbr"></span></button></nav>
   <small id="hd"></small>
   <button class="g hidden" id="refresh">↻ Actualiser</button>
   <button class="g hidden" id="out">Se déconnecter</button>
@@ -77,6 +94,18 @@
 </div>
 
 <main id="app" class="hidden">
+ <section id="v-retours" class="hidden">
+  <div class="card">
+    <h2>💬 Retours des joueurs <span class="tag" id="fbcount"></span></h2>
+    <div class="bar">
+      <button class="chip on" data-f="todo">À traiter</button><button class="chip" data-f="all">Tous</button><button class="chip" data-f="bug">🐞 Bugs</button><button class="chip" data-f="idee">💡 Idées</button><button class="chip" data-f="done">✔ Traités</button>
+      <input class="search" id="q-fb" placeholder="Chercher dans les retours (texte, pseudo, version)…">
+      <button class="g" id="dl">⬇ Télécharger (.txt)</button>
+    </div>
+    <div id="fblist"></div>
+  </div>
+ </section>
+ <section id="v-dash">
   <div class="grid k4" id="kpis"></div>
   <div class="grid k2" style="margin-top:14px">
     <div class="card"><h2><span class="live"></span> En ligne maintenant <span id="onc" class="tag g"></span></h2><div class="scroll"><table id="online"></table></div></div>
@@ -95,9 +124,10 @@
     <div class="card"><h2>🏭 Entreprises (campagnes)</h2><input class="search" id="q-co" placeholder="Chercher une entreprise ou un code…"><div class="scroll"><table id="cos"></table></div></div>
   </div>
   <div class="grid k2" style="margin-top:14px">
-    <div class="card"><h2>💬 Derniers retours des joueurs</h2><div id="fb"></div><p style="margin-bottom:0"><a href="/retours" target="_blank">Tous les retours →</a></p></div>
+    <div class="card"><h2>💬 Retours à traiter</h2><div id="fb"></div><p style="margin-bottom:0"><a href="#retours">Tous les retours →</a></p></div>
     <div class="card"><h2>🖥 Serveur</h2><table id="srv"></table></div>
   </div>
+  </section>
   <p class="dim" style="text-align:center;font-size:12px">Les adresses IP ne sont jamais enregistrées (les visiteurs uniques sont comptés avec une empreinte qui change chaque jour). Actualisation automatique toutes les 15 s.</p>
 </main>
 
@@ -109,7 +139,11 @@
   const ago = t => { if (!t) return '—'; const s = (Date.now() - t) / 1000; if (s < 60) return 'à l\'instant'; if (s < 3600) return 'il y a ' + Math.round(s / 60) + ' min'; if (s < 86400) return 'il y a ' + Math.round(s / 3600) + ' h'; const d = Math.round(s / 86400); return 'il y a ' + d + ' j'; };
   const eur = v => Math.round(v || 0).toLocaleString('fr-FR') + ' €';
   const num = v => Math.round(v || 0).toLocaleString('fr-FR');
-  let tok = localStorage.getItem('ml_admin') || '', D = null, timer = null;
+  let tok = localStorage.getItem('ml_admin') || '', D = null, timer = null, FF = 'todo';
+  const view = () => (location.hash === '#retours' ? 'retours' : 'dash');
+  function showView() { const v = view(); $('v-retours').classList.toggle('hidden', v !== 'retours'); $('v-dash').classList.toggle('hidden', v !== 'dash'); document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); }
+  window.addEventListener('hashchange', showView);
+  document.querySelectorAll('nav button').forEach(b => { b.onclick = () => { location.hash = b.dataset.v === 'retours' ? 'retours' : ''; showView(); }; });
 
   async function api(body) {
     const r = await fetch('/admin/api', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
@@ -119,12 +153,12 @@
     let r; try { r = await api(body || { tok }); } catch (e) { $('lerr').textContent = 'Serveur injoignable (il se réveille peut-être : réessaie dans 30 s).'; showLogin(); return; }
     if (!r.ok) { if (body) $('lerr').textContent = r.m; else { tok = ''; localStorage.removeItem('ml_admin'); $('lerr').textContent = r.setup ? r.m : ''; } showLogin(); return; }
     tok = r.tok; localStorage.setItem('ml_admin', tok); D = r.data;
-    $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('out').classList.remove('hidden'); $('refresh').classList.remove('hidden');
+    $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('out').classList.remove('hidden'); $('refresh').classList.remove('hidden'); $('nav').classList.remove('hidden'); showView();
     $('hd').textContent = 'Connecté : ' + r.me + ' · mis à jour ' + new Date().toLocaleTimeString('fr-FR');
     render();
     clearTimeout(timer); timer = setTimeout(() => load(), 15000);
   }
-  function showLogin() { clearTimeout(timer); $('app').classList.add('hidden'); $('login').classList.remove('hidden'); $('out').classList.add('hidden'); $('refresh').classList.add('hidden'); }
+  function showLogin() { clearTimeout(timer); $('nav').classList.add('hidden'); $('app').classList.add('hidden'); $('login').classList.remove('hidden'); $('out').classList.add('hidden'); $('refresh').classList.add('hidden'); }
 
   function bars(el, vals, labels, opt = {}) {
     const max = Math.max(1, ...vals, ...(opt.second || [0]));
@@ -158,7 +192,9 @@
     const ML = Object.entries(M).sort((a, b) => b[1] - a[1]), mt = ML.reduce((a, x) => a + x[1], 0);
     $('modes').innerHTML = ML.length ? '<tr><th>Mode</th><th class="n">Parties</th><th class="n">%</th></tr>' + ML.map(([m, n]) => `<tr><td>${esc(m)}</td><td class="n">${num(n)}</td><td class="n">${Math.round(n / mt * 100)} %</td></tr>`).join('') : '<tr><td class="dim">Pas encore de partie enregistrée.</td></tr>';
     renderPlayers(); renderCos();
-    $('fb').innerHTML = (D.retours || []).map(x => `<div class="fb"><span class="tag ${x.k === 'bug' ? 'o' : 'g'}">${x.k === 'bug' ? '🐞 bug' : '💡 idée'}</span> <b>${esc(x.n)}</b> <span class="dim">${esc(x.d)}</span><br>${esc(x.t)}</div>`).join('') || '<span class="dim">Aucun retour.</span>';
+    renderFb();
+    const todo = (D.retours || []).filter(x => !x.done); $('nbr').textContent = todo.length; $('nbr').classList.toggle('hidden', !todo.length);
+    $('fb').innerHTML = todo.slice(0, 6).map(x => `<div class="fb"><span class="tag ${x.k === 'bug' ? 'o' : 'g'}">${x.k === 'bug' ? '🐞 bug' : '💡 idée'}</span> <b>${esc(x.n)}</b> <span class="dim">${esc(x.d)}</span><br>${esc(x.t.length > 220 ? x.t.slice(0, 220) + '…' : x.t)}</div>`).join('') || '<span class="dim">Rien à traiter 🎉</span>';
     const R = D.ready || {};
     $('srv').innerHTML = [
       ['Allumé depuis', fmtDur(D.up)], ['Stockage', D.storage], ['Mémoire', D.mem + ' Mo'],
@@ -176,6 +212,21 @@
     $('cos').innerHTML = '<tr><th>Entreprise</th><th class="n">Jour</th><th class="n">Argent</th><th class="n">Machines</th><th class="n">Sauvée</th></tr>' +
       L.map(c => `<tr><td>${c.won ? '🏆 ' : ''}${esc(c.name)} <span class="dim">${esc(c.code)}</span></td><td class="n">${c.day}</td><td class="n">${eur(c.money)}</td><td class="n">${c.mach}</td><td class="n">${ago(c.t)}</td></tr>`).join('');
   }
+  function renderFb() {
+    const q = $('q-fb').value.trim().toLowerCase(), all = D.retours || [];
+    const L = all.filter(x => (FF === 'all' || (FF === 'todo' && !x.done) || (FF === 'done' && x.done) || x.k === FF) && (!q || (x.t + ' ' + x.n + ' ' + x.v + ' ' + x.w).toLowerCase().includes(q)));
+    $('fbcount').textContent = `${L.length} affiché(s) · ${all.filter(x => !x.done).length} à traiter · ${all.length} au total`;
+    $('fblist').innerHTML = L.map(x => `<div class="fbi ${x.done ? 'done' : ''}"><div><span class="tag ${x.k === 'bug' ? 'o' : 'g'}">${x.k === 'bug' ? '🐞 bug' : '💡 idée'}</span></div>
+      <div class="tx"><div class="meta"><b>${esc(x.n)}</b> · ${esc(x.d)}${x.v ? ' · ' + esc(x.v) : ''}${x.w ? ' · ' + esc(x.w) : ''} · n°${x.id}</div>${esc(x.t)}</div>
+      <div class="acts"><button class="g" data-fb="fbdone" data-id="${x.id}">${x.done ? '↩ À refaire' : '✔ Traité'}</button><button class="del" data-fb="fbdel" data-id="${x.id}">🗑 Supprimer</button></div></div>`).join('') || '<p class="dim">Aucun retour ici.</p>';
+  }
+  $('fblist').onclick = e => { const b = e.target.closest('[data-fb]'); if (!b) return; if (b.dataset.fb === 'fbdel' && !confirm('Supprimer définitivement ce retour ?')) return; load({ tok, op: b.dataset.fb, id: +b.dataset.id }); };
+  document.querySelectorAll('.chip').forEach(c => { c.onclick = () => { FF = c.dataset.f; document.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === c)); renderFb(); }; });
+  $('q-fb').oninput = renderFb;
+  $('dl').onclick = () => {
+    const txt = (D.retours || []).map(x => `[${x.d}] ${x.k === 'bug' ? 'BUG' : 'IDÉE'}${x.done ? ' (traité)' : ''} — ${x.n} (${x.v || '?'}${x.w ? ', ' + x.w : ''})\n${x.t}\n`).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain;charset=utf-8' })); a.download = 'retours-lebec-' + new Date().toISOString().slice(0, 10) + '.txt'; a.click();
+  };
   $('q-pl').oninput = renderPlayers; $('q-co').oninput = renderCos;
   $('lf').onsubmit = e => { e.preventDefault(); $('lerr').textContent = '…'; load({ user: $('lu').value, pass: $('lp').value }); };
   $('out').onclick = () => { tok = ''; localStorage.removeItem('ml_admin'); showLogin(); };

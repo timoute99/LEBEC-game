@@ -27,7 +27,7 @@
 //     → {t:'campr', q, ok, m?, code?, data?}
 //   {t:'fb', q, kind:'idee'|'bug', text, name, ver, where}   (V5.1 : suggestions / bugs des joueurs)
 //     → {t:'fbr', q, ok, m?}        {t:'fblist', q} → {t:'fbr', q, ok, list}
-//   Lecture des retours : https://<serveur>/retours (page) ou /retours.txt (fichier texte).
+//   Lecture des retours : dans la page admin (onglet Retours) — /retours redirige vers /admin#retours.
 // 5) STATISTIQUES + PAGE ADMIN (V5.4) : le jeu envoie un petit « battement » POST /api/hb
 //    (visite, en jeu ou au menu, mode) toutes les 45 s. Page https://<serveur>/admin :
 //    connexion avec un compte du jeu dont le pseudo est dans la variable ADMIN_USERS
@@ -178,7 +178,7 @@ function adminData() {
     today: D.days[dayKey()], days, hours: H, tot: Object.assign({ comptes: acc.length, entreprises: cos.length, retours: (FEED.data.list || []).length }, D.tot),
     players: acc.sort((a, b) => b.s - a.s || b.last - a.last).slice(0, 200),
     companies: cos.sort((a, b) => b.t - a.t).slice(0, 100),
-    retours: (FEED.data.list || []).slice(-8).reverse().map(x => ({ d: x.d, k: x.k, n: x.n, t: x.t.slice(0, 200) }))
+    retours: fbIds().slice(-500).reverse().map(x => ({ id: x.id, d: x.d, k: x.k, n: x.n, t: x.t, v: x.v || '', w: x.w || '', done: !!x.done }))
   };
 }
 function adminApi(req, m) {
@@ -191,6 +191,11 @@ function adminApi(req, m) {
   if (m.tok) { k = verify(String(m.tok)); token = m.tok; }
   else { const u = String(m.user || '').trim().toLowerCase(), a = accounts[u]; if (a && hashPass(String(m.pass || ''), a.salt) === a.hash) { k = u; token = sign(u); } }
   if (!k || !L.includes(k)) { if (!m.tok) { F.n++; adminFails.set(ip, F); } return { ok: false, m: k ? 'Ce compte n\'est pas administrateur.' : (m.tok ? 'Session expirée.' : (ACC.ready ? 'Pseudo ou mot de passe incorrect.' : 'Le serveur des comptes démarre, réessaie dans 30 s.')) }; }
+  // V5.4 : actions sur les retours (traité / à refaire / supprimer)
+  if (m.op === 'fbdone' || m.op === 'fbdel') {
+    const L = fbIds(), i = L.findIndex(x => x.id === +m.id);
+    if (i >= 0) { if (m.op === 'fbdel') L.splice(i, 1); else L[i].done = !L[i].done; FEED.save(); }
+  }
   return { ok: true, tok: token, me: accounts[k].name, data: adminData() };
 }
 
@@ -199,17 +204,18 @@ const FB_MAX = 3000;
 function fbOp(c, m) {
   if (!Array.isArray(FEED.data.list)) FEED.data.list = [];
   const L = FEED.data.list;
-  if (m.op === 'list') return { ok: true, list: L.slice(-40).reverse().map(x => ({ d: x.d, k: x.k, n: x.n, t: x.t.slice(0, 300), v: x.v })) };
+  if (m.op === 'list') return { ok: true, list: L.slice(-40).reverse().map(x => ({ d: x.d, k: x.k, n: x.n, t: x.t.slice(0, 300), v: x.v, done: !!x.done })) };
   const now = Date.now(); if (c.fbT && now - c.fbT < 15000) return { ok: false, m: 'Doucement : un message toutes les 15 secondes.' };
   const text = String(m.text || '').replace(/\r/g, '').trim().slice(0, 1500);
   if (text.length < 5) return { ok: false, m: 'Écris au moins quelques mots.' };
   c.fbT = now;
-  L.push({ d: new Date(now).toISOString().slice(0, 16).replace('T', ' '), k: m.kind === 'bug' ? 'bug' : 'idee', n: cleanName(m.name || c.name), t: text, v: String(m.ver || '').slice(0, 10), w: String(m.where || '').slice(0, 40) });
+  L.push({ id: fbId(), d: new Date(now).toISOString().slice(0, 16).replace('T', ' '), k: m.kind === 'bug' ? 'bug' : 'idee', n: cleanName(m.name || c.name), t: text, v: String(m.ver || '').slice(0, 10), w: String(m.where || '').slice(0, 40) });
   if (L.length > FB_MAX) L.splice(0, L.length - FB_MAX);
   FEED.save(); return { ok: true };
 }
-const fbText = () => (FEED.data.list || []).slice().reverse().map(x => `[${x.d}] ${x.k === 'bug' ? '🐞 BUG' : '💡 IDÉE'} — ${x.n} (${x.v || '?'}${x.w ? ', ' + x.w : ''})\n${x.t}\n`).join('\n');
-const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+const fbId = () => { const L = FEED.data.list || []; let mx = 0; for (const x of L) if (x.id > mx) mx = x.id; return mx + 1; };
+// V5.4 : chaque retour a un numéro (les anciens en reçoivent un à la première lecture admin)
+function fbIds() { const L = FEED.data.list || []; let mx = 0, ch = false; for (const x of L) if (x.id > mx) mx = x.id; for (const x of L) if (!x.id) { x.id = ++mx; ch = true; } if (ch) FEED.save(); return L; }
 let accounts = {};               // clé = pseudo en minuscules (= ACC.data)
 const scheduleSave = () => ACC.save();
 
@@ -326,13 +332,7 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url === '/admin' || url === '/admin/') { fs.readFile(path.join(__dirname, 'admin.html'), (err, data) => { res.writeHead(err ? 500 : 200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }); res.end(err ? 'admin.html manquant' : data); }); return; }
-  if (url === '/retours.txt') { res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end(fbText() || 'Aucun retour pour l\'instant.'); return; }
-  if (url === '/retours') {
-    const L = (FEED.data.list || []).slice().reverse();
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Retours des joueurs — Mécanique Lebec</title><style>body{font-family:Arial,sans-serif;background:#12141c;color:#eee;max-width:900px;margin:auto;padding:20px}h1{color:#ffd257}.r{background:#1d2130;border-radius:10px;padding:10px 14px;margin:10px 0;border-left:5px solid #74b9ff}.r.bug{border-color:#ff6b6b}.m{color:#99a;font-size:13px}pre{white-space:pre-wrap;font-family:inherit;margin:6px 0 0}</style></head><body><h1>Retours des joueurs (${L.length})</h1><p class="m">💡 suggestions · 🐞 bugs — <a style="color:#74b9ff" href="/retours.txt">version texte</a></p>${L.map(x => `<div class="r ${x.k}"><div class="m">${x.k === 'bug' ? '🐞 BUG' : '💡 IDÉE'} — <b>${esc(x.n)}</b> — ${esc(x.d)} — ${esc(x.v || '')} ${esc(x.w || '')}</div><pre>${esc(x.t)}</pre></div>`).join('') || '<p>Aucun retour pour l\'instant.</p>'}</body></html>`);
-    return;
-  }
+  if (url === '/retours' || url === '/retours/' || url === '/retours.txt') { res.writeHead(302, { Location: '/admin#retours' }); res.end(); return; }   // V5.4 : réunis dans la page admin
   const file = path.normalize(path.join(ROOT, url === '/' ? 'index.html' : url));
   if (!file.startsWith(ROOT) || file.startsWith(__dirname)) { res.writeHead(403); res.end(); return; }
   fs.readFile(file, (err, data) => {

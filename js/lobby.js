@@ -397,7 +397,7 @@
     $('fb-list').textContent = 'Chargement…';
     if (!(await L.ensure())) { $('fb-list').textContent = 'Serveur injoignable.'; return; }
     const r = await N.fb('list');
-    $('fb-list').innerHTML = r.ok && r.list.length ? r.list.map(x => `<div class="f ${x.k}">${x.k === 'bug' ? '🐞' : '💡'} <b>${U.esc(x.n)}</b> <span class="dim">${U.esc(x.d)}</span><br>${U.esc(x.t)}</div>`).join('') : (r.ok ? 'Aucun message pour l\'instant : sois le premier !' : U.esc(r.m || ''));
+    $('fb-list').innerHTML = r.ok && r.list.length ? r.list.map(x => `<div class="f ${x.k}">${x.k === 'bug' ? '🐞' : '💡'} <b>${U.esc(x.n)}</b> <span class="dim">${U.esc(x.d)}</span>${x.done ? ' <span class="ok">✅ pris en compte</span>' : ''}<br>${U.esc(x.t)}</div>`).join('') : (r.ok ? 'Aucun message pour l\'instant : sois le premier !' : U.esc(r.m || ''));
   };
   /** V5 : en pleine partie (menu Pause) — changer de perso, ou revenir au menu principal */
   L.inGameProfile = () => { L.ingame = true; ML.ui.modal = 'profile'; ML.Input.unlock(); ML.HUD.showPause(false); L.el.classList.add('ingame'); L.show(); L.screen('scr-profile'); L.renderProfile(); };

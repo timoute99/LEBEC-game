@@ -3,9 +3,16 @@
    menu Pause). La plus récente en haut. Une version = un titre + une
    liste de lignes courtes, écrites pour les joueurs.
    Les suggestions et bugs envoyés depuis cette page arrivent sur le
-   serveur : https://lebec-game.onrender.com/retours (et /retours.txt).
+   serveur : page admin https://lebec-game.onrender.com/admin, onglet Retours.
    ===================================================================== */
 ML.PATCH = [
+  { v: 'V5.5', d: 'novembre 2026', t: 'Bruts de fonderie et mécano-soudé enfin évidents', l: [
+    '🧱 Sur le PC, un grand encadré orange « BRUTS À ACHETER » (dans 📥 Commandes et 🛒 Fournisseurs) : un bouton « 🛒 Commander » par pièce, le prix, où il arrive, et le compte à rebours de la livraison.',
+    '✅ Les demandes de fonderie / mécano-soudé ont un bouton « Accepter + commander le brut » : un seul clic.',
+    '📍 Un bouton GPS pour aller acheter le brut moins cher directement chez Fonderie Boulard ou Babinsky.',
+    '🧱 L\'icône Fournisseurs du bureau montre combien de bruts sont à commander.',
+    '💬 Les retours des joueurs sont dans la page admin (onglet Retours : filtres, recherche, « traité », téléchargement). Dans le jeu, un retour traité affiche « ✅ pris en compte ».'
+  ] },
   { v: 'V5.4', d: 'novembre 2026', t: 'Page admin, Lean Manufacturing, journées de 8 min', l: [
     '📊 Nouvelle page ADMIN (/admin) : joueurs connectés en direct, visites et visiteurs uniques, temps de jeu par jour et par joueur, parties par mode, heures de pointe, entreprises, retours.',
     '💣 Bleuenn s\'appelle maintenant LEAN MANUFACTURING (et bricole toujours n\'importe quoi sur le tableau électrique).',

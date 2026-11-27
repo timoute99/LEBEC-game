@@ -17,7 +17,7 @@
   /* V5.3 : LebecOS — un vrai bureau d'ordinateur : icônes d'applications, fenêtre, barre des tâches, menu Démarrer */
   const APPS = [
     ['cmd', '📥', 'Commandes', 'Accepte les demandes des clients, suis tes commandes, commande les bruts de fonderie et de mécano-soudé.'],
-    ['sup', '🛒', 'Fournisseurs', 'Barres de matière et outils coupants, livrés par camion à la réception.'],
+    ['sup', '🛒', 'Fournisseurs', 'Barres de matière, outils coupants… et les bruts de fonderie / mécano-soudé à acheter.'],
     ['shop', '🏭', 'Boutique Atelier', 'Machines, agrandissement, fenwick, poste de préparation, confort, abonnements.'],
     ['rh', '👷', 'Personnel', 'Embauche des opérateurs pour les machines, des apprentis, un cariste, un livreur.'],
     ['bil', '📊', 'Bilan', 'L\'argent de la journée, la réputation, l\'objectif.'],
@@ -48,6 +48,8 @@
       if (a === 'hfilter') { E.hf = b.dataset.k; E.render(true); return; }
       if (a === 'close') return E.close();
       if (a === 'arexis') { E.close(); ML.Mini.run('arexis', {}, r => { if (r === 'ok') G.intent({ a: 'use', id: 'pc', mg: 'ok' }); }); return; }
+      if (a === 'acceptsub') { G.intent({ a: 'erp', op: 'accept', id: b.dataset.id }); G.intent({ a: 'erp', op: 'subpc', id: b.dataset.id }); ML.Sfx.play('cash'); setTimeout(() => E.render(true), 150); return; }   // V5.4
+      if (a === 'gps') { const L = ML.LOC.comp[b.dataset.k]; if (L) { ML.GPS.set(L.dock.x, L.dock.z); ML.HUD.notify(`📍 GPS réglé sur ${COMP[b.dataset.k].name} (suis le trait au sol, M = carte).`, 'info'); } return; }
       if (a === 'part') { G.intent({ a: 'part', id: b.dataset.id, ok: +b.dataset.ok }); ML.Sfx.play('bip'); return; }
       // panier (côté joueur) : plus, moins, supprimer, vider, tout commander
       if (['cplus', 'cminus', 'cdel', 'cclear', 'corder'].includes(a)) {
@@ -100,7 +102,8 @@
     const G = ML.Game, S = G.S; if (!S) return;
     const nProps = S.props.length + S.parts.filter(p => p.st === 'wait').length, app = APPS.find(a => a[0] === E.tab);
     const clock = '<span class="dyn" data-k="c" data-v="0"></span>';
-    const icons = APPS.map(([k, ic, n]) => `<button class="os-ico ${E.tab === k ? 'on' : ''}" data-act="tab" data-t="${k}"><i>${ic}</i><span>${n}</span>${k === 'cmd' && nProps ? `<b class="badge">${nProps}</b>` : ''}</button>`).join('') +
+    const nBrut = S.orders.filter(o => !o.q && ['fonderie', 'chaudro'].includes(o.steps[o.si])).length;
+    const icons = APPS.map(([k, ic, n]) => `<button class="os-ico ${E.tab === k ? 'on' : ''}" data-act="tab" data-t="${k}"><i>${ic}</i><span>${n}</span>${k === 'cmd' && nProps ? `<b class="badge">${nProps}</b>` : ''}${k === 'sup' && nBrut ? `<b class="badge" title="bruts à commander">🧱${nBrut}</b>` : ''}</button>`).join('') +
       (S.evs && S.evs.fred ? '<button class="os-ico hot" data-act="arexis"><i>💼</i><span>ARÉXIS</span><b class="badge">!</b></button>' : '') +
       '<button class="os-ico" data-act="trash"><i>🗑</i><span>Corbeille</span></button>';
     const T2 = todo(S);
@@ -126,14 +129,36 @@
   const steps = (o, si) => o.steps.map((s, i) => `<span class="${si !== undefined && i < si ? 'done' : si === i ? 'cur' : ''}">${STEP_ICON[s]}</span>`).join('<i>›</i>');
   const who = o => (o.client === 'part' ? `🙋 ${ML.PEOPLE[o.who].name} (comptoir)` : COMP[o.client].name);
 
+  /* V5.4 : les bruts de fonderie / mécano-soudé — un encadré clair, dans Commandes ET dans Fournisseurs */
+  const BICON = { fonderie: '🔥', chaudro: '⚙️' }, BNAME = { fonderie: 'de FONDERIE (fonte)', chaudro: 'MÉCANO-SOUDÉE' };
+  function brutBox(S) {
+    const L = S.orders.filter(o => { const st = o.steps[o.si]; return st === 'fonderie' || st === 'chaudro'; });
+    if (!L.length) return '';
+    let h = '<div class="brutbox"><div class="bb-h">🧱 BRUTS À ACHETER <span>pièces de fonderie et mécano-soudées : elles ne partent pas d\'une barre du rack</span></div>';
+    for (const o of L) {
+      const st = o.steps[o.si], d = S.deliv.find(x => x.oid === o.id), pc = ML.ECO.subPC[st], dir = ML.ECO.sub[st];
+      h += `<div class="bb-row ${o.q ? 'done' : ''}"><div class="bb-ic">${BICON[st]}</div><div class="bb-tx"><b>#${o.id} ${U.esc(o.part)}</b> <span class="dim">· ${U.esc(who(o))}</span><br>`;
+      if (!o.q) h += `Brut ${BNAME[st]} à commander.</div><div class="bb-act"><button class="big" data-act="subpc" data-id="${o.id}" ${S.money < pc ? 'disabled' : ''}>🛒 Commander : ${eur(pc)}</button><span class="small">livré à la <b>RÉCEPTION</b> de l'atelier (~2 min)</span>
+          <span class="small dim">ou ${eur(dir)} en allant payer ${COMP[st].name} sur place <button class="mini" data-act="gps" data-k="${st}">📍 GPS</button></span></div>`;
+      else if (d) h += `🚚 En route : arrive à la <b>RÉCEPTION</b> dans <b>${T(d.eta)}</b>. Ensuite : prends-le (E) → machine → outil.</div><div class="bb-act"><span class="ok">✔ commandé</span></div>`;
+      else h += `🏭 En fabrication chez ${COMP[st].name} : il sortira sur <b>son quai</b>.</div><div class="bb-act"><button class="mini" data-act="gps" data-k="${st}">📍 GPS</button></div>`;
+      h += '</div>';
+    }
+    return h + '</div>';
+  }
   function tabCmd(S) {
     let h = '<h3>📥 Demandes des clients</h3>';
     const waiting = S.parts.filter(p => p.st === 'wait');
     if (!S.props.length && !waiting.length) h += `<p class="dim">Aucune demande pour l'instant.${S.up.erp_auto ? ' (ERP+ : elles sont acceptées automatiquement.)' : ' Elles arrivent ici : accepte-les avant qu\'elles expirent !'}</p>`;
     for (const p of waiting) h += `<div class="erp-row part"><div><b>🙋 ${U.esc(ML.PEOPLE[p.id].name)}</b> attend au COMPTOIR : <b>${U.esc(p.part)}</b> ${chips(p)} — à faire en ${Math.round(p.dur)} s</div>
       <div class="erp-act"><b class="price">${eur(p.price)}</b><span class="dim">part dans ${T(p.exp)}</span><button data-act="part" data-id="${p.id}" data-ok="1">Accepter</button><button class="sec" data-act="part" data-id="${p.id}" data-ok="0">Refuser</button></div></div>`;
-    for (const p of S.props) h += `<div class="erp-row"><div><b>${U.esc(COMP[p.client].name)}</b> : ${U.esc(p.part)} ${chips(p)} <span class="steps">${steps(p)}</span> — délai ${Math.round(p.dur)} s</div>
-      <div class="erp-act"><b class="price">${eur(p.price)}</b><span class="dim">expire dans ${T(p.exp)}</span><button data-act="accept" data-id="${p.id}">Accepter</button><button class="sec" data-act="refuse" data-id="${p.id}">Refuser</button></div></div>`;
+    for (const p of S.props) {
+      const sp = p.src && (p.src === 'fonderie' || p.src === 'chaudro') ? p.src : null, bp = sp && ML.ECO.subPC[sp];
+      h += `<div class="erp-row ${sp ? 'brutrow' : ''}"><div><b>${U.esc(COMP[p.client].name)}</b> : ${U.esc(p.part)} ${chips(p)} <span class="steps">${steps(p)}</span> — délai ${Math.round(p.dur)} s
+        ${sp ? `<div class="brutnote">${BICON[sp]} Pièce ${BNAME[sp]} : pas de barre du rack, il faut <b>acheter le brut</b> (${eur(bp)}, livré à l'atelier).</div>` : ''}</div>
+      <div class="erp-act"><b class="price">${eur(p.price)}</b><span class="dim">expire dans ${T(p.exp)}</span>${sp ? `<button class="big" data-act="acceptsub" data-id="${p.id}" ${S.money < bp ? 'disabled' : ''}>✅ Accepter + commander le brut (${eur(bp)})</button><button class="sec" data-act="accept" data-id="${p.id}">Accepter seulement</button>` : `<button data-act="accept" data-id="${p.id}">Accepter</button>`}<button class="sec" data-act="refuse" data-id="${p.id}">Refuser</button></div></div>`;
+    }
+    h += brutBox(S);
     h += `<h3>📋 Commandes acceptées (${S.orders.length})</h3>`;
     if (!S.orders.length) h += '<p class="dim">Aucune commande en cours.</p>';
     const mids = ML.MACHINE_ORDER.filter(id => S.machines[id]);
@@ -142,11 +167,11 @@
       let now = '';
       if (st === 'usinage') {
         const M = o.m && S.machines[o.m];
-        now = M && M.job ? `en cours sur <b>${o.m}</b> : ${M.job.tool ? PC(o.m) : 'attend ' + ML.TOOLS[M.job.need].label}` : o.src ? 'brut en réception → à mettre sur une machine' : `brut ${ML.MATERIALS[o.mat].label} → ${ML.MTYPE[o.mtype]}`;
+        now = M && M.job ? `en cours sur <b>${o.m}</b> : ${M.job.tool ? PC(o.m) : 'attend ' + ML.TOOLS[M.job.need].label}` : o.src ? '📦 brut arrivé (en RÉCEPTION, ou sur le quai du fournisseur si acheté sur place) → prends-le (E) et mets-le dans une machine' : `brut ${ML.MATERIALS[o.mat].label} → ${ML.MTYPE[o.mtype]}`;
         if (!o.m) now += ` · machine prévue : ${mids.filter(id => ML.MACHINES.find(m => m.id === id).type === o.mtype).map(id => `<button class="mini ${o.plan === id ? 'on' : ''}" data-act="plan" data-id="${o.id}" data-mid="${o.plan === id ? '' : id}">${id}</button>`).join('')}`;
       } else if (st === 'fonderie' || st === 'chaudro') {
         const d = S.deliv.find(x => x.oid === o.id);
-        now = o.q ? (d ? `brut commandé : livraison dans ${T(d.eta)}` : `brut en cours chez ${COMP[st].name}…`) : `brut à commander : <button class="mini" data-act="subpc" data-id="${o.id}">Commander au PC (${ML.ECO.subPC[st]} €, livré ~2 min)</button> <span class="dim">ou en direct chez ${COMP[st].name} (${ML.ECO.sub[st]} €)</span>`;
+        now = o.q ? (d ? `🚚 brut en route : à la RÉCEPTION dans ${T(d.eta)}` : `brut en cours chez ${COMP[st].name}…`) : `⚠️ brut à commander (voir en haut) : <button class="mini" data-act="subpc" data-id="${o.id}">Commander au PC (${ML.ECO.subPC[st]} €, livré ~2 min)</button> <span class="dim">ou en direct chez ${COMP[st].name} (${ML.ECO.sub[st]} €)</span>`;
       } else if (st === 'tth') now = o.q ? 'au four chez TTH Ouest…' : `caisse → TTH Ouest (${ML.ECO.sub.tth} €)`;
       else now = o.client === 'part' ? 'à rapporter au COMPTOIR' : `à livrer chez ${COMP[o.client].name}`;
       h += `<div class="erp-row ${urgent ? 'urgent' : ''}"><div><b>#${o.id}</b> ${U.esc(who(o))} : ${U.esc(o.part)} ${chips(o)} <span class="steps">${steps(o, o.si)}</span><br><span class="small">${now}</span></div>
@@ -197,7 +222,7 @@
     const sp = k => Math.round(ML.SUPPLY[k].price * (S.black ? ML.ECO.black.supply : 1));      // V5.2 : Black Friday
     const C = E.cart, units = Object.values(C).reduce((x, y) => x + y, 0), sub = Object.keys(C).reduce((x, k) => x + C[k] * sp(k), 0), total = units ? sub + ML.ECO.fee : 0;
     const label = k => (ML.MATERIALS[k] || ML.TOOLS[k]).label;
-    let h = `<p class="dim small">Ajoute les produits au panier, puis commande tout d'un coup : un seul COLIS arrive en réception (${ML.ECO.supplierDelay[0] / 60} à ${ML.ECO.supplierDelay[1] / 60} min). Ouvre-le avec <b>R</b>, puis range les produits (E sur le rack ou l'armoire). Pressé ? Le MAGASINIER peut aller chercher directement chez Eliott et Coco, sans frais de port.</p><h3>🛒 Produits</h3><div class="erp-grid">`;
+    let h = brutBox(S) + `<p class="dim small">Ajoute les produits au panier, puis commande tout d'un coup : un seul COLIS arrive en réception (${ML.ECO.supplierDelay[0] / 60} à ${ML.ECO.supplierDelay[1] / 60} min). Ouvre-le avec <b>R</b>, puis range les produits (E sur le rack ou l'armoire). Pressé ? Le MAGASINIER peut aller chercher directement chez Eliott et Coco, sans frais de port.</p><h3>🛒 Produits</h3><div class="erp-grid">`;
     for (const k in ML.SUPPLY) {
       const L = ML.SUPPLY[k], q = C[k] || 0;
       h += `<div class="erp-item prod"><b>${U.esc(L.name)}</b><span class="small dim">${COMP[L.from].name} · <b class="price">${S.black ? `<s>${L.price}</s> ` : ''}${sp(k)} €</b> l'unité · en stock : <b class="${S.stock[k] ? '' : 'red'}">${S.stock[k]}</b></span>
@@ -250,7 +275,7 @@
     ], true);
     h += sec('⚙️', 'Mécano-soudé et fonderie (les bruts spéciaux)', [
       'Certaines pièces ne partent pas d\'une barre mais d\'un <b>brut</b> : 🔥 fonderie (fonte) ou ⚙️ mécano-soudé (chaudronnerie).',
-      `<b>Le plus simple :</b> dans 📥 Commandes, bouton <b>« Commander au PC »</b> (${eur(sp.fonderie || 90)} fonderie, ${eur(sp.chaudro || 100)} mécano-soudé). Le brut arrive tout seul à la <b>RÉCEPTION</b> de l'atelier en 2 minutes environ.`,
+      `<b>Le plus simple :</b> sur la demande, bouton orange <b>« ✅ Accepter + commander le brut »</b>. Sinon, l'encadré orange <b>🧱 BRUTS À ACHETER</b> (dans 📥 Commandes et 🛒 Fournisseurs) a un bouton <b>« 🛒 Commander »</b> (${eur(sp.fonderie || 90)} fonderie, ${eur(sp.chaudro || 100)} mécano-soudé). Le brut arrive tout seul à la <b>RÉCEPTION</b> de l'atelier en 2 minutes environ.`,
       `<b>Moins cher mais il faut y aller :</b> va voir le patron à la <b>Fonderie Boulard</b> ou à la <b>Chaudronnerie Babinsky</b> (carte M), paie-le (${eur(sd.fonderie || 60)} / ${eur(sd.chaudro || 70)}), attends un peu et prends le brut sur <b>son quai</b>.`,
       'Ensuite, le brut se met dans une machine comme une barre (pas besoin de matière du rack).',
       '🤫 Le livreur IA (Personnel) peut faire les allers-retours à ta place.'

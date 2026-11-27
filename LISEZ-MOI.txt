@@ -1,4 +1,4 @@
-MÉCANIQUE LEBEC — usinage en équipe (V5.4, 1 à 6 joueurs)
+MÉCANIQUE LEBEC — usinage en équipe (V5.5, 1 à 6 joueurs)
 ==========================================================
 En ligne : https://lebec-game.onrender.com
 
@@ -38,6 +38,12 @@ MODES
   avec le code peut la reprendre ; l'Inspecteur vient quand l'atelier est prêt, le réussir
   termine le jeu) · Inspection (boss : règles absurdes qui changent) · Course de Mégane
   (5 manches) · Mode traître (3 joueurs minimum : un joueur payé par UsiFlash, vote à la fin).
+
+NOUVEAU EN V5.5
+  - PC : encadré orange « 🧱 BRUTS À ACHETER » (Commandes + Fournisseurs) avec bouton Commander, état de la
+    livraison et bouton GPS vers le fournisseur ; demandes spéciales : « Accepter + commander le brut ».
+  - Page admin = aussi la page des retours (onglet Retours, /retours y redirige) : filtres, recherche,
+    marquer traité, supprimer, télécharger en .txt.
 
 NOUVEAU EN V5.4
   - PAGE ADMIN : https://lebec-game.onrender.com/admin — joueurs en ligne (en partie / au menu, mode),
@@ -97,7 +103,7 @@ NOUVEAU EN V5.1
     Plus il y a de commandes, moins il y a d'événements (et l'inverse). Commandes par vagues.
   - Tutoriel pas à pas pour les invités et débutants (J pour passer, à revoir depuis la pause).
   - Page 📰 Nouveautés · idées · bugs (accueil + pause) : les joueurs envoient suggestions et bugs.
-    À LIRE ICI : https://lebec-game.onrender.com/retours (ou /retours.txt), et le fichier
+    À LIRE ICI : https://lebec-game.onrender.com/admin, onglet « Retours » (filtres, recherche, ✔ traité, téléchargement .txt), et le fichier
     lebec-retours.json du dépôt GitHub privé des sauvegardes.
 
 NOUVEAU EN V5.0 (grosse mise à jour)
