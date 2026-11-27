@@ -46,7 +46,18 @@ const MAX_PLAYERS = 6, GRACE_MS = 20000, RATE_PER_SEC = 150, MAX_MSG = 512 * 102
 /* ======================= Stockage (comptes, sauvegardes) ======================= */
 const GH = { token: process.env.GITHUB_TOKEN, repo: process.env.GITHUB_REPO };
 const useGitHub = !!(GH.token && GH.repo);
+// V5.4 : sinon, base « Key Value » de Render (Redis/Valkey) si KV_URL est défini — rien à configurer côté GitHub
+const KV_URL = process.env.KV_URL || process.env.REDIS_URL || '';
+const useKV = !useGitHub && !!KV_URL;
+let kv = null;
+if (useKV) {
+  const Redis = require('ioredis');
+  kv = new Redis(KV_URL, { maxRetriesPerRequest: 3, enableReadyCheck: false, connectTimeout: 10000, retryStrategy: n => Math.min(n * 500, 5000) });
+  kv.on('error', e => console.warn('Base Key Value :', e.message));
+}
+const STORAGE = useGitHub ? 'github' : useKV ? 'base Render (Key Value)' : 'fichier';
 let SECRET = process.env.AUTH_SECRET;
+const SECRET_FROM_ENV = !!SECRET;
 function ensureData() { try { fs.mkdirSync(DATA, { recursive: true }); } catch (e) { /* rien */ } }
 if (!SECRET) {
   ensureData();
@@ -82,8 +93,11 @@ function makeStore(ghFile, localFile, label, delay = 2000) {
         else console.warn(`GitHub (${label}) : lecture impossible`, r.status);
       } catch (e) { console.warn(`GitHub (${label}) : erreur`, e.message); }
       if (!st.ready) { setTimeout(st.load, 20000); return; }
+    } else if (useKV) {
+      try { const raw = await kv.get('lebec:' + ghFile); if (raw) mergeIn(JSON.parse(raw)); st.ready = true; }
+      catch (e) { console.warn(`Base Key Value (${label}) : lecture impossible`, e.message); setTimeout(st.load, 20000); return; }
     } else { try { mergeIn(JSON.parse(fs.readFileSync(path.join(DATA, localFile), 'utf8'))); } catch (e) { /* pas de fichier */ } st.ready = true; }
-    console.log(`${label} chargés : ${Object.keys(st.data).length} (stockage ${useGitHub ? 'github' : 'fichier'})`);
+    console.log(`${label} chargés : ${Object.keys(st.data).length} (stockage ${STORAGE})`);
     if (st.pending) st.save();
   };
   const write = async () => {
@@ -101,6 +115,9 @@ function makeStore(ghFile, localFile, label, delay = 2000) {
         await new Promise(r2 => setTimeout(r2, 1500));
       }
       st.pending = true; setTimeout(() => { if (st.pending) st.save(); }, 30000);           // on réessaiera plus tard, sans rien perdre
+    } else if (useKV) {
+      try { await kv.set('lebec:' + ghFile, txt); }
+      catch (e) { console.warn(`Base Key Value (${label}) : écriture impossible`, e.message); st.pending = true; setTimeout(() => { if (st.pending) st.save(); }, 15000); }
     } else { ensureData(); try { fs.writeFileSync(path.join(DATA, localFile), txt); } catch (e) { console.warn('Écriture impossible', e.message); } }
   };
   st.save = () => { clearTimeout(st.timer); st.dirty = true; st.timer = setTimeout(() => { st.dirty = false; write(); }, delay); };
@@ -154,7 +171,7 @@ function adminData() {
   const acc = Object.keys(accounts).map(k => { const a = accounts[k], st = D.acc[k] || {}, P = a.profile || {}; return { n: a.name, created: a.created || 0, last: st.last || 0, s: Math.round(st.s || 0), g: st.g || 0, days: (P.st || {}).days || 0, jetons: P.coins || 0, served: (P.st || {}).served || 0 }; });
   const cos = Object.keys(SAVES.data).map(c => { const e = SAVES.data[c], x = e.d || {}; return { code: c, name: x.name || '?', day: x.day || 1, money: x.money || 0, rep: x.rep || 0, mach: (x.mach || []).length, t: e.t || 0, won: !!x.won }; });
   return {
-    now, up: Math.round((now - T0) / 1000), storage: useGitHub ? 'GitHub' : 'fichier local', ready: { comptes: ACC.ready, sauvegardes: SAVES.ready, retours: FEED.ready, stats: STATS.ready },
+    now, up: Math.round((now - T0) / 1000), storage: useGitHub ? 'GitHub' : useKV ? 'base Render (Key Value)' : 'fichier local (effacé à chaque redémarrage !)', ready: { comptes: ACC.ready, sauvegardes: SAVES.ready, retours: FEED.ready, stats: STATS.ready },
     mem: Math.round(process.memoryUsage().rss / 1048576),
     online: [...online.entries()].map(([sid, o]) => ({ n: o.user || o.n || 'Anonyme', acc: !!o.user, g: o.g, m: o.m, np: o.np, v: o.v, since: o.t0, last: o.last })).sort((a, b) => b.g - a.g || a.since - b.since),
     ws: clients.size, rooms: [...rooms.values()].map(r => ({ code: r.code, host: (clients.get(r.host) || {}).name || '?', n: r.players.length, names: r.players.map(id => (clients.get(id) || {}).name || '?'), state: r.state, priv: r.priv })),
@@ -433,4 +450,12 @@ for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { try { awa
 accounts = ACC.data;                                                       // même objet pour toujours (les lectures fusionnent dedans)
 // V5.4 : on écoute TOUT DE SUITE (Render attend le port) ; les données arrivent derrière, les « ready » protègent les écritures
 server.listen(PORT, () => console.log(`Mécanique Lebec — serveur prêt : http://localhost:${PORT}/`));
-Promise.all([ACC.load(), SAVES.load(), FEED.load(), STATS.load()]).then(() => { accounts = ACC.data; });
+// V5.4 : sans AUTH_SECRET, la clé qui signe les sessions est gardée dans la base (sinon tout le monde serait déconnecté à chaque réveil du serveur)
+async function loadSecret() {
+  if (SECRET_FROM_ENV || !useKV) return;
+  for (;;) {
+    try { const s0 = await kv.get('lebec:secret'); if (s0) SECRET = s0; else await kv.set('lebec:secret', SECRET); return; }
+    catch (e) { console.warn('Base Key Value (clé) :', e.message); await new Promise(r => setTimeout(r, 5000)); }
+  }
+}
+loadSecret().then(() => Promise.all([ACC.load(), SAVES.load(), FEED.load(), STATS.load()])).then(() => { accounts = ACC.data; });

@@ -46,6 +46,8 @@ NOUVEAU EN V5.4
     Accès : se connecter avec un compte du jeu dont le pseudo figure dans la variable d'environnement
     ADMIN_USERS de Render (pseudos séparés par des virgules). Aucune adresse IP n'est enregistrée.
     Les stats sont stockées comme les comptes (fichier lebec-stats.json du dépôt privé, ou server/data/stats.json).
+  - Stockage des comptes / entreprises / stats : base « Key Value » gratuite de Render (lebec-donnees),
+    branchée par la variable KV_URL. (Si GITHUB_TOKEN + GITHUB_REPO sont définis, GitHub reste prioritaire.)
   - Bleuenn est renommée « Lean Manufacturing ».
   - Les journées reviennent à 8 minutes.
 

@@ -10,7 +10,8 @@ ML.PATCH = [
     '📊 Nouvelle page ADMIN (/admin) : joueurs connectés en direct, visites et visiteurs uniques, temps de jeu par jour et par joueur, parties par mode, heures de pointe, entreprises, retours.',
     '💣 Bleuenn s\'appelle maintenant LEAN MANUFACTURING (et bricole toujours n\'importe quoi sur le tableau électrique).',
     '⏱ Les journées reviennent à 8 minutes (le reste de l\'équilibrage V5.3 est gardé).',
-    '🛠 Le serveur démarre plus vite après une mise en veille.'
+    '🛠 Le serveur démarre plus vite après une mise en veille.',
+    '💾 Les comptes, entreprises et statistiques sont maintenant gardés dans une base de données Render : ils ne disparaissent plus quand le serveur s\'endort.'
   ] },
   { v: 'V5.3', d: 'novembre 2026', t: 'Un vrai ordinateur, un mode débutant, et l\'atelier plus facile à prendre en main', l: [
     '💻 Le PC de gestion devient un VRAI ORDINATEUR (« LebecOS ») : un bureau avec des icônes d\'applications, des fenêtres, une barre des tâches, un menu Démarrer… et un 📌 pense-bête qui dit quoi faire maintenant.',
